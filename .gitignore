@@ -3,12 +3,14 @@ __pycache__
 
 # C extensions
 *.so
+*.c
 
 # Packages
 *.egg
 *.egg-info
 dist
 sdist
+build
 _build
 .eggs
 .cache
