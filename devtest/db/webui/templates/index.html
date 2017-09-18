@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block pagetitle %}Home{% endblock %}
+{% block header %}
+<h1>{{ apptitle }}</h1>
+    <p>
+      DevTest information model management.
+    </p>
+{% endblock %}
+{% block main %}
+<ul>
+{% for menuitem in menu %}
+  <li>{{ menuitem }}</li>
+{% endfor %}
+</ul>
+{% endblock %}
+
+{% block footer %}
+{{ super() }}
+{% endblock %}
+
+{% block bottom %}
+{{ super() }}
+{% endblock %}

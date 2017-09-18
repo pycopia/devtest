@@ -1,0 +1,19 @@
+*~
+__pycache__
+
+# C extensions
+*.so
+
+# Packages
+*.egg
+*.egg-info
+dist
+sdist
+_build
+.eggs
+.cache
+
+# Translations
+*.mo
+
+tags

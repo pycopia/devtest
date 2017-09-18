@@ -1,0 +1,4 @@
+[build-system]
+requires = ["setuptools", "cython", "flake8", "pytest>=2.8.7", "pytest-cov",
+            "pytest-runner", "setuptools_scm", "wheel", "sphinx",
+            "sphinx-autodoc-annotation", ]

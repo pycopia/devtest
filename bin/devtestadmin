@@ -1,0 +1,869 @@
+#!/usr/bin/env python3
+"""
+CLI tool for managing the Devtest database.
+"""
+import sys
+import os
+import textwrap
+from html.parser import HTMLParser
+
+import docopt
+
+from devtest.textutils import colors
+from devtest.db import controllers
+from devtest import json
+
+
+if os.isatty(sys.stdout.fileno()):
+    WIDTH = os.get_terminal_size()[0] - 16
+else:
+    WIDTH = 80
+
+
+_deep_text_wrapper = textwrap.TextWrapper(width=WIDTH,
+                                          initial_indent=" "*21,
+                                          subsequent_indent=" "*21)
+
+
+_medium_text_wrapper = textwrap.TextWrapper(width=WIDTH,
+                                            initial_indent=" "*10,
+                                            subsequent_indent=" "*10)
+
+
+_shallow_text_wrapper = textwrap.TextWrapper(width=WIDTH,
+                                             initial_indent=" "*4,
+                                             subsequent_indent=" "*4)
+
+
+def main(argv):
+    """Manage the devtest persistent storage from the command line.
+
+    Usage:
+        devtestadmin tui [<args>...]
+        devtestadmin testbed list [-v] [<like>]
+        devtestadmin testbed show [-v] <name>
+        devtestadmin testbed create <name> [--notes=<notes>]
+        devtestadmin testbed update <name> --notes=<notes>
+        devtestadmin testbed delete <name>
+        devtestadmin testbed <name> attrib list
+        devtestadmin testbed <name> attrib get <attrname>
+        devtestadmin testbed <name> attrib set <attrname> <attrvalue>
+        devtestadmin testbed <name> attrib del <attrname>
+        devtestadmin testbed <name> attrib export <file>
+        devtestadmin testbed <name> attrib import <file>
+        devtestadmin testbed <name> add <eqname> <rolename>
+        devtestadmin testbed <name> remove <eqname> <rolename>
+        devtestadmin eqmodel list [-v] [<like>]
+        devtestadmin eqmodel show <name> [--manufacturer=manufacturer]
+        devtestadmin eqmodel create <name> <manufacturer> [--note=<note>] [--specs=<specs>]
+        devtestadmin eqmodel update <name> <manufacturer>
+                                        [--note=<note>] [--specs=<specs>]
+                                        [--newmanufacturer=<newmanufacturer>]
+        devtestadmin eqmodel delete <name> <manufacturer>
+        devtestadmin eqmodel <name> attrib list [--manufacturer=<manufacturer>]
+        devtestadmin eqmodel <name> attrib get <attrname> [--manufacturer=<manufacturer>]
+        devtestadmin eqmodel <name> attrib set <attrname> <attrvalue> [--manufacturer=<manufacturer>]
+        devtestadmin eqmodel <name> attrib del <attrname> [--manufacturer=<manufacturer>]
+        devtestadmin eqmodel <name> attrib export <file> [--manufacturer=<manufacturer>]
+        devtestadmin eqmodel <name> attrib import <file> [--manufacturer=<manufacturer>]
+        devtestadmin eq list [-v] [<like>]
+        devtestadmin eq show <name>
+        devtestadmin eq create <modelname> <name> [--serno=<serno>]
+                                               [--account=<accountid>]
+                                               [--user=<userid>]
+                                               [--partof=<partof>]
+                                               [--notes=<notes>]
+                                               [--location=<location>]
+        devtestadmin eq update <modelname> <name> [--serno=<serno>]
+                                               [--account=<accountid>]
+                                               [--user=<userid>]
+                                               [--partof=<partof>]
+                                               [--notes=<notes>]
+                                               [--location=<location>]
+        devtestadmin eq delete <modelname> <name>
+        devtestadmin eq <name> attrib list [--modelname=<modelname>]
+        devtestadmin eq <name> attrib get <attrname>
+        devtestadmin eq <name> attrib set <attrname> <attrvalue>
+        devtestadmin eq <name> attrib del <attrname>
+        devtestadmin eq <name> attrib export <file> [--modelname=<modelname>]
+        devtestadmin eq <name> attrib import <file> [--modelname=<modelname>]
+        devtestadmin eq <name> iface add <iface> [--modelname=<modelname>]
+                                              [--ifindex=<ifindex>]
+                                              [--macaddr=<macaddr>]
+                                              [--ipaddr=<ipaddr>]
+                                              [--ipaddr6=<ipaddr6>]
+                                              [--network=<network>]
+        devtestadmin eq <name> iface del <iface> [--modelname=<modelname>]
+        devtestadmin function list [-v] [<like>]
+        devtestadmin function show <name>
+        devtestadmin function create <name> [--description=<description>]
+                                         [--implementation=<implementation>]
+        devtestadmin function update <name> [--description=<description>]
+                                         [--implementation=<implementation>]
+        devtestadmin function delete <name>
+        devtestadmin account list [-v] [<like>]
+        devtestadmin account show <identifier>
+        devtestadmin account create <identifier> <login> [--note=<note>] [--password=<password>] [--admin | -a]
+        devtestadmin account update <identifier> [--login=<login>] [--note=<note>] [--password=<password>] [--admin | -a]
+        devtestadmin account delete <identifier>
+        devtestadmin scenario list [<like>]
+        devtestadmin scenario show <name>
+        devtestadmin scenario search <words>...
+        devtestadmin suite list [<like>]
+        devtestadmin suite show <name>
+        devtestadmin suite search <words>...
+        devtestadmin testcase list [<like>]
+        devtestadmin testcase show <name>
+        devtestadmin testcase search <words>...
+        devtestadmin testresult list [<resulttype>] [-F]
+        devtestadmin testresult latest [-F] [-s] [-l]
+        devtestadmin testresult for [-s] <testcases>...
+        devtestadmin testresult run [-l] <id>...
+
+    Options:
+        --name=<name>                      The name of something.
+        --user=<userid>                    Name of a regular user account.
+        --account=<accountid>              Name of a super user account.
+        --admin, -a                        Specify an admin (superuser) account.  [default: False]
+        --manufacturer=<manufacturer>      The name of a manufacturer [default: Acme Inc.]
+        --serno=<serno>                    A serial number (string).
+        --identifier=<identifier>          An identifier in the AccountIds table.
+        --partof=<partof>                  Name of another equipment that this is a part of.
+        --implementation=<implementation>  A Python style path to a Controller class or callable.
+
+        <resulttype> one of summary, test, or suite.
+    """  # noqa
+    arguments = docopt.docopt(main.__doc__, argv=argv[1:])
+    controllers.connect()
+    # TestBed management
+    if arguments["testbed"]:
+        if arguments["show"]:
+            show_testbed(arguments["<name>"], verbose=arguments["-v"])
+        elif arguments["create"]:
+            name = arguments["<name>"]
+            controllers.TestBedController.create(name, notes=arguments["--notes"])
+        elif arguments["update"]:
+            name = arguments["<name>"]
+            controllers.TestBedController.update(name, notes=arguments["--notes"])
+        elif arguments["delete"]:
+            name = arguments["<name>"]
+            controllers.TestBedController.delete(name)
+        elif arguments["add"]:
+            name = arguments["<name>"]
+            eqname = arguments["<eqname>"]
+            role = arguments["<rolename>"]
+            controllers.TestBedController.add_testequipment(name, eqname, role)
+        elif arguments["remove"]:
+            name = arguments["<name>"]
+            eqname = arguments["<eqname>"]
+            role = arguments["<rolename>"]
+            controllers.TestBedController.remove_testequipment(name, eqname, role)
+        elif arguments["attrib"]:
+            name = arguments["<name>"]
+            if arguments["list"]:
+                attribs = controllers.TestBedController.attribute_list(name)
+                if attribs is not None:
+                    for key, val in attribs:
+                        print("  {:25.25s} = {!r}".format(key, val))
+            elif arguments["get"]:
+                print(controllers.TestBedController.attribute_get(name, arguments["<attrname>"]))
+            elif arguments["set"]:
+                controllers.TestBedController.attribute_set(name, arguments["<attrname>"],
+                                                            arguments["<attrvalue>"])
+                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
+                                                 controllers.TestBedController.attribute_get(
+                                                    name, arguments["<attrname>"])))
+            elif arguments["del"]:
+                controllers.TestBedController.attribute_del(arguments["<name>"],
+                                                            arguments["<attrname>"])
+            elif arguments["export"]:
+                fname = arguments["<file>"]
+                attribs = controllers.TestBedController.attributes_export(name)
+                if fname == "-":
+                    json.dump(attribs, sys.stdout)
+                else:
+                    with open(fname, mode="w", encoding="utf-8") as fo:
+                        json.dump(attribs, fo)
+                        fo.write("\n")
+            elif arguments["import"]:
+                fname = arguments["<file>"]
+                with open(fname, mode="r", encoding="utf-8") as fo:
+                    attribs = json.load(fo)
+                controllers.TestBedController.attributes_import(name, attribs)
+        elif arguments["list"]:
+            list_testbeds(arguments["<like>"], arguments["-v"])
+
+    # EquipmentModel
+    elif arguments["eqmodel"]:
+        if arguments["show"]:
+            show_equipmentmodel(arguments["<name>"], arguments["--manufacturer"])
+        elif arguments["create"]:
+            name = arguments["<name>"]
+            manufacturer = arguments["<manufacturer>"]
+            note = arguments["--note"]
+            specs = arguments["--specs"]
+            eqm, created = controllers.EquipmentModelController.create(
+                    name, manufacturer=manufacturer, note=note, specs=specs)
+            if created:
+                print("Created")
+            else:
+                print("Already exists.")
+        elif arguments["update"]:
+            name = arguments["<name>"]
+            manufacturer = arguments["<manufacturer>"]
+            newmanufacturer = arguments["--newmanufacturer"]
+            note = arguments["--note"]
+            specs = arguments["--specs"]
+            controllers.EquipmentModelController.update(name,
+                                                        manufacturer=manufacturer,
+                                                        note=note, specs=specs,
+                                                        newmanufacturer=newmanufacturer)
+        elif arguments["delete"]:
+            name = arguments["<name>"]
+            manufacturer = arguments["<manufacturer>"]
+            controllers.EquipmentModelController.delete(name, manufacturer)
+        elif arguments["attrib"]:
+            name = arguments["<name>"]
+            manufacturer = arguments["--manufacturer"]
+            if arguments["list"]:
+                attribs = controllers.EquipmentModelController.attribute_list(
+                    name, manufacturer=manufacturer)
+                if attribs is not None:
+                    for key, val in attribs:
+                        print("  {:25.25s} = {!r}".format(key, val))
+            elif arguments["get"]:
+                print(controllers.EquipmentModelController.attribute_get(
+                    name, arguments["<attrname>"], manufacturer=manufacturer))
+            elif arguments["set"]:
+                name = arguments["<name>"]
+                controllers.EquipmentModelController.attribute_set(
+                    name, arguments["<attrname>"], arguments["<attrvalue>"],
+                    manufacturer=manufacturer)
+                print("Set {!r} to {!r}.".format(
+                    arguments["<attrname>"],
+                    controllers.EquipmentModelController.attribute_get(
+                        name, arguments["<attrname>"], manufacturer=manufacturer)))
+            elif arguments["del"]:
+                controllers.EquipmentModelController.attribute_del(
+                    name, arguments["<attrname>"], manufacturer=manufacturer)
+            elif arguments["export"]:
+                fname = arguments["<file>"]
+                attribs = controllers.EquipmentModelController.attributes_export(
+                    name, manufacturer=manufacturer)
+                if fname == "-":
+                    json.dump(attribs, sys.stdout)
+                else:
+                    with open(fname, mode="w", encoding="utf-8") as fo:
+                        json.dump(attribs, fo)
+                        fo.write("\n")
+            elif arguments["import"]:
+                fname = arguments["<file>"]
+                with open(fname, mode="r", encoding="utf-8") as fo:
+                    attribs = json.load(fo)
+                controllers.EquipmentModelController.attributes_import(name, attribs,
+                                                                       manufacturer=manufacturer)
+        elif arguments["list"]:
+            list_equipmentmodels(arguments["<like>"], arguments["-v"])
+
+    # Equipment
+    elif arguments["eq"]:  # Equipment
+        if arguments["show"]:
+            show_equipment(arguments["<name>"])
+        elif arguments["create"]:
+            modelname = arguments["<modelname>"]
+            name = arguments["<name>"]
+            serno = arguments["--serno"]
+            accountid = arguments["--account"]
+            userid = arguments["--user"]
+            partof = arguments["--partof"]
+            notes = arguments["--notes"]
+            location = arguments["--location"]
+            eq, created = controllers.EquipmentController.create(
+                modelname, name,
+                serno=serno,
+                accountid=accountid,
+                userid=userid,
+                partof=partof,
+                notes=notes,
+                location=location)
+            if created:
+                print("Created")
+            else:
+                print("Already existed.")
+        elif arguments["update"]:
+            modelname = arguments["<modelname>"]
+            name = arguments["<name>"]
+            serno = arguments["--serno"]
+            accountid = arguments["--account"]
+            userid = arguments["--user"]
+            partof = arguments["--partof"]
+            notes = arguments["--notes"]
+            location = arguments["--location"]
+            controllers.EquipmentController.update(
+                modelname, name,
+                serno=serno,
+                accountid=accountid,
+                userid=userid,
+                partof=partof,
+                notes=notes,
+                location=location)
+        elif arguments["delete"]:
+            modelname = arguments["<modelname>"]
+            name = arguments["<name>"]
+            controllers.EquipmentController.delete(modelname, name)
+        elif arguments["attrib"]:
+            name = arguments["<name>"]
+            if arguments["list"]:
+                modelname = arguments["--modelname"]
+                attribs = controllers.EquipmentController.attribute_list(name, modelname=modelname)
+                if attribs is not None:
+                    for key, val in attribs:
+                        print("  {:25.25s} = {!r}".format(key, val))
+            elif arguments["get"]:
+                print(controllers.EquipmentController.attribute_get(name, arguments["<attrname>"]))
+            elif arguments["set"]:
+                controllers.EquipmentController.attribute_set(
+                    name, arguments["<attrname>"], arguments["<attrvalue>"])
+                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
+                                                 controllers.EquipmentController.attribute_get(
+                                                 name, arguments["<attrname>"])))
+            elif arguments["del"]:
+                controllers.EquipmentController.attribute_del(name, arguments["<attrname>"])
+            elif arguments["export"]:
+                modelname = arguments["--modelname"]
+                fname = arguments["<file>"]
+                attribs = controllers.EquipmentController.attributes_export(
+                    name, modelname=modelname)
+                if fname == "-":
+                    json.dump(attribs, sys.stdout)
+                else:
+                    with open(fname, mode="w", encoding="utf-8") as fo:
+                        json.dump(attribs, fo)
+                        fo.write("\n")
+            elif arguments["import"]:
+                modelname = arguments["--modelname"]
+                fname = arguments["<file>"]
+                with open(fname, mode="r", encoding="utf-8") as fo:
+                    attribs = json.load(fo)
+                controllers.EquipmentController.attributes_import(name, attribs,
+                                                                  modelname=modelname)
+        elif arguments["iface"]:
+            if arguments["add"]:
+                name = arguments["<name>"]
+                iface = arguments["<iface>"]
+                modelname = arguments["--modelname"]
+                controllers.EquipmentController.add_interface(name, iface, modelname=modelname,
+                                                              ifindex=arguments["--ifindex"],
+                                                              macaddr=arguments["--macaddr"],
+                                                              ipaddr=arguments["--ipaddr"],
+                                                              ipaddr6=arguments["--ipaddr6"],
+                                                              network=arguments["--network"])
+            elif arguments["del"]:
+                name = arguments["<name>"]
+                iface = arguments["<iface>"]
+                modelname = arguments["--modelname"]
+                controllers.EquipmentController.del_interface(name, iface, modelname=modelname)
+        elif arguments["list"]:
+            list_equipment(arguments["<like>"], arguments["-v"])
+    # Function
+    elif arguments["function"]:
+        if arguments["list"]:
+            list_functions(arguments["<like>"], arguments["-v"])
+        elif arguments["show"]:
+            name = arguments["<name>"]
+            func = controllers.FunctionController.get(name)
+            if func:
+                show_function(func, True)
+            else:
+                print(func)
+        elif arguments["create"]:
+            name = arguments["<name>"]
+            desc = arguments["--description"]
+            impl = arguments["--implementation"]
+            func, created = controllers.FunctionController.create(
+                name, description=desc, role_implementation=impl)
+            if created:
+                print("Created.")
+        elif arguments["update"]:
+            name = arguments["<name>"]
+            desc = arguments["--description"]
+            impl = arguments["--implementation"]
+            controllers.FunctionController.update(
+                name, description=desc, role_implementation=impl)
+        elif arguments["delete"]:
+            name = arguments["<name>"]
+            controllers.FunctionController.delete(name)
+    # AccountIds
+    elif arguments["account"]:
+        if arguments["list"]:
+            list_accounts(arguments["<like>"], arguments["-v"])
+        elif arguments["show"]:
+            name = arguments["<identifier>"]
+            acc = controllers.AccountIdsController.get(name)
+            if acc:
+                show_account(acc, True)
+        elif arguments["create"]:
+            name = arguments["<identifier>"]
+            login = arguments["<login>"]
+            password = arguments["--password"]
+            note = arguments["--note"]
+            admin = arguments["--admin"]
+            controllers.AccountIdsController.create(
+                name, login=login, password=password, note=note, admin=admin)
+        elif arguments["update"]:
+            name = arguments["<identifier>"]
+            login = arguments["--login"]
+            password = arguments["--password"]
+            note = arguments["--note"]
+            admin = arguments["--admin"]
+            controllers.AccountIdsController.update(
+                name, login=login, password=password, note=note, admin=admin)
+        elif arguments["delete"]:
+            name = arguments["<identifier>"]
+            controllers.AccountIdsController.delete(name)
+    # Scenario
+    elif arguments["scenario"]:
+        if arguments["list"]:
+            for sc in controllers.ScenarioController.all(arguments["<like>"]):
+                print(colors.yellow(sc.name))
+        elif arguments["show"]:
+            sc = controllers.ScenarioController.get(arguments["<name>"])
+            if sc:
+                show_scenario(sc)
+        elif arguments["search"]:
+            for sc in controllers.ScenarioController.search(" ".join(arguments["<words>"])):
+                show_scenario(sc)
+    # TestSuites
+    elif arguments["suite"]:
+        if arguments["list"]:
+            for inst in controllers.TestSuitesController.all(arguments["<like>"]):
+                print(colors.cyan(inst.name))
+        elif arguments["show"]:
+            inst = controllers.TestSuitesController.get(arguments["<name>"])
+            if inst:
+                show_testsuite(inst)
+        elif arguments["search"]:
+            for inst in controllers.TestSuitesController.search(" ".join(arguments["<words>"])):
+                show_testsuite(inst)
+    # TestCases
+    elif arguments["testcase"]:
+        if arguments["list"]:
+            for inst in controllers.TestCasesController.all(arguments["<like>"]):
+                print(colors.green(inst.name))
+        elif arguments["show"]:
+            inst = controllers.TestCasesController.get(arguments["<name>"])
+            if inst:
+                show_testcase(inst)
+        elif arguments["search"]:
+            for inst in controllers.TestCasesController.search(" ".join(arguments["<words>"])):
+                show_testcase(inst)
+    # Test results
+    elif arguments["testresult"]:
+        if arguments["list"]:
+            for inst in controllers.TestResultsController.all(arguments["<resulttype>"],
+                                                              arguments["-F"]):
+                print(inst)
+        elif arguments["for"]:
+            summarize = arguments["-s"]
+            for tcname in arguments["<testcases>"]:
+                results = controllers.TestResultsController.results_for(tcname)
+                for result in results:
+                    show_testresult(result, summarize=summarize)
+        elif arguments["latest"]:
+            inst = controllers.TestResultsController.latest()
+            show_testresult(inst, failures=arguments["-F"], summarize=arguments["-s"])
+            if arguments["-l"]:  # show logs
+                show_testresult_logs(inst)
+        elif arguments["run"]:
+            result_id = arguments["<id>"]
+            tr = controllers.TestResultsController.get_by_id(result_id)
+            show_testresult(tr)
+            if arguments["-l"]:  # show logs
+                show_testresult_logs(tr)
+
+
+def list_functions(like, verbose):
+    for func in controllers.FunctionController.all(like):
+        show_function(func, verbose)
+
+
+def show_function(func, verbose):
+    print(colors.green(func.name))
+    if verbose:
+        if func.description:
+            print(_shallow_text_wrapper.fill(func.description))
+        if func.role_implementation:
+            print("    Implemented by:", colors.underline(func.role_implementation))
+
+
+def list_accounts(like, verbose):
+    for acc in controllers.AccountIdsController.all(like):
+        show_account(acc, verbose)
+
+
+def show_account(acc, verbose):
+    if acc.admin:
+        colorf = colors.green
+    else:
+        colorf = colors.yellow
+    print(colorf(acc.identifier), "(admin)" if acc.admin else "")
+    if verbose:
+        if acc.note:
+            print(_shallow_text_wrapper.fill(acc.note))
+        if acc.login:
+            print("       login:", acc.login)
+        if acc.password:
+            print("    password:", colors.red(acc.password))
+
+
+def list_testbeds(like, verbose):
+    for tb in controllers.TestBedController.all(like):
+        print(colors.green(tb.name))
+        if verbose:
+            show_testbed_object(tb)
+
+
+def show_testbed(name, verbose=False):
+    tb = controllers.TestBedController.get(name)
+    if tb:
+        print(colors.green(tb.name))
+        if tb.notes:
+            print(_shallow_text_wrapper.fill(tb.notes))
+        show_attributes(tb.attributes, indent=2)
+        print("  Test equipment:")
+        show_testbed_object(tb, verbose)
+    else:
+        print(tb)
+
+
+def show_testbed_object(tb, verbose=False):
+    for te in tb.testequipment:
+        if verbose:
+            eq = te.equipment
+            status = "" if eq.active else "(inactive)"
+            role = te.function.name
+            print("   ", colors.magenta(eq.model.name), colors.white(eq.name, bold=True),
+                  eq.serno, status, "role:", role)
+            if eq.notes:
+                print(_medium_text_wrapper.fill(eq.notes))
+            if eq.partof:
+                print("    ", colors.cyan("Part of:"), eq.partof)
+            print("    ", colors.cyan("Location:"), eq.location)
+            if eq.account:
+                print("    ", colors.cyan("Accessor account:"), eq.account)
+            show_attributes(eq.attributes, indent=4)
+            if eq.interfaces:
+                print("    ", colors.cyan("Network interfaces:"))
+                for iface in eq.interfaces:
+                    print("       ", iface)
+        else:
+            print("   ", te.equipment.name, "role:", te.function.name)
+
+
+def list_equipmentmodels(like, verbose):
+    for eqm in controllers.EquipmentModelController.all(like):
+        print("{:>20.20s} {}".format(eqm.manufacturer, colors.white(eqm.name, bold=True)))
+        if verbose:
+            if eqm.attributes:
+                print(_deep_text_wrapper.fill(
+                    ", ".join("{}={!r}".format(k, v) for k, v in eqm.attributes.items())))
+
+
+def show_equipmentmodel(name, manufacturer=None):
+    eqm = controllers.EquipmentModelController.get(name, manufacturer)
+    if eqm:
+        print(eqm.manufacturer, colors.white(eqm.name, bold=True))
+        if eqm.note:
+            print(_shallow_text_wrapper.fill(eqm.note))
+        if eqm.specs:
+            print(colors.cyan("  Specs:"), eqm.specs)
+        if eqm.radar_component:
+            print(colors.cyan("  Radar Component:"), eqm.radar_component)
+        show_attributes(eqm.attributes)
+    else:
+        print(eqm)
+
+
+def show_attributes(attributes, indent=4):
+    if attributes:
+        print(" " * indent, colors.cyan("Attributes:"))
+        for key, value in attributes.items():
+            print("{}{:>25.25s}={!r}".format(" " * indent, key, value))
+
+
+def show_equipment(name):
+    eq = controllers.EquipmentController.get(name)
+    if eq:
+        status = "" if eq.active else "(inactive)"
+        print(colors.magenta(eq.model.name), colors.white(eq.name, bold=True), eq.serno, status)
+        if eq.notes:
+            print(_shallow_text_wrapper.fill(eq.notes))
+        if eq.partof:
+            print(colors.cyan("  Part of:"), eq.partof)
+        print(colors.cyan("  Location:"), eq.location)
+        if eq.account:
+            print(colors.cyan("  Accessor account:"), eq.account)
+        show_attributes(eq.attributes)
+        if eq.interfaces:
+            print(colors.cyan("  Network interfaces:"))
+            for iface in eq.interfaces:
+                print("    ", iface)
+    else:
+        print(eq)
+
+
+def list_equipment(like, verbose):
+    for eq in controllers.EquipmentController.all(like):
+        print("{:>30.30s} {}".format(eq.model.name, colors.white(eq.name, bold=True)))
+        if verbose:
+            if eq.attributes:
+                print(_deep_text_wrapper.fill(
+                    ", ".join("{}={!r}".format(k, v) for k, v in eq.attributes.items())))
+
+
+def show_scenario(scenario):
+    print(colors.box(scenario.name))
+    if scenario.purpose:
+        print(colors.cyan("  Purpose:"))
+        parser = TCParser()
+        parser.feed(scenario.purpose)
+        parser.close()
+    if scenario.notes:
+        print(colors.cyan("  Notes:"))
+        print(_shallow_text_wrapper.fill(scenario.notes))
+    print(colors.cyan("    Implementation:"), scenario.implementation)
+    print(colors.cyan("        Parameters:"), scenario.parameters)
+    print(colors.cyan("       Report Name:"), scenario.reportname)
+    # scenario.owners         #  ArrayField(null=True)  # Array of employee IDs
+    if scenario.testbed:
+        print(colors.cyan("           TestBed:"), scenario.testbed.name)
+    if scenario.testsuite:
+        print(colors.cyan("         TestSuite:"), scenario.testsuite.name)
+
+
+def show_testsuite(suite):
+    COL = colors.CYAN if suite.valid else colors.RED
+    print(colors.box(suite.name, level=1, color=COL))
+    if suite.purpose:
+        print(colors.cyan("  Purpose:"))
+        parser = TCParser()
+        parser.feed(suite.purpose)
+        parser.close()
+    print(colors.cyan("    Implementation:"), suite.suiteimplementation)
+    print(colors.cyan("      Last Changed:"), suite.lastchange)
+    if suite.test_cases:  # Ordered array of TestCase.id values.
+        for tc in suite.test_cases:
+            print(tc)
+    # owners = ArrayField(null=True)  # Array of employee IDs
+
+
+def show_testcase(testcase):
+    parser = TCParser()
+    COL = colors.GREEN if testcase.valid else colors.RED
+    print(colors.box(testcase.name, level=2, color=COL))
+    print("   ", _TESTCASE_TYPES[(testcase.interactive, testcase.automated)])
+    print(colors.cyan("    Implementation:"), testcase.testimplementation)
+    print(colors.cyan("              Type:"), testcase.type)
+    print(colors.cyan("          Priority:"), testcase.priority)
+    print(colors.cyan("            Status:"), testcase.status)
+    if testcase.radar_component:
+        print(colors.cyan("    Radar Component:"), testcase.radar_component)
+    print(colors.cyan("      Last Changed:"), testcase.lastchange)
+    if testcase.attributes:
+        print(colors.cyan("        Attributes:"), testcase.attributes)
+    if testcase.comments:
+        print(colors.cyan("    Comments:"))
+        print(_shallow_text_wrapper.fill(testcase.comments))
+    for attrname in ("purpose", "passcriteria", "startcondition",
+                     "endcondition", "procedure"):
+        value = getattr(testcase, attrname)
+        if value:
+            parser.reset()
+            parser.feed(value)
+            parser.close()
+
+
+# (interactive, automated) | meaning
+_TESTCASE_TYPES = {
+    (False, False): "A manual test; the user must supply final result.",
+    (False, True): "A fully automated test.",
+    (True, False): "A manual test; the user must supply final result and data.",
+    (True, True): ("A partially automated test; "
+                   "needs user input but result is automatically reported."),
+}
+
+
+# For now, testcases keep text fields in HTML markup. Might change later.
+# Just use this simple HTML formatter for now.
+class TCParser(HTMLParser):
+
+    def reset(self):
+        super().reset()
+        self._stack = []
+        self._state = 0
+        self._count = 0
+        self._indent = self._initial_indent = 8
+        self._current_tag = ""
+
+    def close(self):
+        super().close()
+        self._stack.append("\n")
+        for el in self._stack:
+            sys.stdout.write(el)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "h1":
+            self._stack.append(colors.CYAN)
+            self._indent += 4
+        elif tag == "ol":
+            self._indent += 4
+            self._count = 1
+        elif tag == "ul":
+            self._indent += 4
+            self._count = 0
+        elif tag == "li":
+            if self._count > 0:
+                self._stack.append(" "*self._indent + "{}. ".format(self._count))
+                self._count += 1
+            else:
+                self._stack.append(" "*self._indent + "* ")
+            self._initial_indent = 0
+        elif tag == "cite":
+            self._stack.append(" ")
+            self._stack.append(colors.UNDERLINE_ON)
+        elif tag == "strong":
+            self._stack.append(" ")
+            self._stack.append(colors.BRIGHT)
+        self._current_tag = tag
+
+    def handle_endtag(self, tag):
+        if tag == "h1":
+            self._stack.append(colors.RESET)
+        elif tag == "ol":
+            self._indent -= 4
+            self._initial_indent = 4
+            self._count = 0
+        elif tag == "ul":
+            self._indent -= 4
+            self._initial_indent = 4
+        elif tag == "cite":
+            self._stack.append(colors.UNDERLINE_OFF)
+            self._stack.append(" ")
+        elif tag == "strong":
+            self._stack.append(colors.RESET)
+            self._stack.append(" ")
+        elif tag == "p":
+            self._stack.append("\n")
+
+    def handle_data(self, text):
+        text = text.strip()
+        if not text:
+            return
+        text = text.replace("\n", " ")
+        if self._current_tag == "h1":
+            self._stack.append("    " + text + ":")
+        elif self._current_tag == "cite":
+            self._stack.append(text)
+        elif self._current_tag == "strong":
+            self._stack.append(text)
+        else:
+            self._stack.append(textwrap.fill(text,
+                                             width=WIDTH - self._indent,
+                                             initial_indent=" "*self._initial_indent,
+                                             subsequent_indent=" "*self._indent))
+
+
+def show_testresult(result, failures=False, summarize=False):
+    if result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["summary"]:
+        print(colors.white("Test Run\n========"))
+        print("  Id: {}, Testbed: {}".format(result.id, result.testbed))
+        if result.dutbuild:
+            print("  DUT build:", result.dutbuild)
+        print("  Artifact location:", result.resultslocation)
+        if result.arguments:
+            print("Arguments:", result.arguments)
+        for result in controllers.TestResultsController.subresults(result, failures=failures):
+            _print_result_other(result, 0, failures, summarize)
+        print()
+    elif result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["suite"]:
+        _print_suite_result(result, 0, failures, summarize)
+    elif result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["test"]:
+        _print_testcase_result(result, 0, summarize)
+
+
+def _print_testcase_result(result, level, summarize):
+    if result.result.is_passed():
+        colorf = colors.green
+    elif result.result.is_failed():
+        colorf = colors.red
+    else:
+        colorf = colors.yellow
+    name = result.testcase.name if result.testcase else "*unimported*"
+    if summarize:
+        arguments = str(result.arguments) if result.arguments else "()"
+        print(" " * level, "{}({}): {}".format(colors.green(name), arguments,
+              colorf(str(result.result))))
+        return
+    print(" " * level, colors.green(name), "=>", colorf(str(result.result)))
+    if result.testversion:
+        print(" " * level, "  Version:", result.testversion)
+    if result.arguments:
+        print(" " * level, "Arguments:", result.arguments)
+    print(" " * level, "    Start:", result.starttime)
+    print(" " * level, "      End:", result.endtime)
+    print(" " * level, "  Elapsed:", result.endtime - result.starttime)
+    if result.diagnostic:
+        print(" " * level, colors.magenta("  Diagnostic:"))
+        if "\n" in result.diagnostic:
+            print(result.diagnostic)
+        else:
+            print(_medium_text_wrapper.fill(result.diagnostic))
+    if result.note:
+        print(" " * level, colors.white("  Note:"))
+        print(_medium_text_wrapper.fill(result.note))
+    print()
+
+
+def _print_suite_result(result, level, failures, summarize):
+    if result.result.is_passed():
+        colorf = colors.green
+    elif result.result.is_failed():
+        colorf = colors.red
+    else:
+        colorf = colors.yellow
+    if result.testsuite:
+        print(" " * level, colors.yellow(result.testsuite.name), "=>", colorf(str(result.result)))
+    else:
+        print(" " * level, colors.yellow("bases.TestSuite"), "=>", colorf(str(result.result)))
+    if not summarize:
+        print(" " * level, "    Start:", result.starttime)
+        print(" " * level, "      End:", result.endtime)
+        print(" " * level, "  Elapsed:", result.endtime - result.starttime)
+        if result.note:
+            print(" " * level, colors.white("  Note:"))
+            print(_medium_text_wrapper.fill(result.note))
+    print(" " * level + "  " + colors.underline("Tests:"))
+    for result in controllers.TestResultsController.subresults(result, failures=failures):
+        _print_result_other(result, level+1, failures, summarize)
+    print()
+
+
+def _print_result_other(result, level, failures, summarize):
+    if result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["suite"]:
+        _print_suite_result(result, level+1, failures, summarize)
+    elif result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["test"]:
+        _print_testcase_result(result, level+1, summarize)
+
+
+def show_testresult_logs(tr):
+    rl = tr.resultslocation
+    if rl and os.path.isdir(rl):
+        print("Artifact location:", rl)
+        for de in os.scandir(rl):
+            st = de.stat()
+            print("  {:>10d} {}".format(st.st_size, de.name))
+
+
+main(sys.argv)
+
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

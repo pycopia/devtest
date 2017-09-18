@@ -1,0 +1,20 @@
+resultsdir: "$HOME/tmp/resultsdir"
+
+database:
+        url: "postgresql://devtest@localhost/devtest"
+        # url: "sqlite:///var/tmp/devtest.db"
+
+flags:
+        debug: 0
+        verbose: 0
+        keep: 0
+        stderr: 0
+        repeat: 1
+
+webui:
+    static_folder: "/var/www/devtest/static"
+    secret_key: "sKlSkwdtEstbdlKD94$$kldspCwLdkkDAld"
+    auth_username: "admin"
+    auth_password: "devtest"
+    realm: "devtest"
+    redis_url: "redis://localhost:6379/0"
