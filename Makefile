@@ -2,19 +2,26 @@
 
 # Set only major.minor version string, used elsewhere.
 # Make sure your python3 is linked to the specific version you want.
-PYVER := $(shell python3 -c 'import sys;print("{}.{}".format(*sys.version_info))')
+PYVER := $(shell python3 -c 'import sys;print("{}.{}{}".format(sys.version_info[0], sys.version_info[1], sys.abiflags))')
 
-PYTHON := $(shell python3-config --prefix)/bin/python$(PYVER)
+PYTHONBIN ?= $(shell python3-config --prefix)/bin/python$(PYVER)
 SUFFIX := $(shell python3-config --extension-suffix)
 
+OSNAME = $(shell uname)
+# Assumes using python on darwin installed from homebrew
+ifneq ($(OSNAME), Darwin)
+	SUDO = sudo
+else
+	SUDO = 
+endif
 
 .PHONY: help info build install clean distclean develop test sdist \
 	requirements publish extensions
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
+	@echo "  info          Show info about the Python being used."
 	@echo "  build         to just build the packages."
-	@echo "  info          Show info about the Python used."
 	@echo "  extensions    to build only extensions."
 	@echo "  install       to install from this workspace."
 	@echo "  develop       to set up for local development."
@@ -24,29 +31,31 @@ help:
 	@echo "  sdist         to build source distribution."
 
 info:
-	@echo Specific Python: $(PYTHON)
+	@echo Found Python version: $(PYVER)
+	@echo Specific Python used: $(PYTHONBIN)
 	@echo Python suffix: $(SUFFIX)
+	@echo sudo: $(SUDO)
 
 build:
-	$(PYTHON) setup.py build
+	$(PYTHONBIN) setup.py build
 
 extensions:
-	$(PYTHON) setup.py build_ext --inplace
+	$(PYTHONBIN) setup.py build_ext --inplace
 
 install: build
-	$(PYTHON) setup.py install --skip-build --optimize
+	$(PYTHONBIN) setup.py install --skip-build --optimize
 
 requirements:
-	sudo pip$(PYVER) install -r dev-requirements.txt
+	$(SUDO) $(PYTHONBIN) -m pip install -r dev-requirements.txt
 
 develop: requirements
-	$(PYTHON) setup.py develop --user
+	$(PYTHONBIN) setup.py develop --user
 
 test: extensions
-	$(PYTHON) setup.py test
+	$(PYTHONBIN) setup.py test
 
 clean:
-	$(PYTHON) setup.py clean
+	$(PYTHONBIN) setup.py clean
 	find . -depth -type d -name __pycache__ -exec rm -rf {} \;
 
 distclean: clean
@@ -58,8 +67,8 @@ distclean: clean
 	find . -type f -name "*$(SUFFIX)" -delete
 
 sdist: requirements
-	$(PYTHON) setup.py sdist
+	$(PYTHONBIN) setup.py sdist
 
 publish:
-	$(PYTHON) setup.py sdist upload
-	$(PYTHON) setup.py bdist_wheel upload
+	$(PYTHONBIN) setup.py sdist upload
+	$(PYTHONBIN) setup.py bdist_wheel upload
