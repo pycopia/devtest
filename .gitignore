@@ -3,7 +3,7 @@ __pycache__
 
 # C extensions
 *.so
-*.c
+src/*.c
 
 # Packages
 *.egg
@@ -12,10 +12,14 @@ dist
 sdist
 build
 _build
+build
 .eggs
 .cache
 
 # Translations
 *.mo
+
+# OS cruft
+.directory
 
 tags
