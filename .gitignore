@@ -12,7 +12,6 @@ dist
 sdist
 build
 _build
-build
 .eggs
 .cache
 
@@ -21,5 +20,6 @@ build
 
 # OS cruft
 .directory
+.DS_Store
 
 tags
