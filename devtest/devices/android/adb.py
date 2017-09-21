@@ -16,10 +16,16 @@ Native adb client-to-server protocol implementation.
 This is an async implementation, suitable for including in an event loop.
 """
 
+import os
+import struct
+
+from devtest import ringbuffer
 from devtest.io import socket
 from devtest.os import process
 from devtest.os import procutils
+from devtest.os import exitstatus
 from devtest.io.reactor import get_kernel
+
 
 ADB = procutils.which("adb")
 if ADB is None:
@@ -27,6 +33,9 @@ if ADB is None:
                       "This module will not work.")
 
 ADB_PORT = 5037
+
+MAX_PAYLOAD_V2 = 256 * 1024
+MAX_PAYLOAD = MAX_PAYLOAD_V2
 
 
 class Error(Exception):
@@ -81,17 +90,18 @@ class AdbConnection:
             raise IOError(errno, "Could not connect to adb server")
         self.socket = sock
 
-    async def message(self, msg):
+    async def message(self, msg, expect_response=True):
         msg = b"%04x%b" % (len(msg), msg)
         await self.socket.sendall(msg)
         stat = await self.socket.recv(4)
         if stat == b"OKAY":
-            lenst = await self.socket.recv(4)
-            length = int(lenst, 16)
-            if length:
-                return await self.socket.recv(length)
-            else:
-                return b""
+            if expect_response:
+                lenst = await self.socket.recv(4)
+                length = int(lenst, 16)
+                if length:
+                    return await self.socket.recv(length)
+                else:
+                    return b""
         elif stat == b"FAIL":
             lenst = await self.socket.recv(4)
             length = int(lenst, 16)
@@ -135,12 +145,6 @@ async def _forward_transact(conn, msg):
     else:
         await conn.close()
         raise AdbProtocolError(stat.decode("ascii"))
-
-
-async def _shell_transact(serial, conn, cmdline):
-    msg = b"host:transport:%b" % serial
-    await conn.open()
-# TODO
 
 
 class AdbClient:
@@ -210,6 +214,12 @@ class AndroidDeviceClient:
         resp = self._message(msg)
         return resp.decode("ascii")
 
+    @property
+    def features(self):
+        msg = b"host-serial:%b:features" % (self.serial,)
+        resp = self._message(msg)
+        return resp.decode("ascii")
+
     def forward(self, hostport, devport):
         """Tell server to start forwarding TCP ports.
         """
@@ -217,8 +227,94 @@ class AndroidDeviceClient:
                                                          hostport, devport)
         get_kernel().run(_forward_transact(self._conn, msg))
 
-    def shell(self, cmdline):
-        get_kernel().run(_shell_transact(self.serial, self._conn, cmdline))
+    def command(self, cmdline, usepty=False, timeout=300):
+        """Run a non-interactive shell command.
+
+        Uses ring buffers to collect outputs to avoid a runaway device command
+        from filling host memory. However, this might possibly truncate output.
+
+        Returns:
+            stdout (string): output of command
+            stderr (string): error output of command
+            exitstatus (ExitStatus): the exit status of the command.
+        """
+        if isinstance(cmdline, list):
+            name = cmdline[0]
+            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
+        else:
+            name = cmdline.split()[0]
+        cmdline = cmdline.encode("utf8")
+        kern = get_kernel()
+        kern.run(_start_shell(self.serial, self._conn, usepty, cmdline),
+                 timeout=60)
+        sp = ShellProtocol(self._conn.socket)
+        stdout = ringbuffer.RingBuffer(MAX_PAYLOAD)
+        stderr = ringbuffer.RingBuffer(MAX_PAYLOAD)
+        resp = kern.run(sp.run(None, stdout, stderr), timeout=timeout)
+        kern.run(self._conn.close())
+        rc = resp[0]
+        if rc & 0x80:
+            rc = -(rc & 0x7F)
+        return (stdout.buffer.decode("utf8"),
+                stderr.buffer.decode("utf8"),
+                exitstatus.ExitStatus(
+                    None,
+                    name="{}@{}".format(name, self.serial.decode("ascii")),
+                    returncode=rc)
+                )
+
+
+# Perform shell request, connection stays open
+async def _start_shell(serial, conn, usepty, cmdline):
+    tpmsg = b"host:transport:%b" % serial
+    msg = b"shell,%b:%b" % (b",".join([b"v2",
+                                       b"TERM=%b" % os.environb[b"TERM"],
+                                       b"pty" if usepty else b"raw"]),
+                            cmdline)
+    await conn.open()
+    await conn.message(tpmsg, expect_response=False)
+    await conn.message(msg, expect_response=False)
+
+
+class ShellProtocol:
+    """Implement the shell protocol v2."""
+    IDSTDIN = 0
+    IDSTDOUT = 1
+    IDSTDERR = 2
+    IDEXIT = 3
+    CLOSESTDIN = 4
+    # Window size change (an ASCII version of struct winsize).
+    WINDOWSIZECHANGE = 5
+    # Indicates an invalid or unknown packet.
+    INVALID = 255
+
+    def __init__(self, socket):
+        self._sock = socket
+        self._header = struct.Struct(b"<BI")
+        self._winsize = None
+
+    async def run(self, inbuf, outbuf, errbuf):
+        while True:
+            tl = await self._sock.recv(5)
+            msgtype, msglen = self._header.unpack(tl)
+            if msgtype == 0:
+                pass
+            elif msgtype == 1:
+                data = await self._sock.recv(msglen)
+                outbuf.write(data)
+            elif msgtype == 2:
+                data = await self._sock.recv(msglen)
+                errbuf.write(data)
+            elif msgtype == 3:
+                data = await self._sock.recv(msglen)
+                return data
+            elif msgtype == 4:
+                pass  # TODO
+            elif msgtype == 5:
+                data = await self._sock.recv(msglen)
+                self._winsize = data
+            else:
+                raise AdbProtocolError("Unhandled shell protocol message type.")
 
 
 class AndroidDevice:
@@ -258,6 +354,11 @@ if __name__ == "__main__":
 
     ac = AndroidDeviceClient(devinfo.serial)
     print(ac.state)
+    # print(ac.features)
+    stdout, stderr, es = ac.command(["ls", "/sdcard"])
+    print(es)
+    print("stdout:", stdout)
+    print("stderr:", stderr)
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
