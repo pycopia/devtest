@@ -51,6 +51,12 @@ def autodebug(on=True):
         sys.excepthook = sys.__excepthook__
 
 
+def DEBUG(*args, **kwargs):
+    """Can use this instead of 'print' when debugging. Prints to stderr.
+    """
+    kwargs["file"] = sys.stderr
+    print("DEBUG", *args, **kwargs)
+
 # Self test
 if __name__ == '__main__':
     try:
