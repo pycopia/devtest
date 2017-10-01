@@ -5,6 +5,7 @@ namespace.
 
 from __future__ import generator_stop
 
+import sys
 import pkgutil
 
 from .. import importlib
@@ -16,7 +17,15 @@ def iter_module_specs(package="testcases", onerror=None):
     """Yield a ModuleSpec for all modules in the base package.
     Default is *testcases* package.
     """
-    mod = importlib.import_module(package)
+    try:
+        mod = importlib.import_module(package)
+    except ImportError as ierr:
+        if callable(onerror):
+            onerror(package)
+        else:
+            print("The package {!r} could not be imported.".format(package),
+                  file=sys.stderr)
+        return
     for finder, name, ispkg in pkgutil.walk_packages(
             path=mod.__path__, prefix=mod.__name__+'.', onerror=onerror):
         if not ispkg and "._" not in name:
