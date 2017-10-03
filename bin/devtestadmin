@@ -68,19 +68,19 @@ def main(argv):
         devtestadmin eqmodel <name> attrib import <file> [--manufacturer=<manufacturer>]
         devtestadmin eq list [-v] [<like>]
         devtestadmin eq show <name>
-        devtestadmin eq create <modelname> <name> [--serno=<serno>]
+        devtestadmin eq create <manufacturer> <modelname> <name> [--serno=<serno>]
                                                [--account=<accountid>]
                                                [--user=<userid>]
                                                [--partof=<partof>]
                                                [--notes=<notes>]
                                                [--location=<location>]
-        devtestadmin eq update <modelname> <name> [--serno=<serno>]
+        devtestadmin eq update <manufacturer> <modelname> <name> [--serno=<serno>]
                                                [--account=<accountid>]
                                                [--user=<userid>]
                                                [--partof=<partof>]
                                                [--notes=<notes>]
                                                [--location=<location>]
-        devtestadmin eq delete <modelname> <name>
+        devtestadmin eq delete <manufacturer> <modelname> <name>
         devtestadmin eq <name> attrib list [--modelname=<modelname>]
         devtestadmin eq <name> attrib get <attrname>
         devtestadmin eq <name> attrib set <attrname> <attrvalue>
@@ -270,6 +270,7 @@ def main(argv):
         if arguments["show"]:
             show_equipment(arguments["<name>"])
         elif arguments["create"]:
+            manufacturer = arguments["<manufacturer>"]
             modelname = arguments["<modelname>"]
             name = arguments["<name>"]
             serno = arguments["--serno"]
@@ -280,6 +281,7 @@ def main(argv):
             location = arguments["--location"]
             eq, created = controllers.EquipmentController.create(
                 modelname, name,
+                manufacturer=manufacturer,
                 serno=serno,
                 accountid=accountid,
                 userid=userid,
@@ -291,6 +293,7 @@ def main(argv):
             else:
                 print("Already existed.")
         elif arguments["update"]:
+            manufacturer = arguments["<manufacturer>"]
             modelname = arguments["<modelname>"]
             name = arguments["<name>"]
             serno = arguments["--serno"]
@@ -301,6 +304,7 @@ def main(argv):
             location = arguments["--location"]
             controllers.EquipmentController.update(
                 modelname, name,
+                manufacturer=manufacturer,
                 serno=serno,
                 accountid=accountid,
                 userid=userid,
@@ -308,9 +312,13 @@ def main(argv):
                 notes=notes,
                 location=location)
         elif arguments["delete"]:
+            manufacturer = arguments["<manufacturer>"]
             modelname = arguments["<modelname>"]
             name = arguments["<name>"]
-            controllers.EquipmentController.delete(modelname, name)
+            controllers.EquipmentController.delete(
+                modelname, name,
+                manufacturer=manufacturer,
+            )
         elif arguments["attrib"]:
             name = arguments["<name>"]
             if arguments["list"]:

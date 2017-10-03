@@ -251,8 +251,11 @@ def _restore_stderr(oldfd):
     os.close(oldfd)
 
 def get_local_timezone():
-    link = os.readlink("/etc/localtime")
-    tzname = "/".join(link.split("/")[-2:])
+    try:
+        link = os.readlink("/etc/localtime")
+        tzname = "/".join(link.split("/")[-2:])
+    except OSError:
+        tzname = open("/etc/timezone").read().strip()
     return pytz.timezone(tzname)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

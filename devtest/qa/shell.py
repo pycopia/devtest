@@ -140,12 +140,23 @@ class ShellInterface:
             return
         if not self.arguments and self.pick_tests:
             pick_tests(self.arguments)
-        testlist, errlist = loader.load_selections(self.arguments)
+        try:
+            testlist, errlist = loader.load_selections(self.arguments)
+        except:
+            ex, val, tb = sys.exc_info()
+            if self.debug_framework:
+                debugger.post_mortem(tb)
+            else:
+                print("Error loading: {}: {}".format(ex.__name__, val),
+                      file=sys.stderr)
+                while val.__cause__ is not None:
+                    val = val.__cause__
+                    print("Because: {}: {}".format(val.__class__.__name__, val),
+                          file=sys.stderr)
         if errlist:
             print("Warning: some modules could not be loaded:", file=sys.stderr)
             for errarg in errlist:
-                print("    {!r} could not be loaded.".format(errarg.argument),
-                      file=sys.stderr)
+                print("  ", colors.magenta(errarg.argument), file=sys.stderr)
         if testlist:
             if self.config.flags.do_show_testcase:
                 from . import displayer

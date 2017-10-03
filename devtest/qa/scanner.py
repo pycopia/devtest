@@ -36,7 +36,14 @@ def iter_module_specs(package="testcases", onerror=None):
 def iter_modules(package="testcases", onerror=None):
     for spec in iter_module_specs(package=package, onerror=onerror):
         mod = importlib.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        try:
+            spec.loader.exec_module(mod)
+        except (ImportError, AttributeError) as err:
+            if callable(onerror):
+                onerror("{}.{}: {}".format(mod.__package__, mod.__name__, err))
+            else:
+                print(err, file=sys.stderr)
+            continue
         yield mod
 
 
