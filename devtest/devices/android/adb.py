@@ -208,14 +208,12 @@ class AndroidDeviceClient:
             raise Error("Operation on a closed device client.")
         return get_kernel().run(_transact(self._conn, msg))
 
-    @property
-    def state(self):
+    def get_state(self):
         msg = b"host-serial:%b:get-state" % (self.serial,)
         resp = self._message(msg)
         return resp.decode("ascii")
 
-    @property
-    def features(self):
+    def get_features(self):
         msg = b"host-serial:%b:features" % (self.serial,)
         resp = self._message(msg)
         return resp.decode("ascii")
@@ -353,8 +351,8 @@ if __name__ == "__main__":
     c.close()
 
     ac = AndroidDeviceClient(devinfo.serial)
-    print(ac.state)
-    # print(ac.features)
+    print(ac.get_state())
+    print(ac.get_features())
     stdout, stderr, es = ac.command(["ls", "/sdcard"])
     print(es)
     print("stdout:", stdout)
