@@ -211,6 +211,15 @@ class Equipment(BaseModel):
         conn = self.connections.filter(type=connection_type).get()
         return conn.destination
 
+    def set_connection_state(self, connection_type, state):
+        conn = self.connections.filter(type=connection_type).get()
+        with database.atomic():
+            conn.state = int(state)
+
+    def get_connection_state(self, connection_type):
+        conn = self.connections.filter(type=connection_type).get()
+        return conn.state
+
 
 class Function(BaseModel):
     """The function, or purpose of a device or software. This is a generic
@@ -305,7 +314,7 @@ class _SoftwareVariants(BaseModel):
 class TestBed(BaseModel):
     """An TestBed is a collection of equipment that is associated in some way.
     Equipment can be assigned roles. These roles are selected in a test
-    scenario.  An test bed should contain all the devices necessary to perform
+    scenario.  A testbed should contain all the devices necessary to perform
     the test.  You may also attach arbitrary attributes to it for use by test
     cases.
     """
