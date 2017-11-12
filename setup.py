@@ -46,7 +46,7 @@ setup(
         'psycopg2',
         'pygments',
         'pyyaml',
-        'elicit',
+        'elicit>=1.2',
 # webui
         'flask',
         'Flask-BasicAuth',
