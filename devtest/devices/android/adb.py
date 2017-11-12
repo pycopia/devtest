@@ -127,7 +127,7 @@ async def _transact(conn, msg):
 
 
 # On the host: 1st OKAY is connect, 2nd OKAY is status.
-async def _forward_transact(conn, msg):
+async def _command_transact(conn, msg):
     await conn.open()
     msg = b"%04x%b" % (len(msg), msg)
     await conn.socket.sendall(msg)
@@ -135,7 +135,7 @@ async def _forward_transact(conn, msg):
     if connstat == b"OKAY":
         stat = await conn.socket.recv(4)
         if stat != b"OKAY":
-            raise AdbCommandFail("forward status not OKAY")
+            raise AdbCommandFail("command not OKAY")
     elif stat == b"FAIL":
         lenst = await conn.socket.recv(4)
         length = int(lenst, 16)
@@ -181,7 +181,7 @@ class AdbClient:
         """
         msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (serial.encode("ascii"),
                                                          hostport, devport)
-        get_kernel().run(_forward_transact(self._conn, msg))
+        get_kernel().run(_command_transact(self._conn, msg))
 
     @property
     def server_version(self):
@@ -223,7 +223,17 @@ class AndroidDeviceClient:
         """
         msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (self.serial,
                                                          hostport, devport)
-        get_kernel().run(_forward_transact(self._conn, msg))
+        get_kernel().run(_command_transact(self._conn, msg))
+
+    def wait_for(self, state: str):
+        """Wait for device to be in a particular state.
+
+        State must be one of {"any", "bootloader", "device", "recovery", "sideload"}
+        """
+        if state not in {"any", "bootloader", "device", "recovery", "sideload"}:
+            raise ValueError("Invalid state to wait for.")
+        msg = b"host-serial:%b:wait-for-usb-%b" % (self.serial, state.encode("ascii"))
+        get_kernel().run(_command_transact(self._conn, msg))
 
     def command(self, cmdline, usepty=False, timeout=300):
         """Run a non-interactive shell command.
@@ -357,6 +367,9 @@ if __name__ == "__main__":
     print(es)
     print("stdout:", stdout)
     print("stderr:", stderr)
+
+    print(ac.wait_for("device"))
+
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
