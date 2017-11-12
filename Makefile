@@ -2,10 +2,11 @@
 
 # Set only major.minor version string, used elsewhere.
 # Make sure your python3 is linked to the specific version you want.
-PYVER := $(shell python3 -c 'import sys;print("{}.{}{}".format(sys.version_info[0], sys.version_info[1], sys.abiflags))')
-
-PYTHONBIN ?= $(shell python3-config --prefix)/bin/python$(PYVER)
+PYVER := $(shell python3 -c 'import sys;print("{}.{}".format(sys.version_info[0], sys.version_info[1]))')
+ABIFLAGS := $(shell python3-config --abiflags)
 SUFFIX := $(shell python3-config --extension-suffix)
+
+PYTHONBIN ?= $(shell python3-config --prefix)/bin/python$(PYVER)$(ABIFLAGS)
 
 OSNAME = $(shell uname)
 # Assumes using python on darwin installed from homebrew
@@ -31,10 +32,10 @@ help:
 	@echo "  sdist         to build source distribution."
 
 info:
-	@echo Found Python version: $(PYVER)
+	@echo Found Python version: $(PYVER)$(ABIFLAGS)
 	@echo Specific Python used: $(PYTHONBIN)
-	@echo Python suffix: $(SUFFIX)
-	@echo sudo: $(SUDO)
+	@echo Python extension suffix: $(SUFFIX)
+	@echo sudo used: $(SUDO)
 
 build:
 	$(PYTHONBIN) setup.py build
@@ -46,7 +47,7 @@ install: build
 	$(PYTHONBIN) setup.py install --skip-build --optimize
 
 requirements:
-	$(SUDO) $(PYTHONBIN) -m pip install -r dev-requirements.txt
+	$(SUDO) $(PYTHONBIN) -m pip$(PYVER) install -r dev-requirements.txt
 
 develop: requirements
 	$(PYTHONBIN) setup.py develop --user
