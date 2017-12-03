@@ -2,11 +2,12 @@
 
 # Set only major.minor version string, used elsewhere.
 # Make sure your python3 is linked to the specific version you want.
-PYVER := $(shell python3 -c 'import sys;print("{}.{}".format(sys.version_info[0], sys.version_info[1]))')
-ABIFLAGS := $(shell python3-config --abiflags)
-SUFFIX := $(shell python3-config --extension-suffix)
+PYTHONBIN ?= $(shell python3-config --prefix)/bin/python3
 
-PYTHONBIN ?= $(shell python3-config --prefix)/bin/python$(PYVER)$(ABIFLAGS)
+PYVER := $(shell $(PYTHONBIN) -c 'import sys;print("{}.{}".format(sys.version_info[0], sys.version_info[1]))')
+ABIFLAGS := $(shell $(PYTHONBIN)-config --abiflags)
+SUFFIX := $(shell $(PYTHONBIN)-config --extension-suffix)
+
 
 OSNAME = $(shell uname)
 # Assumes using python on darwin installed from homebrew
@@ -47,7 +48,7 @@ install: build
 	$(PYTHONBIN) setup.py install --skip-build --optimize
 
 requirements:
-	$(SUDO) $(PYTHONBIN) -m pip$(PYVER) install -r dev-requirements.txt
+	$(SUDO) $(PYTHONBIN) -m pip install -r dev-requirements.txt
 
 develop: requirements
 	$(PYTHONBIN) setup.py develop --user
