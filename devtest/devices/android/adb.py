@@ -106,7 +106,7 @@ class AdbConnection:
             lenst = await self.socket.recv(4)
             length = int(lenst, 16)
             resp = await self.socket.recv(length)
-            raise AdbCommandFail(resp.decode("ascii"))
+            raise AdbCommandFail("message FAIL: {}".format(resp.decode("ascii")))
         else:
             raise AdbProtocolError(stat.decode("ascii"))
 
@@ -197,6 +197,7 @@ class AndroidDeviceClient:
     def __init__(self, serial, host="localhost", port=ADB_PORT):
         self.serial = serial.encode("ascii")
         self._conn = AdbConnection(host=host, port=port)
+        self.features = self.get_features()
 
     def close(self):
         if self._conn is not None:
@@ -246,6 +247,8 @@ class AndroidDeviceClient:
             stderr (string): error output of command
             exitstatus (ExitStatus): the exit status of the command.
         """
+        if "shell_v2" not in self.features:
+            raise AdbCommandFail("Only shell v2 protocol currently supported.")
         if isinstance(cmdline, list):
             name = cmdline[0]
             cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
@@ -353,23 +356,24 @@ if __name__ == "__main__":
     from devtest import debugger
     debugger.autodebug()
     start_server()
+    print("Test AdbClient")
     c = AdbClient()
     print(c.server_version)
     for devinfo in c.get_device_list():
         print(devinfo)
-    c.forward(devinfo.serial, 8080, 8080)
+    # c.forward(devinfo.serial, 8080, 8080)
     c.close()
+    del c
 
+    print("Test AndroidDeviceClient")
     ac = AndroidDeviceClient(devinfo.serial)
+    print("features:", ac.features)
     print(ac.get_state())
-    print(ac.get_features())
     stdout, stderr, es = ac.command(["ls", "/sdcard"])
     print(es)
     print("stdout:", stdout)
     print("stderr:", stderr)
-
     print(ac.wait_for("device"))
-
-
+    ac.close()
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
