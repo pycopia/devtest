@@ -3,7 +3,6 @@ Unit tests for devtest.settings module.
 """
 
 import unittest
-import runpy
 
 from devtest import config
 
@@ -41,6 +40,6 @@ class ConfigUpdateTests(unittest.TestCase):
 
 
 def test_module():
-    runpy.run_module("devtest.core.types", run_name="__main__", alter_sys=True)
+    config._test([])
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
