@@ -21,18 +21,18 @@ else:
 
 
 _deep_text_wrapper = textwrap.TextWrapper(width=WIDTH,
-                                          initial_indent=" "*21,
-                                          subsequent_indent=" "*21)
+                                          initial_indent=" " * 21,
+                                          subsequent_indent=" " * 21)
 
 
 _medium_text_wrapper = textwrap.TextWrapper(width=WIDTH,
-                                            initial_indent=" "*10,
-                                            subsequent_indent=" "*10)
+                                            initial_indent=" " * 10,
+                                            subsequent_indent=" " * 10)
 
 
 _shallow_text_wrapper = textwrap.TextWrapper(width=WIDTH,
-                                             initial_indent=" "*4,
-                                             subsequent_indent=" "*4)
+                                             initial_indent=" " * 4,
+                                             subsequent_indent=" " * 4)
 
 
 def main(argv):
@@ -172,7 +172,7 @@ def main(argv):
                                                             arguments["<attrvalue>"])
                 print("Set {!r} to {!r}.".format(arguments["<attrname>"],
                                                  controllers.TestBedController.attribute_get(
-                                                    name, arguments["<attrname>"])))
+                                                 name, arguments["<attrname>"])))
             elif arguments["del"]:
                 controllers.TestBedController.attribute_del(arguments["<name>"],
                                                             arguments["<attrname>"])
@@ -203,7 +203,7 @@ def main(argv):
             note = arguments["--note"]
             specs = arguments["--specs"]
             eqm, created = controllers.EquipmentModelController.create(
-                    name, manufacturer=manufacturer, note=note, specs=specs)
+                name, manufacturer=manufacturer, note=note, specs=specs)
             if created:
                 print("Created")
             else:
@@ -731,10 +731,10 @@ class TCParser(HTMLParser):
             self._count = 0
         elif tag == "li":
             if self._count > 0:
-                self._stack.append(" "*self._indent + "{}. ".format(self._count))
+                self._stack.append(" " * self._indent + "{}. ".format(self._count))
                 self._count += 1
             else:
-                self._stack.append(" "*self._indent + "* ")
+                self._stack.append(" " * self._indent + "* ")
             self._initial_indent = 0
         elif tag == "cite":
             self._stack.append(" ")
@@ -777,8 +777,8 @@ class TCParser(HTMLParser):
         else:
             self._stack.append(textwrap.fill(text,
                                              width=WIDTH - self._indent,
-                                             initial_indent=" "*self._initial_indent,
-                                             subsequent_indent=" "*self._indent))
+                                             initial_indent=" " * self._initial_indent,
+                                             subsequent_indent=" " * self._indent))
 
 
 def show_testresult(result, failures=False, summarize=False):
@@ -852,15 +852,15 @@ def _print_suite_result(result, level, failures, summarize):
             print(_medium_text_wrapper.fill(result.note))
     print(" " * level + "  " + colors.underline("Tests:"))
     for result in controllers.TestResultsController.subresults(result, failures=failures):
-        _print_result_other(result, level+1, failures, summarize)
+        _print_result_other(result, level + 1, failures, summarize)
     print()
 
 
 def _print_result_other(result, level, failures, summarize):
     if result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["suite"]:
-        _print_suite_result(result, level+1, failures, summarize)
+        _print_suite_result(result, level + 1, failures, summarize)
     elif result.resulttype == controllers.TestResultsController.RESULT_TYPE_MAP["test"]:
-        _print_testcase_result(result, level+1, summarize)
+        _print_testcase_result(result, level + 1, summarize)
 
 
 def show_testresult_logs(tr):

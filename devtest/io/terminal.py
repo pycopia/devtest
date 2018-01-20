@@ -54,8 +54,8 @@ class Terminal:
         self.reset()
 
     def __repr__(self):
-        return "{}({!r}, prompt={!r}, timeout={!r})".format(self.__class__.__name__,
-                self._fo, self.prompt, self._timeout)
+        return "{}({!r}, prompt={!r}, timeout={!r})".format(
+            self.__class__.__name__, self._fo, self.prompt, self._timeout)
 
     def fileno(self):
         return self._fo.fileno()

@@ -21,7 +21,7 @@ Example::
 
 from __future__ import generator_stop
 
-from playhouse.migrate import PostgresqlMigrator, migrate
+from playhouse.migrate import PostgresqlMigrator, migrate  # noqa
 
 from . import util
 

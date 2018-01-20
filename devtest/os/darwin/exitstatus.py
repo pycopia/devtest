@@ -87,13 +87,13 @@ class ExitStatus:
                 return "{}: Exited normally.".format(self.name)
             else:
                 return "{}: Exited abnormally with status {:d}.".format(
-                        self.name, self._status)
+                    self.name, self._status)
         elif self.state == 2:
             return "{} is stopped by signal {:d}.".format(
-                    self.name, self._signal)
+                self.name, self._signal)
         elif self.state == 3:
             return "{} exited by signal {:d}. ".format(
-                    self.name, self.signal)
+                self.name, self.signal)
         else:
             raise RuntimeError("FIXME! unknown state in ExitStatus")
 

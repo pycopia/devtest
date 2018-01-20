@@ -12,7 +12,8 @@ import os
 
 from .fsm import FiniteStateMachine, ANY
 
-_SPECIAL = {"r":"\r", "n":"\n", "t":"\t", "b":"\b"}
+_SPECIAL = {"r": "\r", "n": "\n", "t": "\t", "b": "\b"}
+
 
 class ShellParser:
     """Simple shell-like syntax feed parser."""
@@ -43,7 +44,7 @@ class ShellParser:
             while self._fsm.stack:
                 self._fsm.process(self._fsm.pop())
             i += 1
-        if self._fsm.current_state: # non-zero, stuff left
+        if self._fsm.current_state:  # non-zero, stuff left
             self._buf = text[i:]
         return self._fsm.current_state
 

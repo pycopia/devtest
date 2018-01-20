@@ -28,9 +28,9 @@ def run_as(pwent, umask=0o22):
     os.umask(umask)
     home = pwent.home
     try:
-      os.chdir(home)
+        os.chdir(home)
     except OSError:
-      os.chdir("/")
+        os.chdir("/")
     # drop privs to user
     os.setgroups(pwent.groups)
     os.setgid(pwent.gid)

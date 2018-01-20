@@ -17,30 +17,33 @@ __all__ = ["Telnet", "get_telnet"]
 # Telnet protocol defaults
 TELNET_PORT = 23
 
+
 def byte(val):
     return struct.pack("B", val)
 
-# Telnet protocol characters (don't change)
-IAC   = byte(255) # "Interpret As Command"
-DONT  = byte(254) # 0xfe
-DO    = byte(253) # 0xfd
-WONT  = byte(252) # 0xfc
-WILL  = byte(251) # 0xfb
-SB    = byte(250) # sub negotiation 0xfa
-GA    = byte(249) # Go ahead
-EL    = byte(248) # Erase Line
-EC    = byte(247) # Erase character
-AYT   = byte(246) # Are You There
-AO    = byte(245) # Abort output
-IP    = byte(244) # Interrupt Process
-BREAK = byte(243) # NVT character BRK.
-DM    = byte(242) # Data Mark.
-                 # The data stream portion of a Synch.
-                 # This should always be accompanied by a TCP Urgent notification.
-NOP   = byte(241) # No operation.
-SE    = byte(240) # End of subnegotiation parameters.
 
-IAC2 = IAC+IAC   # double IAC for escaping
+# Telnet protocol characters (don't change)
+IAC   = byte(255)  # "Interpret As Command"
+DONT  = byte(254)  # 0xfe
+DO    = byte(253)  # 0xfd
+WONT  = byte(252)  # 0xfc
+WILL  = byte(251)  # 0xfb
+SB    = byte(250)  # sub negotiation 0xfa
+GA    = byte(249)  # Go ahead
+EL    = byte(248)  # Erase Line
+EC    = byte(247)  # Erase character
+AYT   = byte(246)  # Are You There
+AO    = byte(245)  # Abort output
+IP    = byte(244)  # Interrupt Process
+BREAK = byte(243)  # NVT character BRK.
+DM    = byte(242)  # Data Mark.
+
+# The data stream portion of a Synch.
+# This should always be accompanied by a TCP Urgent notification.
+NOP   = byte(241)  # No operation.
+SE    = byte(240)  # End of subnegotiation parameters.
+
+IAC2 = IAC + IAC  # double IAC for escaping
 
 # NVT special codes
 NULL = byte(0)
@@ -51,71 +54,71 @@ LF = byte(10)
 VT = byte(11)
 FF = byte(12)
 CR = byte(13)
-CRLF = CR+LF
-CRNULL = CR+NULL
+CRLF = CR + LF
+CRNULL = CR + NULL
 
 
 # Telnet protocol options code (don't change)
 # These ones all come from arpa/telnet.h
-BINARY = byte(0) # 8-bit data path
-ECHO = byte(1) # echo
-RCP = byte(2) # prepare to reconnect
-SGA = byte(3) # suppress go ahead
-NAMS = byte(4) # approximate message size
-STATUS = byte(5) # give status
-TM = byte(6) # timing mark
-RCTE = byte(7) # remote controlled transmission and echo
-NAOL = byte(8) # negotiate about output line width
-NAOP = byte(9) # negotiate about output page size
-NAOCRD = byte(10) # negotiate about CR disposition
-NAOHTS = byte(11) # negotiate about horizontal tabstops
-NAOHTD = byte(12) # negotiate about horizontal tab disposition
-NAOFFD = byte(13) # negotiate about formfeed disposition
-NAOVTS = byte(14) # negotiate about vertical tab stops
-NAOVTD = byte(15) # negotiate about vertical tab disposition
-NAOLFD = byte(16) # negotiate about output LF disposition
-XASCII = byte(17) # extended ascii character set
-LOGOUT = byte(18) # force logout
-BM = byte(19) # byte macro
-DET = byte(20) # data entry terminal
-SUPDUP = byte(21) # supdup protocol
-SUPDUPOUTPUT = byte(22) # supdup output
-SNDLOC = byte(23) # send location
-TTYPE = byte(24) # terminal type
-EOR = byte(25) # end or record
-TUID = byte(26) # TACACS user identification
-OUTMRK = byte(27) # output marking
-TTYLOC = byte(28) # terminal location number
-VT3270REGIME = byte(29) # 3270 regime
-X3PAD = byte(30) # X.3 PAD
-NAWS = byte(31) # window size
-TSPEED = byte(32) # terminal speed
-LFLOW = byte(33) # remote flow control
-LINEMODE = byte(34) # Linemode option
-XDISPLOC = byte(35) # X Display Location
-OLD_ENVIRON = byte(36) # Old - Environment variables
-AUTHENTICATION = byte(37) # Authenticate
-ENCRYPT = byte(38) # Encryption option
-NEW_ENVIRON = byte(39) # New - Environment variables
+BINARY = byte(0)  # 8-bit data path
+ECHO = byte(1)  # echo
+RCP = byte(2)  # prepare to reconnect
+SGA = byte(3)  # suppress go ahead
+NAMS = byte(4)  # approximate message size
+STATUS = byte(5)  # give status
+TM = byte(6)  # timing mark
+RCTE = byte(7)  # remote controlled transmission and echo
+NAOL = byte(8)  # negotiate about output line width
+NAOP = byte(9)  # negotiate about output page size
+NAOCRD = byte(10)  # negotiate about CR disposition
+NAOHTS = byte(11)  # negotiate about horizontal tabstops
+NAOHTD = byte(12)  # negotiate about horizontal tab disposition
+NAOFFD = byte(13)  # negotiate about formfeed disposition
+NAOVTS = byte(14)  # negotiate about vertical tab stops
+NAOVTD = byte(15)  # negotiate about vertical tab disposition
+NAOLFD = byte(16)  # negotiate about output LF disposition
+XASCII = byte(17)  # extended ascii character set
+LOGOUT = byte(18)  # force logout
+BM = byte(19)  # byte macro
+DET = byte(20)  # data entry terminal
+SUPDUP = byte(21)  # supdup protocol
+SUPDUPOUTPUT = byte(22)  # supdup output
+SNDLOC = byte(23)  # send location
+TTYPE = byte(24)  # terminal type
+EOR = byte(25)  # end or record
+TUID = byte(26)  # TACACS user identification
+OUTMRK = byte(27)  # output marking
+TTYLOC = byte(28)  # terminal location number
+VT3270REGIME = byte(29)  # 3270 regime
+X3PAD = byte(30)  # X.3 PAD
+NAWS = byte(31)  # window size
+TSPEED = byte(32)  # terminal speed
+LFLOW = byte(33)  # remote flow control
+LINEMODE = byte(34)  # Linemode option
+XDISPLOC = byte(35)  # X Display Location
+OLD_ENVIRON = byte(36)  # Old - Environment variables
+AUTHENTICATION = byte(37)  # Authenticate
+ENCRYPT = byte(38)  # Encryption option
+NEW_ENVIRON = byte(39)  # New - Environment variables
 
 # the following ones come from
 # http://www.iana.org/assignments/telnet-options
 # Unfortunately, that document does not assign identifiers
 # to all of them, so we are making them up
-TN3270E = byte(40) # TN3270E
-XAUTH = byte(41) # XAUTH
-CHARSET = byte(42) # CHARSET
-RSP = byte(43) # Telnet Remote Serial Port
-COM_PORT_OPTION = byte(44) # Com Port Control Option
-SUPPRESS_LOCAL_ECHO = byte(45) # Telnet Suppress Local Echo
-TLS = byte(46) # Telnet Start TLS
-KERMIT = byte(47) # KERMIT
-SEND_URL = byte(48) # SEND-URL
-FORWARD_X = byte(49) # FORWARD_X
-PRAGMA_LOGON = byte(138) # TELOPT PRAGMA LOGON
-SSPI_LOGON = byte(139) # TELOPT SSPI LOGON
-PRAGMA_HEARTBEAT = byte(140) # TELOPT PRAGMA HEARTBEAT
-EXOPL = byte(255) # Extended-Options-List
+TN3270E = byte(40)  # TN3270E
+XAUTH = byte(41)  # XAUTH
+CHARSET = byte(42)  # CHARSET
+RSP = byte(43)  # Telnet Remote Serial Port
+COM_PORT_OPTION = byte(44)  # Com Port Control Option
+SUPPRESS_LOCAL_ECHO = byte(45)  # Telnet Suppress Local Echo
+TLS = byte(46)  # Telnet Start TLS
+KERMIT = byte(47)  # KERMIT
+SEND_URL = byte(48)  # SEND-URL
+FORWARD_X = byte(49)  # FORWARD_X
+PRAGMA_LOGON = byte(138)  # TELOPT PRAGMA LOGON
+SSPI_LOGON = byte(139)  # TELOPT SSPI LOGON
+PRAGMA_HEARTBEAT = byte(140)  # TELOPT PRAGMA HEARTBEAT
+EXOPL = byte(255)  # Extended-Options-List
 NOOPT = byte(0)
 
 
@@ -150,6 +153,7 @@ RESP_PURGE_DATA          =  byte(112)
 class TelnetError(Exception):
     pass
 
+
 class BadConnectionError(TelnetError):
     pass
 
@@ -175,10 +179,10 @@ class Telnet:
         return False
 
     def __str__(self):
-        return "Telnet({!r:s}, {:d}): {} ({})".format(self.host, self.port,
-                "open" if not self.eof else "closed",
-                "binary" if self._binary else "nonbinary",
-                )
+        return "Telnet({!r:s}, {:d}): {} ({})".format(
+            self.host, self.port,
+            "open" if not self.eof else "closed",
+            "binary" if self._binary else "nonbinary",)
 
     def open(self, host, port=TELNET_PORT):
         """Open a conneciton to a host.
@@ -199,11 +203,10 @@ class Telnet:
 
     def _init_connection(self):
         self._sendall(
-                    IAC + DO + BINARY +
-                    IAC + DO + SGA +
-                    IAC + DONT + ECHO +
-                    IAC + WILL + COM_PORT_OPTION
-                    )
+            IAC + DO + BINARY +
+            IAC + DO + SGA +
+            IAC + DONT + ECHO +
+            IAC + WILL + COM_PORT_OPTION)
         self._fill_rawq(12)
         self._process_rawq()
         self._closed = 0
@@ -230,8 +233,8 @@ class Telnet:
         self._q = b''
         self._qi = 0
         self._irawq = 0
-        self.iacseq = b'' # Buffer for IAC sequence.
-        self.sb = 0 # flag for SB and SE sequence.
+        self.iacseq = b''  # Buffer for IAC sequence.
+        self.sb = 0  # flag for SB and SE sequence.
         self.sbdataq = b''
         self._binary = False
         self._sga = False
@@ -260,7 +263,7 @@ class Telnet:
         while not self._q:
             self._fill_rawq()
             self._process_rawq()
-        d = self._q[self._qi:self._qi+amt]
+        d = self._q[self._qi:self._qi + amt]
         self._qi += amt
         if self._qi >= len(self._q):
             self._q = b''
@@ -301,7 +304,7 @@ class Telnet:
         return c
 
     def _process_rawq(self):
-        buf = [b'', b''] # data buffer and SB buffer
+        buf = [b'', b'']  # data buffer and SB buffer
         try:
             while self._rawq:
                 c = self._rawq_getchar()
@@ -324,7 +327,7 @@ class Telnet:
                     if c == IAC:
                         buf[self.sb] += c
                     else:
-                        if c == SB: # SB ... SE start.
+                        if c == SB:  # SB ... SE start.
                             self.sb = 1
                             self.sbdataq = b''
                         elif c == SE:
@@ -342,7 +345,7 @@ class Telnet:
                     else:
                         logging.error("telnet bad command: {!r}".format(cmd))
         except EOFError:
-            self.iacseq = b'' # Reset on EOF
+            self.iacseq = b''  # Reset on EOF
             self.sb = 0
         self._q += buf[0]
         self.sbdataq += buf[1]
@@ -353,7 +356,7 @@ class Telnet:
         self.sock.sendall(data, opt)
 
     def _neg_option(self, cmd, opt):
-        if cmd == DO: # 0xfd
+        if cmd == DO:  # 0xfd
             if opt == BINARY:
                 self._sendall(IAC + WILL + BINARY)
             elif opt == SGA:
@@ -361,7 +364,9 @@ class Telnet:
             elif opt == COM_PORT_OPTION:
                 self._do_com = True
                 # Don't bother us with modem state changes
-                self._sendall(IAC+SB+COM_PORT_OPTION+SET_MODEMSTATE_MASK+b"\x00"+IAC+SE)
+                self._sendall(
+                    IAC + SB + COM_PORT_OPTION + SET_MODEMSTATE_MASK +
+                    b"\x00" + IAC + SE)
             else:
                 self._sendall(IAC + WONT + opt)
         elif cmd == WILL:
@@ -391,7 +396,6 @@ class Telnet:
         if subopt[0] == COM_PORT_OPTION:
             comopt = subopt[1]
             if comopt == RESP_NOTIFY_LINESTATE:
-                value = subopt[2]
                 self._linestate = LineState(subopt[2])
             elif comopt == RESP_NOTIFY_MODEMSTATE:
                 self._modemstate = ModemState(subopt[2])
@@ -423,7 +427,7 @@ class Telnet:
         self._process_rawq()
 
     def send_command(self, cmd):
-        self._sendall(IAC+cmd)
+        self._sendall(IAC + cmd)
 
     def send_option(self, disp, opt):
         self._sendall(IAC + disp + opt)
@@ -494,8 +498,7 @@ class ModemState(object):
             self.delta_rx_detect,
             self.ring_indicator,
             self.delta_dataset_ready,
-            self.delta_clear_to_send,
-            )
+            self.delta_clear_to_send)
 
 
 def get_telnet(host, port=TELNET_PORT, logfile=None):

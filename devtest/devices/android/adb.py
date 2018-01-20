@@ -167,7 +167,7 @@ class AdbClient:
 
     def get_device(self, serial):
         return AndroidDeviceClient(
-                serial, host=self._conn.host, port=self._conn.port)
+            serial, host=self._conn.host, port=self._conn.port)
 
     def get_device_list(self):
         dl = []

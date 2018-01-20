@@ -12,7 +12,7 @@ def debugthis(meth):
     def _lambda(*iargs, **ikwargs):
         try:
             return meth(*iargs, **ikwargs)
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             from devtest import debugger
             debugger.post_mortem(tb)

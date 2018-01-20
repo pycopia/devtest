@@ -212,8 +212,8 @@ class DefaultReportUnicode(DefaultReport):
         ts = time.astimezone(self.timezone).timetz().isoformat()
         nw = WIDTH - len(ts) - 2
         text = "Start run at {:{width}s}".format(ts, width=nw)
-        tt = "{}{}{}".format(UL, hor*(len(text)+2), UR)
-        bt = "{}{}{}".format(LL, hor*(len(text)+2), LR)
+        tt = "{}{}{}".format(UL, hor * (len(text) + 2), UR)
+        bt = "{}{}{}".format(LL, hor * (len(text) + 2), LR)
         ml = "{} {} {}".format(vert, text, vert)
         print(tt, ml, bt, sep="\n", file=self._file)
 
@@ -221,11 +221,12 @@ class DefaultReportUnicode(DefaultReport):
         UL, hor, vert, UR, LL, LR = _BOXCHARS[2]
         ts = time.astimezone(self.timezone).timetz().isoformat()
         nw = WIDTH - len(ts) - 21
-        tt = "{}{}{}".format(UL, hor*(WIDTH-2), UR)
-        bt = "{}{}{}".format(LL, hor*(WIDTH-2), LR)
+        tt = "{}{}{}".format(UL, hor * (WIDTH - 2), UR)
+        bt = "{}{}{}".format(LL, hor * (WIDTH - 2), LR)
         ml = "{0} Start TestSuite: {1:{width}s} {B}{2}{R}{3}".format(
-              vert, testsuite.test_name, ts, vert, width=nw, B=BLUE, R=RESET)
+            vert, testsuite.test_name, ts, vert, width=nw, B=BLUE, R=RESET)
         print(tt, ml, bt, sep="\n", file=self._file)
+
 
 def _get_timestring(dt, zone):
     return dt.astimezone(zone).timetz().isoformat()

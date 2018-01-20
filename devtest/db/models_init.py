@@ -7,10 +7,8 @@ import sys
 
 from . import models
 from .util import create_db
-from ..core import constants
 
 database = models.database
-
 
 
 def do_default_testbed(database):
@@ -32,8 +30,7 @@ def do_function(database):
             ("database", "A database server."),
             ("tftpserver", "Provides TFTP server"),
             ("nfsserver", "An NFS server."),
-            ("ntpserver", "Provides network time sync service."),
-            ):
+            ("ntpserver", "Provides network time sync service."),):
         models.Function.create(name=name, description=desc)
     database.commit()
 
@@ -44,12 +41,12 @@ def do_function(database):
 
 
 def do_equipment_models(database):
-
     manufacturer = "Acme Inc."
     for name, attribs in ():
         models.EquipmentModel.create(name=name, manufacturer=manufacturer,
                                      attributes=attribs)
     database.commit()
+
 
 def init_database(url):
     global database

@@ -17,6 +17,7 @@ del _cre
 
 ANY = NamedNumber(-1, "ANY")
 
+
 class FiniteStateMachine:
     """This class is a Finite State Machine (FSM).
     You set up a state transition table which is the association of:
@@ -78,7 +79,7 @@ class FiniteStateMachine:
             self.default_transition = None
         else:
             self.default_transition = (action, next_state)
-    add_default_transition = set_default_transition # alias
+    add_default_transition = set_default_transition  # alias
 
     def add_transition(self, input_symbol, state, action, next_state):
         """This adds an association between inputs and outputs.
@@ -94,7 +95,7 @@ class FiniteStateMachine:
         the symbol.
         """
         cre = re.compile(expression, flags)
-        self._expressions.append( (cre, state, action, next_state) )
+        self._expressions.append((cre, state, action, next_state))
         self._transitions[(SREType, state)] = (self._check_expression, None)
 
     def _check_expression(self, symbol, myself):
@@ -110,7 +111,7 @@ class FiniteStateMachine:
         You can pass a list or a string.
         """
         for input_symbol in input_symbols:
-            self.add_transition (input_symbol, state, action, next_state)
+            self.add_transition(input_symbol, state, action, next_state)
 
     def get_transition(self, input_symbol, state):
         try:

@@ -251,7 +251,7 @@ class H2Protocol(asyncio.Protocol):
                 # In a *real* application you'd want to consider priority here.
                 max_size = self.conn.max_outbound_frame_size
                 chunks = (
-                    data_to_send[x:x+max_size]
+                    data_to_send[x:x + max_size]
                     for x in range(0, len(data_to_send), max_size)
                 )
                 for chunk in chunks:

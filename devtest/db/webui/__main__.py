@@ -10,6 +10,7 @@ from . import app
 
 models.connect()
 
+
 @app.before_request
 def _db_connect():
     models.database.connect()

@@ -27,7 +27,7 @@ from devtest.qa import signals
 from devtest.core import exceptions
 from devtest.io import socket
 from devtest.io import serial
-from devtest.io.reactor import get_kernel, get_new_kernel, spawn, Event, sleep
+from devtest.io.reactor import get_kernel, get_new_kernel, spawn, Event
 from devtest.io.streams import FileStream
 
 from . import Service
@@ -158,7 +158,7 @@ class SerialCaptureServer(threading.Thread):
         self._data = threading.local()
         try:
             os.unlink(CONTROL_SOCKET)
-        except:
+        except OSError:
             pass
         self._data.logdir = "/var/tmp"
         self._data.channels = {}

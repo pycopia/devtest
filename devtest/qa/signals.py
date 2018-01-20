@@ -64,6 +64,7 @@ def _test(argv):
     run_start.disconnect(listener)
     run_start.send(msg="No second message")
 
+
 if __name__ == "__main__":
     import sys
     _test(sys.argv)

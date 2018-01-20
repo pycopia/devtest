@@ -20,4 +20,3 @@ def flatten(alist):
         else:
             rv.append(val)
     return rv
-

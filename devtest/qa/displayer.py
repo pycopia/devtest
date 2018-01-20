@@ -45,7 +45,7 @@ class TestReporter:
 
     def show_testcase(self, testcase):
         name = testcase.__qualname__
-        head = "\n".join([name, "="*len(name)])
+        head = "\n".join([name, "=" * len(name)])
         doc = inspect.cleandoc(inspect.getdoc(testcase))
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
@@ -54,7 +54,7 @@ class TestReporter:
 
     def show_scenario(self, scenario):
         name = scenario.__qualname__
-        head = "\n".join([name, "="*len(name)])
+        head = "\n".join([name, "=" * len(name)])
         doc = inspect.cleandoc(inspect.getdoc(scenario))
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
@@ -63,7 +63,7 @@ class TestReporter:
 
     def show_suite(self, suite):
         name = suite.__qualname__
-        head = "\n".join([name, "="*len(name)])
+        head = "\n".join([name, "=" * len(name)])
         doc = inspect.cleandoc(inspect.getdoc(suite))
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
@@ -74,7 +74,7 @@ class TestReporter:
 
     def show_module(self, mod):
         name = mod.__name__
-        head = "\n".join([name, "="*len(name)])
+        head = "\n".join([name, "=" * len(name)])
         doc = inspect.cleandoc(inspect.getdoc(mod))
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:

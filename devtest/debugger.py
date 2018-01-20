@@ -57,11 +57,12 @@ def DEBUG(*args, **kwargs):
     kwargs["file"] = sys.stderr
     print("DEBUG", *args, **kwargs)
 
+
 # Self test
 if __name__ == '__main__':
     try:
         raise RuntimeError("Testing")
-    except:
+    except:  # noqa
         post_mortem()
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

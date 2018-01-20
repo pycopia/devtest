@@ -63,7 +63,7 @@ def choose(somelist, defidx=0, prompt="choose", lines=LINES, columns=COLUMNS):
 
 def _choose(stdscr, somelist, defidx, prompt, lines, columns):
     oldcur = curses.curs_set(0)
-    pad = curses.newpad(len(somelist)+1, columns-2)
+    pad = curses.newpad(len(somelist) + 1, columns - 2)
     for line in somelist:
         pad.addstr(str(line) + "\n")
     pminrow = defidx  # also somelist index
@@ -76,7 +76,7 @@ def _choose(stdscr, somelist, defidx, prompt, lines, columns):
     # Build form
     stdscr.clear()
     stdscr.addstr("{} (Press Enter to select)".format(prompt))
-    curses.textpad.rectangle(stdscr, 1, 0, lines-2, columns-1)
+    curses.textpad.rectangle(stdscr, 1, 0, lines - 2, columns - 1)
     stdscr.refresh()
     pad.chgat(pminrow, 0, smaxcol - 1, curses.A_REVERSE)
     pad.refresh(pminrow, pmincol, sminrow, smincol, smaxrow, smaxcol)

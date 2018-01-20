@@ -13,4 +13,4 @@ app = Flask(__name__)
 app._logger = logging.Logger(app.logger_name)
 
 # Needs to be last.
-from . import views
+from . import views  # noqa

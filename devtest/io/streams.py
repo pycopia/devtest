@@ -7,7 +7,7 @@ from __future__ import generator_stop
 # For now we can just use the "stock" Stream from curio. In the future we can
 # change the implementation here, if necessary, without changing other client
 # code.
-from curio.io import FileStream, SocketStream, Socket
+from curio.io import FileStream, SocketStream, Socket  # noqa
 
 
 def _test(argv):

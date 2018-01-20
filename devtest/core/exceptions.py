@@ -117,8 +117,10 @@ class InvalidTestError(LoaderError):
 class ControllerError(Exception):
     """Base class for controller related errors."""
 
+
 class TimeoutError(OSError):
     """Unified timeout error."""
+
 
 # Errors in report objects
 class ReportError(Exception):

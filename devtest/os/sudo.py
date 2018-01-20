@@ -23,9 +23,9 @@ def sudo(command, user=None, password=None, extraopts=None):
     cmd = "{} {} {} {}".format(SUDO, opts, extraopts or "", command)
     proc = process.start_process(cmd, delaytime=0.5)
     if password:
-        process.run_coroutine(proc.stderr.read(9)) # discard password prompt
+        process.run_coroutine(proc.stderr.read(9))  # discard password prompt
         process.run_coroutine(proc.stdout.write("{}\r".format(password)))
-        process.run_coroutine(proc.stderr.read(1)) # discard newline
+        process.run_coroutine(proc.stderr.read(1))  # discard newline
     return proc
 
 

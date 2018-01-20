@@ -375,7 +375,7 @@ def _test(argv):
     log.error('Error message')
     try:
         raise AttributeError("bogus attr error") from KeyError("chained key error")
-    except:
+    except:  # noqa
         ex, val, tb = sys.exc_info()
         exception_error("testing exception_error", val)
 

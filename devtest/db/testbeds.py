@@ -218,7 +218,8 @@ class EquipmentRuntime:
         s.append(attribs["hostname"])
         port = attribs.get("serviceport", port)
         if port:
-            s.append(":"); s.append(str(port))
+            s.append(":")
+            s.append(str(port))
         s.append(path or attribs.get("servicepath", "/"))
         return "".join(s)
 
@@ -261,13 +262,15 @@ class EquipmentRuntime:
             try:
                 role = self._attributes["role"]
                 self._device = _get_controller(self, role)
-            except:
+            except:  # noqa
                 ex, err, tb = sys.exc_info()
-                logging.exception_error("Error in device controller construction", err)
+                logging.exception_error(
+                    "Error in device controller construction", err)
                 if self._debug:
                     debugger.post_mortem(tb)
                 tb = None
-                raise ConfigError("controller for {!r} could not be created.".format(role)) from err
+                raise ConfigError(
+                    "controller for {!r} could not be created.".format(role)) from err
         return self._device
 
     @device.deleter
@@ -284,14 +287,15 @@ class EquipmentRuntime:
     def initializer(self):
         """The initializing controller defined for this equipment."""
         if self._initializer is None:
-            iobjname = self._attributes.get("initializer", self.model._attributes.get("initializer"))
+            iobjname = self._attributes.get(
+                "initializer", self.model._attributes.get("initializer"))
             if iobjname is None:
                 msg = "'initializer' is not defined in properties."
                 logging.error(msg)
                 raise ConfigError(msg)
             try:
                 self._initializer = _get_controller(self, iobjname)
-            except:
+            except:  # noqa
                 ex, err, tb = sys.exc_info()
                 msg = "Initializer {!r} could not be created".format(iobjname)
                 logging.exception_error(msg, err)
@@ -326,7 +330,7 @@ class EquipmentRuntime:
     def console(self):
         try:
             return self.get_console()
-        except:
+        except:  # noqa
             ex, err, tb = sys.exc_info()
             msg = "Console could not be created for {!r}".format(self._attributes["hostname"])
             logging.exception_error(msg, err)
@@ -406,7 +410,8 @@ def _get_controller(equipmentrt, rolename):
     FM = models.Function
     impl = FM.select(FM.implementation).where(FM.name == rolename).scalar(convert=True)
     if impl is None:
-        raise ConfigError("No implementation for role {!r} found in Function list.".format(rolename))
+        raise ConfigError(
+            "No implementation for role {!r} found in Function list.".format(rolename))
     klass = importlib.get_callable(impl)
     return klass(equipmentrt)
 

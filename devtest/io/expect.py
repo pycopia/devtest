@@ -170,8 +170,8 @@ class Expect:
             bd = self._inbuf.read()
             i = bd.find(b'\n')
             if i >= 0:
-                line = bd[:i+1]
-                self._inbuf.write(bd[i+1:])
+                line = bd[:i + 1]
+                self._inbuf.write(bd[i + 1:])
                 return line
             else:
                 return bd + self._fo.readline()

@@ -64,7 +64,7 @@ class InteractiveConsole:
             exec(code, self._ns)
         except SystemExit:
             raise
-        except:
+        except:  # noqa
             self.showtraceback()
 
     def showsyntaxerror(self, filename=None):

@@ -5,7 +5,7 @@ import ipaddress
 from datetime import timedelta
 
 from peewee import Field
-from playhouse.postgres_ext import (PostgresqlExtDatabase, BinaryJSONField,
+from playhouse.postgres_ext import (PostgresqlExtDatabase, BinaryJSONField,  # noqa
                                     TSVectorField, DateTimeTZField, ArrayField)
 
 from devtest.core import types
@@ -18,6 +18,7 @@ _PEEWEE_FIELDS = ['BareField', 'BigIntegerField', 'BlobField',
                   'FloatField', 'ForeignKeyField', 'IntegerField',
                   'PrimaryKeyField', 'TextField', 'TimeField', 'UUIDField']
 
+
 # Peewee is monolithic
 def _import_peewee_fields():
     import peewee
@@ -26,6 +27,7 @@ def _import_peewee_fields():
     for name in _PEEWEE_FIELDS:
         obj = getattr(peewee, name)
         setattr(me, name, obj)
+
 
 _import_peewee_fields()
 del _import_peewee_fields
@@ -84,7 +86,7 @@ class EnumField(Field):
     db_field = 'int'
 
     def __init__(self, enumclass, default=None, help_text=None,
-                       verbose_name=None, **extra):
+                 verbose_name=None, **extra):
         assert issubclass(enumclass, enum.IntEnum)
         self._eclass = enumclass
         choices = [(e.value, e.name) for e in enumclass]
@@ -92,8 +94,7 @@ class EnumField(Field):
             "verbose_name": verbose_name or enumclass.__name__,
             "choices": choices,
             "default": choices[0][0] if default is None else default,
-            "help_text": help_text,
-            }
+            "help_text": help_text}
         kwargs.update(extra)
         super().__init__(**kwargs)
 

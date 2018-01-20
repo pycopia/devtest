@@ -18,7 +18,7 @@ An interactive CLI for Android devices, using adb module.
 
 import sys
 
-from elicit.all import *
+from elicit.all import *  # noqa
 
 from devtest.devices.android import adb
 

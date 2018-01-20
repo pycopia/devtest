@@ -1,5 +1,5 @@
 """
-Main test runner for Core OS tests.
+Main test runner for running any runnable target.
 """
 
 import sys
@@ -104,7 +104,7 @@ class TestRunner:
     def _run_module(self, module_with_run):
         try:
             rv = module_with_run.run(self.config, self.testbed, self._ui)
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             run_error.send(self, exc=val)
             if self.config.flags.debug:
@@ -133,7 +133,7 @@ class TestRunner:
         """
 
         suite = bases.TestSuite(self.config, self.testbed, self._ui,
-                               name="{}Suite".format(testclass.__name__))
+                                name="{}Suite".format(testclass.__name__))
         suite.add_test(testclass, *args, **kwargs)
         suite.run()
         return suite.result
@@ -153,7 +153,7 @@ class TestRunner:
         """
 
         suite = bases.TestSuite(self.config, self.testbed, self._ui,
-                               name="RunTestsTempSuite")
+                                name="RunTestsTempSuite")
         suite.add_tests(testclasses)
         suite.run()
         return suite.result
@@ -197,7 +197,8 @@ class TestRunner:
             except ReportFindError as err:
                 logging.error(str(err))
                 raise TestRunnerError("Cannot continue without report.") from err
-        assert isinstance(rpt, reports.BaseReport), "A report needs to be instance of reports.BaseReport"
+        assert isinstance(rpt, reports.BaseReport), \
+            "A report needs to be instance of reports.BaseReport"
         rpt.initialize(config=cf)
         self.report = rpt
 
@@ -238,7 +239,8 @@ def _aggregate_returned_results(resultlist):
 
 
 def _redirect_stderr(name):
-    fd = os.open(name, os.O_WRONLY|os.O_TRUNC|os.O_CREAT|os.O_NOFOLLOW|os.O_SYNC, mode=0o644)
+    fd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
+                 mode=0o644)
     stderr_orig = os.dup(2)
     os.dup2(fd, 2)
     os.close(fd)
@@ -249,6 +251,7 @@ def _restore_stderr(oldfd):
     sys.stderr.flush()
     os.dup2(oldfd, 2)
     os.close(oldfd)
+
 
 def get_local_timezone():
     try:

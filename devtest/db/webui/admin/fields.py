@@ -10,27 +10,28 @@ import ipaddress
 from wtforms import widgets
 # Retain this import order. Some fields have the same name as simpler versions
 # and this will make the nicer ones overwrite simple ones.
-from wtforms.fields.core import *
-from wtforms.fields.simple import *
-from wtforms.fields.html5 import *
-from wtfpeewee.fields import *
+from wtforms.fields.core import *  # noqa
+from wtforms.fields.simple import *  # noqa
+from wtforms.fields.html5 import *  # noqa
+from wtfpeewee.fields import *  # noqa
 
 from devtest import json
 
 # Current (Aug 15) field selection.
 
 __all__ = ['ArrayField', 'AttributesField', 'BooleanField', 'BooleanSelectField',
-  'CIDRField', 'DateField', 'DateTimeField', 'DateTimeLocalField', 'DecimalField',
-  'DecimalRangeField', 'EmailField', 'EnumField', 'FieldList', 'FileField',
-  'FloatField', 'FormField', 'HTMLField', 'HiddenField', 'HiddenQueryField',
-  'IPv4Field', 'IPv6Field', 'IntegerField', 'IntegerRangeField', 'IntervalField',
-  'JSONField', 'MACField', 'ModelHiddenField', 'ModelSelectField',
-  'ModelSelectMultipleField', 'PasswordField', 'RadioField', 'SearchField',
-  'SelectChoicesField', 'SelectField', 'SelectMultipleField',
-  'SelectMultipleQueryField', 'SelectQueryField', 'StringField', 'SubmitField',
-  'TelField', 'TextAreaField', 'TextField', 'URLField', 'WPDateField',
-  'WPDateTimeField', 'WPTimeField',
- ]
+           'CIDRField', 'DateField', 'DateTimeField', 'DateTimeLocalField',
+           'DecimalField', 'DecimalRangeField', 'EmailField', 'EnumField',
+           'FieldList', 'FileField', 'FloatField', 'FormField', 'HTMLField',
+           'HiddenField', 'HiddenQueryField', 'IPv4Field', 'IPv6Field',
+           'IntegerField', 'IntegerRangeField', 'IntervalField', 'JSONField',
+           'MACField', 'ModelHiddenField', 'ModelSelectField',
+           'ModelSelectMultipleField', 'PasswordField', 'RadioField',
+           'SearchField', 'SelectChoicesField', 'SelectField',
+           'SelectMultipleField', 'SelectMultipleQueryField',
+           'SelectQueryField', 'StringField', 'SubmitField', 'TelField',
+           'TextAreaField', 'TextField', 'URLField', 'WPDateField',
+           'WPDateTimeField', 'WPTimeField', ]
 
 
 class IPv4Field(StringField):
@@ -101,7 +102,8 @@ class HTMLWidget:
     def __call__(self, field, **kwargs):
         kwargs.setdefault('id', field.id)
         return '<textarea {}>{}</textarea>'.format(widgets.html_params(name=field.name, **kwargs),
-                                                                      field._value())
+                                                   field._value())
+
 
 class HTMLField(TextAreaField):
     widget = HTMLWidget()
@@ -117,7 +119,6 @@ class ArrayField(FieldList):
 
 class IntervalField(IntegerField):
     pass
-
 
 
 def _test(argv):

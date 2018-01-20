@@ -55,7 +55,6 @@ def iter_first(sequence):
         raise ValueError()
 
 
-
 class ConfigReadError(exceptions.ConfigError):
     """A configuration file could not be read."""
     def __init__(self, filename, reason=None):

@@ -567,10 +567,11 @@ class TestResultsController(Controller):
             q = q.where(models.TestResults.result != constants.TestResult.PASSED)
         return q
 
+
 def _eval_value(attrvalue):
     try:
         return literal_eval(attrvalue)
-    except:
+    except:  # noqa
         return attrvalue
 
 

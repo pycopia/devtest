@@ -108,8 +108,8 @@ def inverse(text):
 
 def box(text, level=0, color=GREY):
     UL, hor, vert, UR, LL, LR = _BOXCHARS[level]
-    tt = "{}{}{}".format(UL, hor*(len(text)+2), UR)
-    bt = "{}{}{}".format(LL, hor*(len(text)+2), LR)
+    tt = "{}{}{}".format(UL, hor * (len(text) + 2), UR)
+    bt = "{}{}{}".format(LL, hor * (len(text) + 2), LR)
     ml = "{} {}{}{} {}".format(vert, color, text, RESET, vert)
     return "\n".join((tt, ml, bt))
 
@@ -125,6 +125,7 @@ def _test(argv):
           green("these words, which are green") + "."))
     print(cyan("Cyan"), cyan("Bright Cyan", bold=True))
     print("Regular", white("and white"))
+
 
 if __name__ == "__main__":
     import sys

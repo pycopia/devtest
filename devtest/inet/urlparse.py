@@ -1,4 +1,4 @@
-
+# python3
 """
 Additional URI parsing functions. This module extends the stock urlparse module
 and you can use it in place of that module.
@@ -13,28 +13,28 @@ import re
 # Well known service ports.
 # Using getservbyname is unreliable across hosts (some say port 80 is "www")
 SERVICES = {
-  "ftp": 21,
-  "ssh": 22,
-  "telnet": 23,
-  "smtp": 25,
-  "gopher": 70,
-  "http": 80,
-  "nntp": 119,
-  "imap": 143,
-  "prospero": 191,
-  "wais": 210,
-  "https": 443,
-  "rtsp": 554,
-  "rsync": 873,
-  "ftps": 990,
-  "imaps": 993,
-  "svn": 3690,
-  "postgres": 5432,
-  "mysql": 3306,
-  "sqlite": 0,
+    "ftp": 21,
+    "ssh": 22,
+    "telnet": 23,
+    "smtp": 25,
+    "gopher": 70,
+    "http": 80,
+    "nntp": 119,
+    "imap": 143,
+    "prospero": 191,
+    "wais": 210,
+    "https": 443,
+    "rtsp": 554,
+    "rsync": 873,
+    "ftps": 990,
+    "imaps": 993,
+    "svn": 3690,
+    "postgres": 5432,
+    "mysql": 3306,
+    "sqlite": 0,
 }
 
-SERVICES_REVERSE = dict((v,k) for k,v in list(SERVICES.items()))
+SERVICES_REVERSE = dict((v, k) for k, v in list(SERVICES.items()))
 
 
 # from rfc2396 appendix B:
@@ -116,6 +116,7 @@ def serverparse(server):
     else:
         host = server[0]
     return user, password, host, port
+
 
 def paramparse(params):
     return params.split(";")
@@ -374,7 +375,7 @@ class UniversalResourceLocator:
     def del_port(self):
         if self._port:
             self._badurl = True
-            self._port = SERVICES.get(self._scheme, 0) # set to default
+            self._port = SERVICES.get(self._scheme, 0)  # set to default
 
     def set_path(self, name):
         self._badurl = True
@@ -385,7 +386,7 @@ class UniversalResourceLocator:
         self._path = None
 
     def get_query(self):
-        self._badurl = True # assume you are going to change it.
+        self._badurl = True  # assume you are going to change it.
         return self._query
 
     def set_query(self, data, update=True):
@@ -426,27 +427,26 @@ class UniversalResourceLocator:
         return (self._host, self._port)
 
     URL   =    property(__str__, _set_URL, None,
-               "Full URL")
+                        "Full URL")
     scheme   = property(lambda s: s._scheme, set_scheme, None,
-               "Scheme part")
+                        "Scheme part")
     user     = property(lambda s: s._user, set_user, del_user,
-               "User part")
+                        "User part")
     password = property(lambda s: s._password, set_password, del_password,
-               "Password part")
+                        "Password part")
     host     = property(lambda s: s._host, set_host, del_host,
-               "Host part ")
+                        "Host part ")
     port     = property(lambda s: s._port, set_port, del_port,
-               "Port part ")
+                        "Port part ")
     path     = property(lambda s: s._path, set_path, del_path,
-               "Path part ")
+                        "Path part ")
     params   = property(lambda s: s._params, set_params, del_params,
-               "Params part")
+                        "Params part")
     query    = property(get_query, set_query, del_query,
-               "URLQuery object")
+                        "URLQuery object")
     fragment = property(lambda s: s._fragment, set_fragment, del_fragment,
-               "Fragment part")
+                        "Fragment part")
     address = property(get_address)
-
 
 
 if __name__ == "__main__":
@@ -467,7 +467,8 @@ if __name__ == "__main__":
     assert str(url) == URL
     url.scheme = "https"
     url.query["arg4"] = "val4"
-    #assert str(url) == "https://name:pass@www.host.com:8080/cgi?arg3=val3&qr=arg1&qr=arg2&arg4=val4"
+    # assert str(url) == ("https://name:pass@www.host.com:8080/cgi"
+    #                     "?arg3=val3&qr=arg1&qr=arg2&arg4=val4")
     assert url.host == "www.host.com"
     url2 = UniversalResourceLocator(url)
     del url.query

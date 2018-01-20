@@ -102,7 +102,7 @@ def _do_long(opt):
         i = opt.index('=')
     except ValueError:
         return opt[2:], True
-    return opt[2:i], _eval(opt[i+1:])
+    return opt[2:i], _eval(opt[i + 1:])
 
 
 def _eval(val):
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     else:
         raise AssertionError("didn't get expected error")
 
-    argv = ["prog", "-dv",  "argument"]
+    argv = ["prog", "-dv", "argument"]
     opts, args = getopt(argv, "h?dv")
     print(opts, args)
 

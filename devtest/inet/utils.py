@@ -47,7 +47,7 @@ def islocal(host):
     ip = gethostbyname(getfqdn(host))
     s = socket(AF_INET, SOCK_STREAM)
     try:
-        s.bind((ip, IPPORT_USERRESERVED+1))
+        s.bind((ip, IPPORT_USERRESERVED + 1))
     except OSError as err:
         if err.errno == EADDRNOTAVAIL:
             return False

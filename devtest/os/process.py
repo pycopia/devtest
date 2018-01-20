@@ -10,7 +10,7 @@ import atexit
 
 import psutil
 
-from subprocess import (
+from subprocess import (  # noqa
     CompletedProcess,
     SubprocessError,
     CalledProcessError,
@@ -24,7 +24,7 @@ from devtest import logging
 from devtest.textutils import shparser
 from devtest.io import subprocess
 from devtest.io.reactor import (get_kernel, sleep, spawn, timeout_after,
-                                CancelledError, TaskTimeout)
+                                TaskTimeout)
 from devtest.os import procutils
 from devtest.os import exitstatus
 
@@ -244,13 +244,14 @@ async def _run_proc(proc, timeout, input):
         proc.kill()
         stdout, stderr = await proc.communicate()
         return TimeoutExpired(proc.args, timeout, output=stdout, stderr=stderr)
-    except:
+    except:  # noqa
         proc.kill()
         raise
     retcode = proc.poll()
     if retcode:
         return CalledProcessError(retcode, proc.args, output=stdout, stderr=stderr)
     return stdout, stderr
+
 
 async def _call_proc(proc, timeout):
     return await proc._popen.wait()
@@ -265,6 +266,7 @@ def call(cmd, timeout=None, directory=None):
 
 
 _manager = None
+
 
 def get_manager():
     global _manager

@@ -27,7 +27,7 @@ def iter_module_specs(package="testcases", onerror=None):
                   file=sys.stderr)
         return
     for finder, name, ispkg in pkgutil.walk_packages(
-            path=mod.__path__, prefix=mod.__name__+'.', onerror=onerror):
+            path=mod.__path__, prefix=mod.__name__ + '.', onerror=onerror):
         if not ispkg and "._" not in name:
             spec = finder.find_spec(name)
             yield spec
@@ -101,7 +101,6 @@ def _test(argv):
 
 
 if __name__ == "__main__":
-    import sys
     tc = _test(sys.argv)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

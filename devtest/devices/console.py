@@ -28,8 +28,8 @@ def _console_login(term, account, password):
     exp.send("\r")
     while True:
         mo, index = exp.expect(
-            ["\rlogin:", "assword:", exp.prompt, AUTOMATION_PROMPT, "\r] ", exp.timeoutmatch(10.0)],
-            timeout=30.0)
+            ["\rlogin:", "assword:", exp.prompt, AUTOMATION_PROMPT, "\r] ",
+             exp.timeoutmatch(10.0)], timeout=30.0)
         if mo:
             if index == 0:
                 exp.send(account + "\r")

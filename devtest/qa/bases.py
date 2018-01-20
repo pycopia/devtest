@@ -148,7 +148,7 @@ class TestCase:
             self.incomplete("{}: aborted by TestSuiteAbort exception.".format(self.test_name))
             test_end.send(self, time=datetime.now(timezone.utc))
             raise  # pass this one up to suite
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestCase", val)
             if self._debug:
@@ -166,7 +166,7 @@ class TestCase:
     def _initialize(self):
         try:
             self.initialize()
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             self.diagnostic("{} ({})".format(ex.__name__, val))
             logging.exception_error("Error in TestCase.initialize", val)
@@ -182,7 +182,7 @@ class TestCase:
     def _finalize(self):
         try:
             self.finalize()
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             self.diagnostic("{} ({})".format(ex.__name__, val))
             logging.exception_error("Error in TestCase.finalize", val)
@@ -762,7 +762,8 @@ class TestSuite:
         if isinstance(suite, str):
             suite = importlib.get_class(suite)
         if type(suite) is type and issubclass(suite, TestSuite):
-            suite = suite(self.config, testbed=self.testbed, ui=self.ui, nested=1, name=name, doc=doc)
+            suite = suite(self.config, testbed=self.testbed, ui=self.ui, nested=1,
+                          name=name, doc=doc)
         else:
             assert isinstance(suite, TestSuite), "Need a TestSuite subclass instance"
             suite.config = self.config
@@ -825,7 +826,7 @@ class TestSuite:
         except KeyboardInterrupt:
             self.info("Suite aborted by user in initialize().")
             raise TestSuiteAbort("Interrupted in suite initialize.")
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestSuite.initialize", val)
             if self._debug:
@@ -886,7 +887,7 @@ class TestSuite:
                     "Suite {!r} aborted by user in finalize().".format(self.test_name))
             else:
                 self.info("Suite aborted by user in finalize().")
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestSuite.finalize", val)
             if self._debug:

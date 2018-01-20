@@ -75,7 +75,7 @@ class AccountIds(BaseModel):
                 return cls.create(identifier=identifier, login=login,
                                   password=password), True
         except IntegrityError:
-            return cls.get(cls.identifier==identifier), False
+            return cls.get(cls.identifier == identifier), False
 
 
 class EquipmentModel(BaseModel):
@@ -93,7 +93,7 @@ class EquipmentModel(BaseModel):
         db_table = 'equipment_model'
         indexes = (
             (("name", "manufacturer"), True),
-            )
+        )
 
     def __str__(self):
         return "{} {}".format(self.manufacturer, self.name)
@@ -114,7 +114,8 @@ class EquipmentModel(BaseModel):
                 return cls.create(name=name, manufacturer=manufacturer,
                                   attributes=attributes), True
         except IntegrityError:
-            return cls.get(cls.name==name, cls.manufacturer==manufacturer), False
+            return (cls.get(cls.name == name,
+                            cls.manufacturer == manufacturer), False)
 
 
 class Equipment(BaseModel):
@@ -131,9 +132,9 @@ class Equipment(BaseModel):
     account = ForeignKeyField(db_column='account_id', null=True,
                               rel_model=AccountIds, to_field='id')
     user = ForeignKeyField(db_column='user_id', null=True,
-                              rel_model=AccountIds, to_field='id',
-                              related_name='user_equipment_set',
-                              on_update="CASCADE", on_delete="SET NULL")
+                           rel_model=AccountIds, to_field='id',
+                           related_name='user_equipment_set',
+                           on_update="CASCADE", on_delete="SET NULL")
     partof = ForeignKeyField(db_column='partof_id', null=True,
                              rel_model='self', to_field='id',
                              related_name='subcomponents',
@@ -157,7 +158,7 @@ class Equipment(BaseModel):
                 return cls.create(name=name, serno=serno, model=model, account=account,
                                   attributes=attributes), True
         except IntegrityError:
-            return cls.get(cls.name==name), False
+            return cls.get(cls.name == name), False
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -245,7 +246,7 @@ class Function(BaseModel):
                 return cls.create(name=name, description=description,
                                   implementation=implementation), True
         except IntegrityError:
-            return cls.get(cls.name==name), False
+            return cls.get(cls.name == name), False
 
     @classmethod
     def get_by_name(cls, name):
@@ -335,7 +336,7 @@ class TestBed(BaseModel):
                 return cls.create(name=name, notes=notes,
                                   attributes=attributes), True
         except IntegrityError:
-            return cls.get(cls.name==name), False
+            return cls.get(cls.name == name), False
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -383,14 +384,15 @@ class TestBed(BaseModel):
         func = Function.select().where(Function.name == rolename).get()
         with database.atomic():
             te, created = _Testequipment.create_or_get(testbed=self,
-                    equipment=eq, function=func)
+                                                       equipment=eq,
+                                                       function=func)
 
     def remove_testequipment(self, eq, rolename):
         func = Function.select().where(Function.name == rolename).get()
         with database.atomic():
             te = _Testequipment.select().where(_Testequipment.testbed == self,
-                                              _Testequipment.function == func,
-                                              _Testequipment.equipment == eq).get()
+                                               _Testequipment.function == func,
+                                               _Testequipment.equipment == eq).get()
             te.delete_instance()
 
     def get_equipment_with_role(self, rolename):
@@ -430,7 +432,7 @@ class _Testequipment(BaseModel):
         db_table = 'testequipment'
         indexes = (
             (("testbed", "equipment", "function"), True),
-            )
+        )
 
     def __str__(self):
         return "{} in TestBed {} as {}".format(self.equipment.name,
@@ -444,8 +446,9 @@ class _Testequipment(BaseModel):
                 return cls.create(testbed=testbed, equipment=equipment,
                                   function=function), True
         except IntegrityError:
-            return cls.get(cls.testbed==testbed, cls.equipment==equipment,
-                                  cls.function==function), False
+            return (cls.get(cls.testbed == testbed, cls.equipment == equipment,
+                            cls.function == function), False)
+
 
 class _SoftwareRoles(BaseModel):
     testbed = ForeignKeyField(db_column='testbed_id',
@@ -631,7 +634,7 @@ class TestCases(BaseModel):
         db_table = 'test_cases'
         indexes = (
             (("testimplementation",), False),
-            )
+        )
 
     def __str__(self):
         return self.name
@@ -739,9 +742,9 @@ class TestResults(BaseModel):
             else:
                 name = "TestSuite: generic"
         elif self.resulttype == constants.TestResultType.TestRunSummary:
-            name = "run id: {} on {}, artifacts: {}".format(self.id,
-                                                    self.testbed.name if self.testbed else "no testbed",
-                                                    self.resultslocation)
+            name = "run id: {} on {}, artifacts: {}".format(
+                self.id, self.testbed.name if self.testbed else "no testbed",
+                self.resultslocation)
         else:
             name = "{!r} id: {}".format(self.resulttype, self.id)
         return "TestResult: {:10.10s} {}".format(self.result.name, name)
@@ -756,7 +759,8 @@ class TestResults(BaseModel):
 
     @classmethod
     def for_testcase(cls, testcase, limit=100):
-        return cls.select().where(cls.testcase == testcase).order_by(cls.starttime).limit(limit).execute()
+        return cls.select().where(
+            cls.testcase == testcase).order_by(cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_runs(cls, limit=20):

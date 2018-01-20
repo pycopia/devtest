@@ -11,7 +11,7 @@ from functools import reduce
 def factorial(x):
     """return x!
     """
-    return x <= 0 or reduce(lambda a, b: a*b, range(1, x+1))
+    return x <= 0 or reduce(lambda a, b: a * b, range(1, x + 1))
 
 
 def prune_end(n, l):
@@ -41,10 +41,11 @@ class ListCounter:
         return self.fetch()
 
     def _increment(self, place):
-        carry, self._counters[place] = divmod(self._counters[place]+1, self._lengths[place])
+        carry, self._counters[place] = divmod(self._counters[place] + 1,
+                                              self._lengths[place])
         if carry:
-            if place+1 < self._places:
-                return self._increment(place+1)
+            if place + 1 < self._places:
+                return self._increment(place + 1)
             else:
                 raise StopIteration
         return carry
@@ -53,7 +54,7 @@ class ListCounter:
         return [l[i] for l, i in zip(self._lists, self._counters)]
 
     def get_number(self):
-        return reduce(lambda a, b: a*b, self._lengths, 1)
+        return reduce(lambda a, b: a * b, self._lengths, 1)
 
 
 class KeywordCounter:
@@ -95,7 +96,7 @@ def prune(maxN, sets, chooser=prune_end):
     number, N, and a list and returning a new list with N elements.
     """
     lenlist = [len(l) for l in sets]
-    while reduce(lambda a, b: a*b, lenlist, 1) > maxN:
+    while reduce(lambda a, b: a * b, lenlist, 1) > maxN:
         lv, li = maxi(lenlist)
         lenlist[li] -= 1
     return [chooser(n, l) for n, l in zip(lenlist, sets)]

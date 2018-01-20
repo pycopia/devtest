@@ -2,7 +2,7 @@
 """
 
 # Use the newer built-in enums for Enum. Here we will always use Integer Enums.
-from enum import IntEnum as Enum
+from enum import IntEnum as Enum  # noqa
 
 
 class NULLType(type):

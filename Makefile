@@ -2,6 +2,7 @@
 
 # Set only major.minor version string, used elsewhere.
 # Make sure your python3 is linked to the specific version you want.
+# Or, preset the PYTHONBIN environment variable to the specific Python you want.
 PYTHONBIN ?= $(shell python3-config --prefix)/bin/python3
 
 PYVER := $(shell $(PYTHONBIN) -c 'import sys;print("{}.{}".format(sys.version_info[0], sys.version_info[1]))')
@@ -18,11 +19,12 @@ else
 endif
 
 .PHONY: help info build install clean distclean develop test sdist \
-	requirements publish extensions
+	requirements publish extensions lint
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  info          Show info about the Python being used."
+	@echo "  lint          to lint the source with flake8."
 	@echo "  build         to just build the packages."
 	@echo "  extensions    to build only extensions."
 	@echo "  install       to install from this workspace."
@@ -40,6 +42,10 @@ info:
 
 build:
 	$(PYTHONBIN) setup.py build
+
+lint:
+	$(PYTHONBIN) -m flake8 devtest/
+	$(PYTHONBIN) -m flake8 bin/devtestadmin
 
 extensions:
 	$(PYTHONBIN) setup.py build_ext --inplace

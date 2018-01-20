@@ -142,7 +142,7 @@ class ShellInterface:
             pick_tests(self.arguments)
         try:
             testlist, errlist = loader.load_selections(self.arguments)
-        except:
+        except:  # noqa
             ex, val, tb = sys.exc_info()
             if self.debug_framework:
                 debugger.post_mortem(tb)
@@ -166,7 +166,7 @@ class ShellInterface:
             try:
                 rnr = runner.TestRunner(self.config)
                 return rnr.runall(testlist)
-            except:
+            except:  # noqa
                 ex, val, tb = sys.exc_info()
                 if self.debug_framework:
                     debugger.post_mortem(tb)
@@ -174,7 +174,9 @@ class ShellInterface:
                     print("Error: {}: {}".format(ex.__name__, val), file=sys.stderr)
                     while val.__cause__ is not None:
                         val = val.__cause__
-                        print("Because: {}: {}".format(val.__class__.__name__, val), file=sys.stderr)
+                        print("Because: {}: {}".format(val.__class__.__name__,
+                                                       val),
+                              file=sys.stderr)
         else:
             print("Warning: nothing to run.", file=sys.stderr)
 

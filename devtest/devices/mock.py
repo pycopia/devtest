@@ -4,6 +4,7 @@ Mock device controller useful for testing and demo.
 
 from . import Controller
 
+
 class MockController(Controller):
 
     def __init__(self, equipment):

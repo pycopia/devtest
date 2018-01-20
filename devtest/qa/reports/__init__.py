@@ -235,6 +235,7 @@ def _test(argv):
     for rptname in get_report_list():
         print(rptname)
 
+
 if __name__ == "__main__":
     import sys
     _test(sys.argv)

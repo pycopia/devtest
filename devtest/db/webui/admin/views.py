@@ -4,11 +4,15 @@ Devtest web admin views.
 
 from __future__ import generator_stop
 
+from gettext import gettext
+
+from flask import flash
+
 from peewee import Field
 
 from wtfpeewee.orm import ModelConverter, model_form
 
-from flask_admin import Admin
+from flask_admin import Admin, parse_like_term
 from flask_admin.menu import MenuLink
 from flask_admin.form import BaseForm
 from flask_admin.model import BaseModelView
@@ -29,7 +33,9 @@ class QueryAjaxModelLoader(AjaxModelLoader):
         self.fields = options.get('fields')
 
         if not self.fields:
-            raise ValueError('AJAX loading requires `fields` to be specified for {}.{}'.format(model, self.name))
+            raise ValueError(
+                'AJAX loading requires `fields` '
+                'to be specified for {}.{}'.format(model, self.name))
 
         self._cached_fields = self._process_fields()
 
@@ -90,7 +96,7 @@ def create_ajax_loader(model, name, field_name, options):
 class ModelView(BaseModelView):
 
     column_list = None
-    #column_filters = None
+    # column_filters = None
     column_searchable_list = None
     filter_converter = filters.FilterConverter()
     form_overrides = None
@@ -123,7 +129,8 @@ class ModelView(BaseModelView):
                 # Check type
                 if (field_type != fields.CharField and field_type != fields.TextField):
                     raise ValueError(
-                        'Can only search on text columns. Failed to setup search for "{}"'.format(p))
+                        'Can only search on text columns. '
+                        'Failed to setup search for "{}"'.format(p))
                 self._search_fields.append(p)
 
         return bool(self._search_fields)
@@ -157,9 +164,10 @@ class ModelView(BaseModelView):
 
     def scaffold_form(self):
         form_class = model_form(self.model,
-                base_class=BaseForm, allow_pk=False,
-                only=None, exclude=self.form_exclude, field_args=self.field_args,
-                converter=ModelConverter(overrides=self.form_overrides))
+                                base_class=BaseForm, allow_pk=False,
+                                only=None, exclude=self.form_exclude,
+                                field_args=self.field_args,
+                                converter=ModelConverter(overrides=self.form_overrides))
         return form_class
 
 #    def scaffold_list_form(self, widget=None, validators=None):
@@ -265,7 +273,6 @@ class ModelView(BaseModelView):
         except Exception as ex:
             if not self.handle_view_exception(ex):
                 flash(gettext('Failed to create record. %(error)s', error=str(ex)), 'error')
-                log.exception('Failed to create record.')
             return False
         else:
             self.after_model_change(form, row, True)
@@ -278,7 +285,6 @@ class ModelView(BaseModelView):
         except Exception as ex:
             if not self.handle_view_exception(ex):
                 flash(gettext('Failed to update record. %(error)s', error=str(ex)), 'error')
-                log.exception('Failed to update record.')
             return False
         else:
             self.after_model_change(form, row, False)
@@ -291,7 +297,6 @@ class ModelView(BaseModelView):
         except Exception as ex:
             if not self.handle_view_exception(ex):
                 flash(gettext('Failed to delete record. %(error)s', error=str(ex)), 'error')
-                log.exception('Failed to delete record.')
             return False
         else:
             self.after_model_delete(row)
@@ -335,7 +340,7 @@ class EquipmentView(ModelView):
     can_view_details = True
     column_details_list = column_list + ("account", "user", "location", "notes",
                                          "partof", "attributes", "active")
-    #column_editable_list = ("location", "active")
+    # column_editable_list = ("location", "active")
     form_ajax_refs = {
         'account': {
             'fields': ('identifier', 'login', 'password', 'admin'),
@@ -436,13 +441,12 @@ class TestCaseView(ModelView):
     column_list = ("name", "purpose", "testimplementation")
     form_exclude = ("owners", "related_problems")
     column_details_list = (column_list +
-        ("passcriteria", "startcondition", "endcondition", "procedure",
-        "attributes", "comments",
-        "type", "priority", "status", "interactive", "automated",
-        "target_software", "target_component", "radar_component",
-        "time_estimate",
-        "lastchange",
-        "valid"))
+                           ("passcriteria", "startcondition", "endcondition",
+                            "procedure", "attributes", "comments", "type",
+                            "priority", "status", "interactive", "automated",
+                            "target_software", "target_component",
+                            "radar_component", "time_estimate", "lastchange",
+                            "valid"))
 
     form_overrides = dict(purpose=formfields.HTMLField,
                           attributes=formfields.JSONField,
@@ -450,8 +454,8 @@ class TestCaseView(ModelView):
                           priority=formfields.EnumField,
                           status=formfields.EnumField,
                           time_estimate=formfields.IntervalField,
-                          #owners=formfields.ArrayField,
-                          #related_problems=formfields.ArrayField,
+                          # owners=formfields.ArrayField,
+                          # related_problems=formfields.ArrayField,
                           )
     field_args = dict(type={"choices": models.TestCases.type.choices},
                       priority={"choices": models.TestCases.priority.choices},
@@ -468,8 +472,8 @@ class TestSuiteView(ModelView):
     form_exclude = ("owners", "test_cases")
     column_details_list = column_list + ("lastchange", "valid")
     form_overrides = dict(purpose=formfields.HTMLField,
-                          #owners=formfields.ArrayField,
-                          #test_cases=formfields.ArrayField,
+                          # owners=formfields.ArrayField,
+                          # test_cases=formfields.ArrayField,
                           )
     can_edit = False
     can_view_details = True
@@ -485,7 +489,7 @@ class ScenarioView(ModelView):
                                          "testbed", "testsuite")
     form_overrides = dict(purpose=formfields.HTMLField,
                           parameters=formfields.JSONField,
-                          #owners=formfields.ArrayField,
+                          # owners=formfields.ArrayField,
                           )
     can_edit = False
     can_view_details = True
@@ -562,4 +566,5 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

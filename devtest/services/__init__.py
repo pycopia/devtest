@@ -19,7 +19,7 @@ _manager = None
 def log_receiver_connected(sig, receiver=None, sender=None, weak=None):
     logging.info(
         "signal.connect: {name!r} receiver={recv!r} sender={sender!r}".format(
-                          name=sig.name, recv=receiver, sender=sender))
+            name=sig.name, recv=receiver, sender=sender))
 
 
 def log_service_want(equipment, service=None):

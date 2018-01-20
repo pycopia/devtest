@@ -23,7 +23,7 @@ def generate_private_key(filename, passphrase, _backend=None):
         algo = serialization.NoEncryption()
     else:
         algo = serialization.BestAvailableEncryption(
-                passphrase.encode("ascii"))
+            passphrase.encode("ascii"))
     key_bytes = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,

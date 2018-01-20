@@ -29,8 +29,8 @@ setup(
     tests_require=['pytest'],
     ext_modules=EXTENSIONS,
     cmdclass={"build_ext": build_ext},
-    #setup_requires=['setuptools_scm'],
-    #use_scm_version=True,
+    # setup_requires=['setuptools_scm'],
+    # use_scm_version=True,
 
     license='Apache 2.0',
     description='General purpose device and system test framework.',
@@ -47,17 +47,17 @@ setup(
         'pygments',
         'pyyaml',
         'elicit>=1.2',
-# webui
+        # webui
         'flask',
-        'Flask-BasicAuth',
-        'flask-admin',
-        'flask-cache',
+        'Flask_BasicAuth',
+        'flask_admin',
+        'flask_cache',
         'wtf-peewee',
     ],
     author='Keith Dart',
     author_email='keith@dartworks.biz',
-    url = "https://github.com/kdart/devtest",
-    classifiers = [
+    url="https://github.com/kdart/devtest",
+    classifiers=[
         "Programming Language :: Python",
         "License :: Apache 2.0",
         "Programming Language :: Python :: 3.5",

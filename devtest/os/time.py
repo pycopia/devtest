@@ -15,6 +15,7 @@ __all__ = ['delay', 'delay_before', 'delay_after']
 
 now = time.time
 
+
 def delay(secs):
     return get_kernel().run(sleep(secs))
 
