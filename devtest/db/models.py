@@ -60,7 +60,7 @@ class AccountIds(BaseModel):
     note = TextField(null=True)
 
     class Meta:
-        db_table = 'account_ids'
+        table_name = 'account_ids'
         indexes = (
             (("identifier",), True),
         )
@@ -90,7 +90,7 @@ class EquipmentModel(BaseModel):
     attributes = BinaryJSONField(default=None, null=True)
 
     class Meta:
-        db_table = 'equipment_model'
+        table_name = 'equipment_model'
         indexes = (
             (("name", "manufacturer"), True),
         )
@@ -126,18 +126,18 @@ class Equipment(BaseModel):
 
     name = CharField(max_length=255, unique=True)
     serno = CharField(max_length=255, null=True)
-    model = ForeignKeyField(db_column='model_id',
-                            rel_model=EquipmentModel, to_field='id',
-                            related_name='equipment')
-    account = ForeignKeyField(db_column='account_id', null=True,
-                              rel_model=AccountIds, to_field='id')
-    user = ForeignKeyField(db_column='user_id', null=True,
-                           rel_model=AccountIds, to_field='id',
-                           related_name='user_equipment_set',
+    model = ForeignKeyField(column_name='model_id',
+                            model=EquipmentModel, field='id',
+                            backref='equipment')
+    account = ForeignKeyField(column_name='account_id', null=True,
+                              model=AccountIds, field='id')
+    user = ForeignKeyField(column_name='user_id', null=True,
+                           model=AccountIds, field='id',
+                           backref='user_equipment_set',
                            on_update="CASCADE", on_delete="SET NULL")
-    partof = ForeignKeyField(db_column='partof_id', null=True,
-                             rel_model='self', to_field='id',
-                             related_name='subcomponents',
+    partof = ForeignKeyField(column_name='partof_id', null=True,
+                             model='self', field='id',
+                             backref='subcomponents',
                              on_update="CASCADE", on_delete="SET NULL")
     location = TextField(null=True)
     notes = TextField(null=True)
@@ -145,7 +145,7 @@ class Equipment(BaseModel):
     active = BooleanField(default=True)
 
     class Meta:
-        db_table = 'equipment'
+        table_name = 'equipment'
 
     def __str__(self):
         return self.name
@@ -234,7 +234,7 @@ class Function(BaseModel):
     implementation = CharField(max_length=255, null=True)
 
     class Meta:
-        db_table = 'function'
+        table_name = 'function'
 
     def __str__(self):
         return "Function: {}".format(self.name)
@@ -270,13 +270,13 @@ class Software(BaseModel):
     """
     name = CharField(max_length=255, unique=True)
     version = CharField(max_length=255, null=True)
-    implements = ForeignKeyField(db_column='category_id',
-                                 rel_model=Function, to_field='id',
-                                 related_name="implementations")
+    implements = ForeignKeyField(column_name='category_id',
+                                 model=Function, field='id',
+                                 backref="implementations")
     attributes = BinaryJSONField(default=None, null=True)
 
     class Meta:
-        db_table = 'software'
+        table_name = 'software'
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -294,21 +294,21 @@ class SoftwareVariant(BaseModel):
     build = CharField(max_length=80)
 
     class Meta:
-        db_table = 'software_variant'
+        table_name = 'software_variant'
 
     def __str__(self):
         return "{}-{}-{}".format(self.branch, self.target, self.build)
 
 
 class _SoftwareVariants(BaseModel):
-    software = ForeignKeyField(db_column='software_id',
-                               rel_model=Software, to_field='id',
-                               related_name="variants")
-    softwarevariant = ForeignKeyField(db_column='softwarevariant_id',
-                                      rel_model=SoftwareVariant, to_field='id')
+    software = ForeignKeyField(column_name='software_id',
+                               model=Software, field='id',
+                               backref="variants")
+    softwarevariant = ForeignKeyField(column_name='softwarevariant_id',
+                                      model=SoftwareVariant, field='id')
 
     class Meta:
-        db_table = 'software_variants'
+        table_name = 'software_variants'
         primary_key = CompositeKey('software', 'softwarevariant')
 
 
@@ -324,7 +324,7 @@ class TestBed(BaseModel):
     attributes = BinaryJSONField(default=None, null=True)
 
     class Meta:
-        db_table = 'testbeds'
+        table_name = 'testbeds'
 
     def __str__(self):
         return self.name
@@ -416,20 +416,20 @@ class TestBed(BaseModel):
 
 # Maps a testbed to equipment.
 class _Testequipment(BaseModel):
-    testbed = ForeignKeyField(db_column='testbed_id',
-                              rel_model=TestBed, to_field='id',
-                              related_name="testequipment",
+    testbed = ForeignKeyField(column_name='testbed_id',
+                              model=TestBed, field='id',
+                              backref="testequipment",
                               on_update="CASCADE", on_delete="CASCADE")
-    equipment = ForeignKeyField(db_column='equipment_id',
-                                rel_model=Equipment, to_field='id',
-                                related_name="testequipment",
+    equipment = ForeignKeyField(column_name='equipment_id',
+                                model=Equipment, field='id',
+                                backref="testequipment",
                                 on_update="CASCADE", on_delete="CASCADE")
-    function = ForeignKeyField(db_column='function_id', null=True,
-                               rel_model=Function, to_field='id',
+    function = ForeignKeyField(column_name='function_id', null=True,
+                               model=Function, field='id',
                                on_update="CASCADE", on_delete="CASCADE")
 
     class Meta:
-        db_table = 'testequipment'
+        table_name = 'testequipment'
         indexes = (
             (("testbed", "equipment", "function"), True),
         )
@@ -451,18 +451,18 @@ class _Testequipment(BaseModel):
 
 
 class _SoftwareRoles(BaseModel):
-    testbed = ForeignKeyField(db_column='testbed_id',
-                              rel_model=TestBed, to_field='id',
+    testbed = ForeignKeyField(column_name='testbed_id',
+                              model=TestBed, field='id',
                               on_update="CASCADE", on_delete="CASCADE")
-    software = ForeignKeyField(db_column='software_id',
-                               rel_model=Software, to_field='id',
+    software = ForeignKeyField(column_name='software_id',
+                               model=Software, field='id',
                                on_update="CASCADE", on_delete="CASCADE")
-    function = ForeignKeyField(db_column='function_id',
-                               rel_model=Function, to_field='id',
+    function = ForeignKeyField(column_name='function_id',
+                               model=Function, field='id',
                                on_update="CASCADE", on_delete="CASCADE")
 
     class Meta:
-        db_table = 'software_roles'
+        table_name = 'software_roles'
         primary_key = CompositeKey('testbed', 'software', 'function')
 
 
@@ -470,20 +470,20 @@ class _SoftwareRoles(BaseModel):
 # connections. These are point-to-point connections with no configurable
 # addressing.
 class _Connection(BaseModel):
-    source = ForeignKeyField(db_column='source_id',
-                             rel_model=Equipment, to_field='id',
-                             related_name="connections",
+    source = ForeignKeyField(column_name='source_id',
+                             model=Equipment, field='id',
+                             backref="connections",
                              on_delete="CASCADE")
-    destination = ForeignKeyField(db_column='destination_id',
-                                  rel_model=Equipment, to_field='id',
-                                  related_name="connected",
+    destination = ForeignKeyField(column_name='destination_id',
+                                  model=Equipment, field='id',
+                                  backref="connected",
                                   on_delete="CASCADE")
     type = EnumField(constants.ConnectionType,
                      default=constants.ConnectionType.Unknown)
     state = IntegerField(null=True)  # User defined state
 
     class Meta:
-        db_table = 'connections'
+        table_name = 'connections'
 
 
 class Networks(BaseModel):
@@ -495,16 +495,16 @@ class Networks(BaseModel):
     ip6network = CIDRField(null=True)
     vlanid = IntegerField(null=True)
     layer = IntegerField(default=3)
-    lower = ForeignKeyField(db_column='lower_id', null=True,
-                            rel_model='self', to_field='id',
-                            related_name="upper")
+    lower = ForeignKeyField(column_name='lower_id', null=True,
+                            model='self', field='id',
+                            backref="upper")
     type = EnumField(constants.NetworkType,
                      default=constants.NetworkType.Unknown)
     notes = TextField(null=True)
     attributes = BinaryJSONField(default=None, null=True)  # User defined attributes
 
     class Meta:
-        db_table = 'networks'
+        table_name = 'networks'
         constraints = [Check('vlanid >= 0 AND vlanid < 4096')]
 
     def __str__(self):
@@ -537,22 +537,22 @@ class Interfaces(BaseModel):
     ipaddr6 = IPv6Field(null=True)  # inet
     macaddr = MACField(null=True)  # macaddr
     vlan = IntegerField(null=True, default=0)
-    parent = ForeignKeyField(db_column='parent_id', null=True,
-                             rel_model='self', to_field='id',
-                             related_name="subinterface",
+    parent = ForeignKeyField(column_name='parent_id', null=True,
+                             model='self', field='id',
+                             backref="subinterface",
                              on_update="CASCADE",
                              on_delete="SET NULL")
-    equipment = ForeignKeyField(db_column='equipment_id', null=True,
-                                rel_model=Equipment, to_field='id',
-                                related_name="interfaces",
+    equipment = ForeignKeyField(column_name='equipment_id', null=True,
+                                model=Equipment, field='id',
+                                backref="interfaces",
                                 on_delete="CASCADE")
-    network = ForeignKeyField(db_column='network_id', null=True,
-                              rel_model=Networks, to_field='id',
+    network = ForeignKeyField(column_name='network_id', null=True,
+                              model=Networks, field='id',
                               on_update="CASCADE",
                               on_delete="SET NULL")
 
     class Meta:
-        db_table = 'interfaces'
+        table_name = 'interfaces'
         constraints = [Check('vlan >= 0 AND vlan < 4096')]
 
     def __str__(self):
@@ -570,7 +570,7 @@ class TestSuites(BaseModel):
     valid = BooleanField(default=True)
 
     class Meta:
-        db_table = 'test_suites'
+        table_name = 'test_suites'
 
     def __str__(self):
         return "TestSuite: {}".format(self.name)
@@ -604,9 +604,9 @@ class TestCases(BaseModel):
     # Running, scheduling and reporting
     testimplementation = CharField(max_length=255, null=True)  # Python path
     target_software = ForeignKeyField(null=True,
-                                      rel_model=Software, to_field='id')
+                                      model=Software, field='id')
     target_component = ForeignKeyField(null=True,
-                                       rel_model=EquipmentModel, to_field='id')
+                                       model=EquipmentModel, field='id')
 
     # Classification
     type = EnumField(constants.TestCaseType,
@@ -631,7 +631,7 @@ class TestCases(BaseModel):
     valid = BooleanField(default=True)
 
     class Meta:
-        db_table = 'test_cases'
+        table_name = 'test_cases'
         indexes = (
             (("testimplementation",), False),
         )
@@ -669,14 +669,14 @@ class Scenario(BaseModel):
     reportname = CharField(max_length=80, null=True)
     owners = ArrayField(null=True)  # Array of user IDs
     notes = TextField(null=True)
-    testbed = ForeignKeyField(db_column='testbed_id',
-                              rel_model=TestBed, to_field='id', null=True)
-    testsuite = ForeignKeyField(db_column='testsuite_id',
-                                rel_model=TestSuites, to_field='id',
-                                related_name="scenarios", null=True)
+    testbed = ForeignKeyField(column_name='testbed_id',
+                              model=TestBed, field='id', null=True)
+    testsuite = ForeignKeyField(column_name='testsuite_id',
+                                model=TestSuites, field='id',
+                                backref="scenarios", null=True)
 
     class Meta:
-        db_table = 'scenarios'
+        table_name = 'scenarios'
 
     def __str__(self):
         return self.name
@@ -714,20 +714,20 @@ class TestResults(BaseModel):
     dutbuild = CharField(max_length=255, null=True)  # target build or version
 
     # Test case and result associations.
-    parent = ForeignKeyField(db_column='parent_id', null=True,
-                             rel_model='self', to_field='id',
-                             related_name="subresults")
-    testcase = ForeignKeyField(db_column='testcase_id', null=True,
-                               rel_model=TestCases, to_field='id',
-                               related_name="testresults")
-    testsuite = ForeignKeyField(db_column='testsuite_id', null=True,
-                                rel_model=TestSuites, to_field='id',
-                                related_name="testresults")
-    testbed = ForeignKeyField(db_column='testbed_id', null=True,
-                              rel_model=TestBed, to_field='id')
+    parent = ForeignKeyField(column_name='parent_id', null=True,
+                             model='self', field='id',
+                             backref="subresults")
+    testcase = ForeignKeyField(column_name='testcase_id', null=True,
+                               model=TestCases, field='id',
+                               backref="testresults")
+    testsuite = ForeignKeyField(column_name='testsuite_id', null=True,
+                                model=TestSuites, field='id',
+                                backref="testresults")
+    testbed = ForeignKeyField(column_name='testbed_id', null=True,
+                              model=TestBed, field='id')
 
     class Meta:
-        db_table = 'test_results'
+        table_name = 'test_results'
 
     def __str__(self):
         name = ""

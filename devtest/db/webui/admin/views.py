@@ -89,7 +89,7 @@ def create_ajax_loader(model, name, field_name, options):
     if prop is None:
         raise ValueError('Model {!r} does not have field {!r}.'.format(model.__name__, field_name))
 
-    remote_model = prop.rel_model
+    remote_model = prop.model
     return QueryAjaxModelLoader(name, remote_model, **options)
 
 
@@ -147,8 +147,8 @@ class ModelView(BaseModelView):
             raise ValueError('Failed to find field for filter: {}'.format(name))
 
         # Check if field is in different model
-        if attr.model_class != self.model:
-            visible_name = '%s / %s' % (self.get_column_name(attr.model_class.__name__),
+        if attr.model != self.model:
+            visible_name = '%s / %s' % (self.get_column_name(attr.model.__name__),
                                         self.get_column_name(attr.name))
         else:
             if not isinstance(name, str):
@@ -174,11 +174,11 @@ class ModelView(BaseModelView):
 #        pass # TODO
 
     def _handle_join(self, query, field, joins):
-        if field.model_class != self.model:
-            model_name = field.model_class.__name__
+        if field.model != self.model:
+            model_name = field.model.__name__
 
             if model_name not in joins:
-                query = query.join(field.model_class)
+                query = query.join(field.model)
                 joins.add(model_name)
         return query
 
@@ -187,7 +187,7 @@ class ModelView(BaseModelView):
             field = getattr(self.model, sort_field)
             query = query.order_by(field.desc() if sort_desc else field.asc())
         elif isinstance(sort_field, Field):
-            if sort_field.model_class != self.model:
+            if sort_field.model != self.model:
                 query = self._handle_join(query, sort_field, joins)
             query = query.order_by(sort_field.desc() if sort_desc else sort_field.asc())
         return query, joins

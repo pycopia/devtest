@@ -65,6 +65,9 @@ def get_database(url, autocommit=False):
         if url.hostname:
             kwargs['host'] = url.hostname
         kwargs['port'] = url.port or 5432
+        kwargs['field_types'] = {'inet': 'inet',
+                                 'cidr': 'cidr',
+                                 'macaddr': 'macaddr'}
     else:
         kwargs['database'] = url.path
     return dbclass(**kwargs)
