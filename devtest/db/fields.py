@@ -5,8 +5,8 @@ import ipaddress
 from datetime import timedelta
 
 from peewee import Field
-from playhouse.postgres_ext import (PostgresqlExtDatabase, BinaryJSONField,  # noqa
-                                    TSVectorField, DateTimeTZField, ArrayField)
+from playhouse.postgres_ext import (BinaryJSONField, TSVectorField,  # noqa
+                                    DateTimeTZField, ArrayField)
 
 from devtest.core import types
 
