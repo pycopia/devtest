@@ -16,7 +16,7 @@ _PEEWEE_FIELDS = ['BareField', 'BigIntegerField', 'BlobField',
                   'BooleanField', 'CharField', 'DateField', 'DateTimeField',
                   'DecimalField', 'DoubleField', 'FixedCharField',
                   'FloatField', 'ForeignKeyField', 'IntegerField',
-                  'PrimaryKeyField', 'TextField', 'TimeField', 'UUIDField']
+                  'AutoField', 'TextField', 'TimeField', 'UUIDField']
 
 
 # Peewee is monolithic
@@ -39,7 +39,7 @@ __all__ = ['IPv4Field', 'IPv6Field', 'CIDRField', 'MACField', 'EnumField',
 
 class IPv4Field(Field):
     """A field for an IP address that may be a host address."""
-    db_field = 'inet'
+    field_type = 'inet'
 
     def db_value(self, value):
         return None if value is None else str(value)
@@ -50,7 +50,7 @@ class IPv4Field(Field):
 
 class IPv6Field(Field):
     """A field for an IPv6 network address."""
-    db_field = 'inet'
+    field_type = 'inet'
 
     def db_value(self, value):
         return None if value is None else str(value)
@@ -61,7 +61,7 @@ class IPv6Field(Field):
 
 class CIDRField(Field):
     """A field for an IP network address."""
-    db_field = 'cidr'
+    field_type = 'cidr'
 
     def db_value(self, value):
         return None if value is None else str(value)
@@ -72,7 +72,7 @@ class CIDRField(Field):
 
 class MACField(Field):
     """A field for an MAC layer address."""
-    db_field = 'macaddr'
+    field_type = 'macaddr'
 
     def db_value(self, value):
         return None if value is None else str(value)
@@ -83,7 +83,7 @@ class MACField(Field):
 
 class EnumField(Field):
     """A field for storing enum.IntEnum objects as an Integer."""
-    db_field = 'int'
+    field_type = 'int'
 
     def __init__(self, enumclass, default=None, help_text=None,
                  verbose_name=None, **extra):
@@ -111,7 +111,7 @@ class EnumField(Field):
 class IntervalField(Field):
     """Time intervals get and receive timedelta objects, or integer as seconds.
     """
-    db_field = 'bigint'
+    field_type = 'bigint'
 
     def db_value(self, value):
         if value is None:
@@ -123,12 +123,5 @@ class IntervalField(Field):
 
     def python_value(self, value):
         return None if value is None else timedelta(seconds=value)
-
-
-PostgresqlExtDatabase.register_fields({
-    'inet': 'inet',
-    'cidr': 'cidr',
-    'macaddr': 'macaddr',
-})
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

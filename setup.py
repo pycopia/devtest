@@ -41,7 +41,7 @@ setup(
         'curio',
         'docopt',
         'docutils>=0.13',
-        'peewee==2.10.2',
+        'peewee>=3.0',
         'psutil',
         'psycopg2',
         'pygments',
