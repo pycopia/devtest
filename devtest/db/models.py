@@ -556,7 +556,7 @@ class Interfaces(BaseModel):
         constraints = [Check('vlan >= 0 AND vlan < 4096')]
 
     def __str__(self):
-        return "{} ({})".format(self.name, self.ipaddr)
+        return "{} (ip:{}, mac:{})".format(self.name, self.ipaddr, self.macaddr)
 
 
 class TestSuites(BaseModel):
