@@ -94,6 +94,27 @@ def main(argv):
                                               [--ipaddr6=<ipaddr6>]
                                               [--network=<network>]
         devtestadmin eq <name> iface del <iface> [--modelname=<modelname>]
+        devtestadmin networks list [-v] [<like>]
+        devtestadmin networks show [-v] <name>
+        devtestadmin networks create <name> [--ipnetwork=<ipnetwork>]
+                                            [--ip6network=<ip6network>]
+                                            [--vlanid=<vlanid>]
+                                            [--layer=<layer>]
+                                            [--type=<type>]
+                                            [--notes=<notes]
+        devtestadmin networks update <name> [--ipnetwork=<ipnetwork>]
+                                            [--ip6network=<ip6network>]
+                                            [--vlanid=<vlanid>]
+                                            [--layer=<layer>]
+                                            [--type=<type>]
+                                            [--notes=<notes]
+        devtestadmin networks delete <name>
+        devtestadmin networks <name> attrib list
+        devtestadmin networks <name> attrib get <attrname>
+        devtestadmin networks <name> attrib set <attrname> <attrvalue>
+        devtestadmin networks <name> attrib del <attrname>
+        devtestadmin networks <name> attrib export <file>
+        devtestadmin networks <name> attrib import <file>
         devtestadmin function list [-v] [<like>]
         devtestadmin function show <name>
         devtestadmin function create <name> [--description=<description>]
@@ -130,6 +151,11 @@ def main(argv):
         --identifier=<identifier>          An identifier in the AccountIds table.
         --partof=<partof>                  Name of another equipment that this is a part of.
         --implementation=<implementation>  A Python style path to a Controller class or callable.
+        --ipnetwork=<ipnetwork>            An IPv4 network in any form.
+        --ip6network=<ip6network>          An IPv6 network in any form.
+        --vlanid=<vlanid>                  The VLAN ID number
+        --layer=<layer>                    A network ISO layer number [default: 3]
+        --type=<type>                      A network type name [default: ethernet]
 
         <resulttype> one of summary, test, or suite.
     """  # noqa
@@ -373,6 +399,79 @@ def main(argv):
                 controllers.EquipmentController.del_interface(name, iface, modelname=modelname)
         elif arguments["list"]:
             list_equipment(arguments["<like>"], arguments["-v"])
+    # Networks
+    elif arguments["networks"]:
+        if arguments["list"]:
+            list_networks(arguments["<like>"], arguments["-v"])
+        elif arguments["show"]:
+            name = arguments["<name>"]
+            verbose = arguments["-v"]
+            nw = controllers.NetworksController.get(name)
+            if nw:
+                show_network(nw, verbose)
+            else:
+                print(nw)
+        elif arguments["create"]:
+            name = arguments["<name>"]
+            ipnet = arguments["--ipnetwork"]
+            ip6net = arguments["--ip6network"]
+            vlanid = arguments["--vlanid"]
+            layer = arguments["--layer"]
+            type = arguments["--type"]
+            notes = arguments["--notes"]
+            nw, created = controllers.NetworksController.create(name,
+                    ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
+                    type=type, notes=notes)
+            if created:
+                print("Created.")
+            else:
+                print("Not created. Already exists?")
+        elif arguments["update"]:
+            name = arguments["<name>"]
+            ipnet = arguments["--ipnetwork"]
+            ip6net = arguments["--ip6network"]
+            vlanid = arguments["--vlanid"]
+            layer = arguments["--layer"]
+            type = arguments["--type"]
+            notes = arguments["--notes"]
+            nw = controllers.NetworksController.update(name,
+                    ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
+                    type=type, notes=notes)
+        elif arguments["delete"]:
+            name = arguments["<name>"]
+            controllers.NetworksController.delete(name)
+        elif arguments["attrib"]:
+            name = arguments["<name>"]
+            if arguments["list"]:
+                attribs = controllers.NetworksController.attribute_list(name)
+                if attribs is not None:
+                    for key, val in attribs:
+                        print("  {:25.25s} = {!r}".format(key, val))
+            elif arguments["get"]:
+                print(controllers.NetworksController.attribute_get(name, arguments["<attrname>"]))
+            elif arguments["set"]:
+                controllers.NetworksController.attribute_set(name, arguments["<attrname>"],
+                                                             arguments["<attrvalue>"])
+                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
+                                                 controllers.NetworksController.attribute_get(
+                                                 name, arguments["<attrname>"])))
+            elif arguments["del"]:
+                controllers.NetworksController.attribute_del(arguments["<name>"],
+                                                            arguments["<attrname>"])
+            elif arguments["export"]:
+                fname = arguments["<file>"]
+                attribs = controllers.NetworksController.attributes_export(name)
+                if fname == "-":
+                    json.dump(attribs, sys.stdout)
+                else:
+                    with open(fname, mode="w", encoding="utf-8") as fo:
+                        json.dump(attribs, fo)
+                        fo.write("\n")
+            elif arguments["import"]:
+                fname = arguments["<file>"]
+                with open(fname, mode="r", encoding="utf-8") as fo:
+                    attribs = json.load(fo)
+                controllers.NetworksController.attributes_import(name, attribs)
     # Function
     elif arguments["function"]:
         if arguments["list"]:
@@ -585,8 +684,6 @@ def show_equipmentmodel(name, manufacturer=None):
             print(_shallow_text_wrapper.fill(eqm.note))
         if eqm.specs:
             print(colors.cyan("  Specs:"), eqm.specs)
-        if eqm.radar_component:
-            print(colors.cyan("  Radar Component:"), eqm.radar_component)
         show_attributes(eqm.attributes)
     else:
         print(eqm)
@@ -628,6 +725,36 @@ def list_equipment(like, verbose):
                 print(_deep_text_wrapper.fill(
                     ", ".join("{}={!r}".format(k, v) for k, v in eq.attributes.items())))
 
+
+def list_networks(like, verbose):
+    for nw in controllers.NetworksController.all(like):
+        print("{:>30.30s}".format(colors.white(nw.name, bold=True)))
+        if verbose:
+            if nw.attributes:
+                print(_deep_text_wrapper.fill(
+                    ", ".join("{}={!r}".format(k, v) for k, v in nw.attributes.items())))
+
+
+def show_network(nw, verbose):
+    if nw.layer == 2 and nw.vlanid is not None:
+        print("{:>20.20s} vlan: {} type: {!s}".format(colors.white(nw.name, bold=True), nw.vlanid, nw.type))
+    elif nw.layer == 3:
+        print("{:>20.20s} ip4: {}, ip6: {}, type: {!s}".format(colors.white(nw.name, bold=True), nw.ipnetwork, nw.ip6network, nw.type))
+    else:
+        print("{:>20.20s} layer: {}, type: {!s}".format(colors.white(nw.name, bold=True), nw.layer, nw.type))
+    if verbose:
+        if nw.notes:
+            print(colors.cyan("  Notes:"))
+            print(_shallow_text_wrapper.fill(nw.notes))
+        if nw.attributes:
+            print(_deep_text_wrapper.fill(
+                ", ".join("{}={!r}".format(k, v) for k, v in nw.attributes.items())))
+        if nw.lower:
+            print(colors.cyan("  Lower Layer:"))
+            show_network(nw.lower, verbose)
+        if nw.upper:
+            print(colors.cyan("  Upper Layer:"))
+            show_network(nw.upper, verbose)
 
 def show_scenario(scenario):
     print(colors.box(scenario.name))
@@ -674,8 +801,6 @@ def show_testcase(testcase):
     print(colors.cyan("              Type:"), testcase.type)
     print(colors.cyan("          Priority:"), testcase.priority)
     print(colors.cyan("            Status:"), testcase.status)
-    if testcase.radar_component:
-        print(colors.cyan("    Radar Component:"), testcase.radar_component)
     print(colors.cyan("      Last Changed:"), testcase.lastchange)
     if testcase.attributes:
         print(colors.cyan("        Attributes:"), testcase.attributes)

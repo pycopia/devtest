@@ -376,6 +376,116 @@ class EquipmentModelController(Controller):
                 inst.save()
 
 
+class NetworksController(Controller):
+
+    NET_TYPE_MAP = {
+        None: constants.NetworkType.Unknown,
+        'unknown': constants.NetworkType.Unknown,
+        'ethernet': constants.NetworkType.Ethernet,
+        'fibrechannel': constants.NetworkType.FibreChannel,
+        'wifi': constants.NetworkType.Wifi,
+        'tunnel': constants.NetworkType.Tunnel,
+        'vlan': constants.NetworkType.Vlan,
+        'usb': constants.NetworkType.USB,
+        'aggregate': constants.NetworkType.Aggregate,
+        'dummy': constants.NetworkType.Dummy,
+        'bluetooth': constants.NetworkType.Bluetooth,  # PAN
+    }
+
+    @staticmethod
+    def all(like=None):
+        q = models.Networks.select().order_by(models.Networks.name)
+        if like:
+            q = q.where(models.Networks.name.contains(like))
+        return list(q.execute())
+
+    @staticmethod
+    @checknotfound(message="Network not found.")
+    def get(netname):
+        q = models.Networks.select().where(models.Networks.name == netname)
+        return q.get()
+
+    @staticmethod
+    def create(name, ipnetwork=None, ip6network=None, vlanid=None, layer=3,
+               type=None, notes=None):
+        defaults = {
+            "ipnetwork": ipnetwork,
+            "ip6network": ip6network,
+            "vlanid": vlanid,
+            "layer": layer,
+            "type": NetworksController.NET_TYPE_MAP.get(type),
+            "notes": notes,
+        }
+        return models.Networks.get_or_create(name=name, defaults=defaults)
+
+    @staticmethod
+    def update(name, ipnetwork=None, ip6network=None, vlanid=None, layer=None,
+               type=None, notes=None):
+        inst = NetworksController.get(name)
+        if inst:
+            with models.database.atomic():
+                if ipnetwork:
+                    inst.ipnetwork = ipnetwork
+                if ip6network:
+                    inst.ip6network = ip6network
+                if vlanid is not None:
+                    inst.vlanid = vlanid
+                if layer is not None:
+                    inst.layer = layer
+                if type is not None:
+                    inst.type = NetworksController.NET_TYPE_MAP.get(type)
+                if notes:
+                    inst.notes = notes
+                inst.save()
+        return inst
+
+    @staticmethod
+    def delete(name):
+        pass
+        nw = NetworksController.get(name)
+        if nw:
+            with models.database.atomic():
+                nw.delete_instance()
+
+    @staticmethod
+    def attribute_get(netname, attrname):
+        inst = NetworksController.get(netname)
+        return inst.attribute_get(attrname)
+
+    @staticmethod
+    def attribute_list(netname):
+        inst = NetworksController.get(netname)
+        if inst and inst.attributes:
+            return inst.attributes.items()
+
+    @staticmethod
+    def attribute_set(netname, attrname, attrvalue):
+        inst = NetworksController.get(netname)
+        if inst:
+            return inst.attribute_set(attrname, _eval_value(attrvalue))
+
+    @staticmethod
+    def attribute_del(netname, attrname):
+        inst = NetworksController.get(netname)
+        if inst:
+            return inst.attribute_del(attrname)
+
+    @staticmethod
+    def attributes_export(netname):
+        inst = NetworksController.get(netname)
+        if inst and inst.attributes:
+            return inst.attributes.copy()
+
+    @staticmethod
+    def attributes_import(netname, attrdict):
+        assert isinstance(attrdict, dict), "Attributes need to be a dictionary."
+        inst = NetworksController.get(netname)
+        if inst:
+            with models.database.atomic():
+                inst.attributes = attrdict
+                inst.save()
+
+
 class AccountIdsController(Controller):
 
     @staticmethod
