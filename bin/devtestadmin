@@ -74,13 +74,13 @@ def main(argv):
                                                [--partof=<partof>]
                                                [--notes=<notes>]
                                                [--location=<location>]
-        devtestadmin eq update <manufacturer> <modelname> <name> [--serno=<serno>]
+        devtestadmin eq update <modelname> <name> [--serno=<serno>]
                                                [--account=<accountid>]
                                                [--user=<userid>]
                                                [--partof=<partof>]
                                                [--notes=<notes>]
                                                [--location=<location>]
-        devtestadmin eq delete <manufacturer> <modelname> <name>
+        devtestadmin eq delete <modelname> <name>
         devtestadmin eq <name> attrib list [--modelname=<modelname>]
         devtestadmin eq <name> attrib get <attrname>
         devtestadmin eq <name> attrib set <attrname> <attrvalue>
@@ -148,6 +148,8 @@ def main(argv):
         --admin, -a                        Specify an admin (superuser) account.  [default: False]
         --manufacturer=<manufacturer>      The name of a manufacturer [default: Acme Inc.]
         --serno=<serno>                    A serial number (string).
+        --location=<location>              A specific location or code.
+        --notes=<notes>                    An arbitrary note to attach to an object.
         --identifier=<identifier>          An identifier in the AccountIds table.
         --partof=<partof>                  Name of another equipment that this is a part of.
         --implementation=<implementation>  A Python style path to a Controller class or callable.
@@ -319,7 +321,6 @@ def main(argv):
             else:
                 print("Already existed.")
         elif arguments["update"]:
-            manufacturer = arguments["<manufacturer>"]
             modelname = arguments["<modelname>"]
             name = arguments["<name>"]
             serno = arguments["--serno"]
@@ -330,7 +331,6 @@ def main(argv):
             location = arguments["--location"]
             controllers.EquipmentController.update(
                 modelname, name,
-                manufacturer=manufacturer,
                 serno=serno,
                 accountid=accountid,
                 userid=userid,
@@ -338,13 +338,9 @@ def main(argv):
                 notes=notes,
                 location=location)
         elif arguments["delete"]:
-            manufacturer = arguments["<manufacturer>"]
             modelname = arguments["<modelname>"]
             name = arguments["<name>"]
-            controllers.EquipmentController.delete(
-                modelname, name,
-                manufacturer=manufacturer,
-            )
+            controllers.EquipmentController.delete(modelname, name)
         elif arguments["attrib"]:
             name = arguments["<name>"]
             if arguments["list"]:
