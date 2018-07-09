@@ -26,11 +26,6 @@ def get_kernel(selector=None):
     global _default_kernel
     if _default_kernel is None:
         _get_kernel(selector=selector)
-    if _default_kernel._crashed:
-        logging.warning("Reactor kernel crashed. Attempting shutdown and build new one.")
-        _default_kernel.run(shutdown=True)
-        _default_kernel = None
-        _get_kernel(selector=selector)
     return _default_kernel
 
 

@@ -14,7 +14,6 @@ from subprocess import (  # noqa
     CompletedProcess,
     SubprocessError,
     CalledProcessError,
-    TimeoutExpired,
     PIPE,
     STDOUT,
     DEVNULL,
@@ -24,7 +23,7 @@ from devtest import logging
 from devtest.textutils import shparser
 from devtest.io import subprocess
 from devtest.io.reactor import (get_kernel, sleep, spawn, timeout_after,
-                                TaskTimeout)
+                                CancelledError, TaskTimeout)
 from devtest.os import procutils
 from devtest.os import exitstatus
 
@@ -93,27 +92,42 @@ class PipeProcess(Process):
     def wait(self):
         return self._popen.wait
 
-    def syncwait(self, timeout=None):
-        return get_kernel().run(self._popen.wait(), timeout=timeout)
+    def syncwait(self):
+        return get_kernel().run(self._popen.wait())
 
     def close(self):
         self.interrupt()
 
-    async def communicate(self, input=b'', timeout=None):
-        stdout_task = await spawn(self._popen.stdout.readlines()) if self._popen.stdout else None
-        stderr_task = await spawn(self._popen.stderr.readlines()) if self._popen.stderr else None
+    async def communicate(self, input=b''):
+        """
+        Communicates with a subprocess.  input argument gives data to
+        feed to the subprocess stdin stream.  Returns a tuple (stdout, stderr)
+        corresponding to the process output.  If cancelled, the resulting
+        cancellation exception has stdout_completed and stderr_completed
+        attributes attached containing the bytes read so far.
+        """
+        stdout_task = await spawn(self.stdout.readall) if self.stdout else None
+        stderr_task = await spawn(self.stderr.readall) if self.stderr else None
         try:
             if input:
-                await timeout_after(timeout, self._popen.stdin.write(input))
-                await self._popen.stdin.close()
-                self._popen.stdin = None
-            # Collect the output from the workers
-            stdout = await timeout_after(timeout, stdout_task.join()) if stdout_task else b''
-            stderr = await timeout_after(timeout, stderr_task.join()) if stderr_task else b''
+                await self.stdin.write(input)
+                await self.stdin.close()
+
+            stdout = await stdout_task.join() if stdout_task else b''
+            stderr = await stderr_task.join() if stderr_task else b''
             return (stdout, stderr)
-        except TaskTimeout:
-            await stdout_task.cancel()
-            await stderr_task.cancel()
+        except CancelledError as err:
+            if stdout_task:
+                await stdout_task.cancel()
+                err.stdout = stdout_task.next_exc.bytes_read
+            else:
+                err.stdout = b''
+
+            if stderr_task:
+                await stderr_task.cancel()
+                err.stderr = stderr_task.next_exc.bytes_read
+            else:
+                err.stderr = b''
             raise
 
     # File-like methods for use by other modules.
@@ -214,46 +228,44 @@ class ProcessManager:
 
     def run_command(self, cmd, timeout=None, input=None, directory=None):
         proc = self.start(cmd, directory=directory)
-        coro = _run_proc(proc, timeout, input)
-        rv = get_kernel().run(coro)
-        if isinstance(rv, Exception):
-            raise rv
-        return rv
+        return self.run_process(proc, timeout=timeout, input=input)
 
     def run_process(self, proc, timeout=None, input=None):
-        rv = get_kernel().run(_run_proc(proc, timeout, input))
+        coro = _run_proc(proc, input)
+        if timeout:
+            coro = timeout_after(float(timeout), coro)
+        rv = get_kernel().run(coro)
         if isinstance(rv, Exception):
             raise rv
         return rv
 
-    def call_command(self, cmd, timeout=None, directory=None):
+    def call_command(self, cmd, directory=None):
         proc = self.start(cmd, stdin=None, stdout=None, stderr=None,
                           directory=directory)
-        coro = _call_proc(proc, timeout)
+        coro = _call_proc(proc)
         rv = get_kernel().run(coro)
         if isinstance(rv, Exception):
             raise rv
         return rv
 
 
-async def _run_proc(proc, timeout, input):
+async def _run_proc(proc, input):
     await sleep(0.1)
     try:
-        stdout, stderr = await proc.communicate(input, timeout)
-    except TaskTimeout:
-        proc.kill()
-        stdout, stderr = await proc.communicate()
-        return TimeoutExpired(proc.args, timeout, output=stdout, stderr=stderr)
-    except:  # noqa
-        proc.kill()
-        raise
+        stdout, stderr = await proc.communicate(input)
+    except CancelledError as err:
+        try:
+            proc.kill()
+        except psutil.NoSuchProcess:
+            pass
+        raise err
     retcode = proc.poll()
     if retcode:
         return CalledProcessError(retcode, proc.args, output=stdout, stderr=stderr)
     return stdout, stderr
 
 
-async def _call_proc(proc, timeout):
+async def _call_proc(proc):
     return await proc._popen.wait()
 
 
@@ -342,7 +354,7 @@ if __name__ == "__main__":
 
     try:
         output, errout = run_command("sleep 10", timeout=5)
-    except TimeoutExpired as to:
+    except TaskTimeout as to:
         print(to, "as expected")
     else:
         raise AssertionError("Subprocess did not time out as expected.")

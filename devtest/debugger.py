@@ -40,6 +40,7 @@ def debugger_hook(exc, value, tb):
                                            KeyboardInterrupt)):
         sys.__excepthook__(exc, value, tb)
     else:
+        DEBUG("Uncaught exception:", exc.__name__, ":", value)
         post_mortem(tb)
 
 
