@@ -49,22 +49,32 @@ def drop_db(url):
         raise NotImplementedError("unhandled scheme: {}".format(scheme))
 
 
-def get_database(url, autocommit=False):
+def get_database(url):
     """Connect to a backend database using the given URL."""
     url = urllib.parse.urlparse(url)
     dbclass = _DBSCHEMES.get(url.scheme)
     if dbclass is None:
         raise ValueError("Unsupported database scheme: {}".format(url.scheme))
-    kwargs = {"autocommit": autocommit, "register_hstore": False}
+    kwargs = {}
     if url.scheme.startswith("postgres"):
-        kwargs['database'] = url.path[1:]
-        if url.username:
-            kwargs['user'] = url.username
-        if url.password:
-            kwargs['password'] = url.password
-        if url.hostname:
-            kwargs['host'] = url.hostname
-        kwargs['port'] = url.port or 5432
+        kwargs["register_hstore"] = False
+        kwargs['encoding'] = "UTF-8"
+        if url.netloc:
+            kwargs['database'] = url.path[1:]
+            if url.username:
+                kwargs['user'] = url.username
+            if url.password:
+                kwargs['password'] = url.password
+            if url.hostname:
+                kwargs['host'] = url.hostname
+            kwargs['port'] = url.port or 5432
+        else:
+            kwargs['database'] = os.path.basename(url.path)
+            kwargs['host'] = os.path.dirname(url.path)
+        if url.query:
+            for part in url.query.split("&"):
+                name, val = part.split("=", 1)
+                kwargs[name] = val
         kwargs['field_types'] = {'inet': 'inet',
                                  'cidr': 'cidr',
                                  'macaddr': 'macaddr'}
