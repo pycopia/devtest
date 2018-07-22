@@ -1,37 +1,34 @@
 """
-Unit tests for devtest.settings module.
+Unit tests for devtest.config module.
 """
-
-import unittest
 
 from devtest import config
 
 
-class ConfigTests(unittest.TestCase):
+class TestConfig:
 
-
-    def setUp(self):
+    def setup_method(self):
         cf = config.get_config()
         self._cf = cf
 
-    def test_1get(self):
+    def test_get(self):
         cf = self._cf
-        self.assertTrue(bool(cf))
+        assert bool(cf)
 
-    def test_2same(self):
+    def test_same(self):
         cf = config.get_config()
-        self.assertEqual(id(cf), id(self._cf))
+        assert id(cf) == id(self._cf)
 
-    def test_3read_default(self):
+    def test_read_default(self):
         cf = self._cf
-        self.assertTrue(cf["database"]["url"].startswith("postgres"))
+        assert cf["database"]["url"].startswith("postgres")
 
-    def test_1flags(self):
+    def test_flags(self):
         cf = self._cf
         cf.flags.debug
 
 
-class ConfigUpdateTests(unittest.TestCase):
+class TestConfigUpdate:
 
     def test_with_initdict(self):
         config._CONFIG = None

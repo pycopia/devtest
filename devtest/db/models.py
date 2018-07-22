@@ -799,7 +799,7 @@ def _attribute_del(inst, attrname):
         inst.save()
 
 
-def connect(url=None, autocommit=False):
+def connect(url=None):
     """Initialize the database object to a backend database using the given URL,
     or what is configured if not provided.
     """
@@ -811,7 +811,7 @@ def connect(url=None, autocommit=False):
         from devtest import config
         cf = config.get_config()
         url = cf["database"]["url"]
-    database = get_database(url, autocommit=autocommit)
+    database = get_database(url)
     database_proxy.initialize(database)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

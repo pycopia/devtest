@@ -138,9 +138,19 @@ def _test(argv):
     _CONFIG = None
     cf = get_config(initdict={"initkey": "initvalue"})
     assert cf.get("initkey", "") == "initvalue"
+    _CONFIG = None
+    cf = get_config(argname="argvalue")
+    assert cf.argname == "argvalue"
+    _CONFIG = None
+    cf = get_config()
+    for cmdarg in argv[1:]:
+        arg, _, val = cmdarg.partition("=")
+        cf[arg] = val
+    show_config(cf)
 
 
 if __name__ == "__main__":
-    _test([])
+    import sys
+    _test(sys.argv)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8
