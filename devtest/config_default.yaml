@@ -3,6 +3,8 @@ resultsdir: "$HOME/tmp/resultsdir"
 database:
         url: "postgresql://devtest@localhost/devtest"
         # url: "sqlite:///var/tmp/devtest.db"
+        postgres:
+            dbdir: "/var/tmp/devtestdb"
 
 flags:
         debug: 0
