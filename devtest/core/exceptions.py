@@ -157,4 +157,13 @@ class ShellConnectionError(ShellError):
     """Could not make initial connection to a shell."""
 
 
+# Errors related to the run-time environment.
+
+class InstallationError(Exception):
+    pass
+
+
+class MissingDependencyError(InstallationError):
+    pass
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8
