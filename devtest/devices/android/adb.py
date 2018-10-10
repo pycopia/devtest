@@ -236,7 +236,7 @@ class AndroidDeviceClient:
         msg = b"host-serial:%b:wait-for-usb-%b" % (self.serial, state.encode("ascii"))
         get_kernel().run(_command_transact(self._conn, msg))
 
-    def command(self, cmdline, usepty=False, timeout=300):
+    def command(self, cmdline, usepty=False):
         """Run a non-interactive shell command.
 
         Uses ring buffers to collect outputs to avoid a runaway device command
@@ -256,18 +256,17 @@ class AndroidDeviceClient:
             name = cmdline.split()[0]
         cmdline = cmdline.encode("utf8")
         kern = get_kernel()
-        kern.run(_start_shell(self.serial, self._conn, usepty, cmdline),
-                 timeout=60)
+        kern.run(_start_shell(self.serial, self._conn, usepty, cmdline))
         sp = ShellProtocol(self._conn.socket)
         stdout = ringbuffer.RingBuffer(MAX_PAYLOAD)
         stderr = ringbuffer.RingBuffer(MAX_PAYLOAD)
-        resp = kern.run(sp.run(None, stdout, stderr), timeout=timeout)
+        resp = kern.run(sp.run(None, stdout, stderr))
         kern.run(self._conn.close())
         rc = resp[0]
         if rc & 0x80:
             rc = -(rc & 0x7F)
-        return (stdout.buffer.decode("utf8"),
-                stderr.buffer.decode("utf8"),
+        return (stdout.read().decode("utf8"),
+                stderr.read().decode("utf8"),
                 exitstatus.ExitStatus(
                     None,
                     name="{}@{}".format(name, self.serial.decode("ascii")),
@@ -371,8 +370,8 @@ if __name__ == "__main__":
     print(ac.get_state())
     stdout, stderr, es = ac.command(["ls", "/sdcard"])
     print(es)
-    print("stdout:", stdout)
-    print("stderr:", stderr)
+    print("stdout:", repr(stdout))
+    print("stderr:", repr(stderr))
     print(ac.wait_for("device"))
     ac.close()
 

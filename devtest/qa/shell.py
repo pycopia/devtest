@@ -140,6 +140,7 @@ class ShellInterface:
             return
         if not self.arguments and self.pick_tests:
             pick_tests(self.arguments)
+        testlist = errlist = None
         try:
             testlist, errlist = loader.load_selections(self.arguments)
         except:  # noqa
