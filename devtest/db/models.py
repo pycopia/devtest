@@ -373,7 +373,7 @@ class TestBed(BaseModel):
         q = (Software.select().join(_SoftwareRoles).join(Function)
              .where(Function.name == rolename)
              .switch(_SoftwareRoles).where(_SoftwareRoles.testbed == self))
-        return q.peek(100)
+        return q.peek(n=100)
 
     def add_software_role(self, software, rolename):
         func = Function.select().where(Function.name == rolename).get()
@@ -406,12 +406,12 @@ class TestBed(BaseModel):
         q = (Equipment.select().join(_Testequipment)
              .join(Function).where(Function.name == rolename)
              .switch(_Testequipment).where(_Testequipment.testbed == self))
-        return q.peek(100)
+        return q.peek(n=100)
 
     def get_all_roles_for_equipment(self, eq):
         q = (Function.select().join(_Testequipment)
              .where((_Testequipment.testbed == self) & (_Testequipment.equipment == eq)))
-        return q.peek(100)
+        return q.peek(n=100)
 
 
 # Maps a testbed to equipment.
