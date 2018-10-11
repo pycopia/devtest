@@ -408,7 +408,7 @@ class SoftwareRuntime:
 
 def _get_controller(equipmentrt, rolename):
     FM = models.Function
-    impl = FM.select(FM.implementation).where(FM.name == rolename).scalar(convert=True)
+    impl = FM.select(FM.implementation).where(FM.name == rolename).scalar()
     if impl is None:
         raise ConfigError(
             "No implementation for role {!r} found in Function list.".format(rolename))
@@ -426,7 +426,7 @@ def _get_software_instance(softwarert):
     if not impl:
         raise ConfigError("No implementation defined for software.")
     FM = models.Function
-    impl = FM.select(FM.implementation).where(FM.name == impl).scalar(convert=True)
+    impl = FM.select(FM.implementation).where(FM.name == impl).scalar()
     obj = importlib.get_callable(impl)
     return obj(softwarert)
 

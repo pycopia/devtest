@@ -550,20 +550,20 @@ class FunctionController(Controller):
         return models.Function.select().where(models.Function.name == name).get()
 
     @staticmethod
-    def create(name, description=None, role_implementation=None):
+    def create(name, description=None, implementation=None):
         return models.Function.get_or_create(name=name,
                                              defaults={"description": description,
-                                                       "role_implementation": role_implementation})
+                                                       "implementation": implementation})
 
     @staticmethod
-    def update(name, description=None, role_implementation=None):
+    def update(name, description=None, implementation=None):
         inst = FunctionController.get(name)
         if inst:
             with models.database.atomic():
                 if description:
                     inst.description = description
-                if role_implementation:
-                    inst.role_implementation = role_implementation
+                if implementation:
+                    inst.implementation = implementation
                 inst.save()
         return inst
 
