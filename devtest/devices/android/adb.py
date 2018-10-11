@@ -136,7 +136,7 @@ async def _command_transact(conn, msg):
         stat = await conn.socket.recv(4)
         if stat != b"OKAY":
             raise AdbCommandFail("command not OKAY")
-    elif stat == b"FAIL":
+    elif connstat == b"FAIL":
         lenst = await conn.socket.recv(4)
         length = int(lenst, 16)
         resp = await conn.socket.recv(length)
@@ -214,6 +214,19 @@ class AndroidDeviceClient:
         resp = self._message(msg)
         return resp.decode("ascii")
 
+    def reboot(self):
+        get_kernel().run(_connect_command(self.serial, self._conn, b"reboot:"))
+
+    def remount(self):
+        resp = get_kernel().run(_special_command(self.serial, self._conn,
+                                                 b"remount:"))
+        return resp.decode("ascii")
+
+    def root(self):
+        resp = get_kernel().run(_special_command(self.serial, self._conn,
+                                                 b"root:"))
+        return resp.decode("ascii")
+
     def get_features(self):
         msg = b"host-serial:%b:features" % (self.serial,)
         resp = self._message(msg)
@@ -284,6 +297,26 @@ async def _start_shell(serial, conn, usepty, cmdline):
     await conn.open()
     await conn.message(tpmsg, expect_response=False)
     await conn.message(msg, expect_response=False)
+
+
+# Send command to specific device with orderly shutdown
+async def _connect_command(serial, conn, msg):
+    tpmsg = b"host:transport:%b" % serial
+    await conn.open()
+    await conn.message(tpmsg, expect_response=False)
+    await conn.message(msg, expect_response=False)
+    await conn.close()
+
+# Root command transaction is special since device adbd restarts.
+async def _special_command(serial, conn, cmd):
+    tpmsg = b"host:transport:%b" % serial
+    await conn.open()
+    await conn.message(tpmsg, expect_response=False)
+    await conn.message(cmd, expect_response=False)
+    resp = await conn.socket.recv(4096)
+    await conn.close()
+    return resp
+
 
 
 class ShellProtocol:
