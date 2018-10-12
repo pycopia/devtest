@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.6
 """
 CLI tool for managing the Devtest database.
 """
@@ -484,7 +484,7 @@ def main(argv):
             desc = arguments["--description"]
             impl = arguments["--implementation"]
             func, created = controllers.FunctionController.create(
-                name, description=desc, role_implementation=impl)
+                name, description=desc, implementation=impl)
             if created:
                 print("Created.")
         elif arguments["update"]:
@@ -492,7 +492,7 @@ def main(argv):
             desc = arguments["--description"]
             impl = arguments["--implementation"]
             controllers.FunctionController.update(
-                name, description=desc, role_implementation=impl)
+                name, description=desc, implementation=impl)
         elif arguments["delete"]:
             name = arguments["<name>"]
             controllers.FunctionController.delete(name)
@@ -595,8 +595,8 @@ def show_function(func, verbose):
     if verbose:
         if func.description:
             print(_shallow_text_wrapper.fill(func.description))
-        if func.role_implementation:
-            print("    Implemented by:", colors.underline(func.role_implementation))
+        if func.implementation:
+            print("    Implemented by:", colors.underline(func.implementation))
 
 
 def list_accounts(like, verbose):
@@ -695,31 +695,35 @@ def show_attributes(attributes, indent=4):
 def show_equipment(name):
     eq = controllers.EquipmentController.get(name)
     if eq:
-        status = "" if eq.active else "(inactive)"
-        print(colors.magenta(eq.model.name), colors.white(eq.name, bold=True), eq.serno, status)
-        if eq.notes:
-            print(_shallow_text_wrapper.fill(eq.notes))
-        if eq.partof:
-            print(colors.cyan("  Part of:"), eq.partof)
-        print(colors.cyan("  Location:"), eq.location)
-        if eq.account:
-            print(colors.cyan("  Accessor account:"), eq.account)
-        show_attributes(eq.attributes)
-        if eq.interfaces:
-            print(colors.cyan("  Network interfaces:"))
-            for iface in eq.interfaces:
-                print("    ", iface)
+        _show_equipment(eq)
     else:
         print(eq)
 
 
+def _show_equipment(eq):
+    status = "" if eq.active else "(inactive)"
+    print(colors.magenta(eq.model.name), colors.white(eq.name, bold=True), eq.serno, status)
+    if eq.notes:
+        print(_shallow_text_wrapper.fill(eq.notes))
+    if eq.partof:
+        print(colors.cyan("  Part of:"), eq.partof)
+    print(colors.cyan("  Location:"), eq.location)
+    if eq.account:
+        print(colors.cyan("  Accessor account:"), eq.account)
+    show_attributes(eq.attributes)
+    if eq.interfaces:
+        print(colors.cyan("  Network interfaces:"))
+        for iface in eq.interfaces:
+            print("    ", iface)
+
+
 def list_equipment(like, verbose):
     for eq in controllers.EquipmentController.all(like):
-        print("{:>30.30s} {}".format(eq.model.name, colors.white(eq.name, bold=True)))
         if verbose:
-            if eq.attributes:
-                print(_deep_text_wrapper.fill(
-                    ", ".join("{}={!r}".format(k, v) for k, v in eq.attributes.items())))
+            _show_equipment(eq)
+            print()
+        else:
+            print("{:>30.30s} {}".format(eq.model.name, colors.white(eq.name, bold=True)))
 
 
 def list_networks(like, verbose):
