@@ -1,6 +1,5 @@
 # Makefile simplifies some operations and supports common idioms.
 
-# Set only major.minor version string, used elsewhere.
 # Make sure your python3 is linked to the specific version you want.
 # Or, preset the PYTHONBIN environment variable to the specific Python you want.
 PYTHONBIN ?= $(shell python3-config --prefix)/bin/python3
