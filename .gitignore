@@ -21,6 +21,7 @@ _build
 
 # OS cruft
 .directory
+devtest/.directory
 .DS_Store
 
 tags
