@@ -25,8 +25,13 @@ import signal
 import subprocess
 from urllib import parse as url_parse
 
+import psycopg2
+
 from devtest.os import procutils
 from devtest.core import exceptions
+
+
+PGPORT = "6543"
 
 
 class DatabaseServer(threading.Thread):
@@ -43,9 +48,15 @@ class DatabaseServer(threading.Thread):
         config.database.url = create_database(self._dbdir)
 
     def run(self):
-        # "unix_socket_directories=/tmp,{sockdir}".format(sockdir=sockdir)
-        proc = subprocess.Popen(['postgres', '-D', self._dbdir], shell=False,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+        cmd = ['postgres',
+               '-D', self._dbdir,
+               '-p', PGPORT,
+               '-c', 'unix_socket_directories=/tmp',
+              ]
+        proc = subprocess.Popen(cmd,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                stdin=subprocess.DEVNULL)
         self.pg_proc = proc
         proc.wait()
 
@@ -67,19 +78,29 @@ def create_database(dbdir):
     if os.path.isdir(os.path.join(dbdir, "base")):
         return url
     os.makedirs(dbdir, exist_ok=True)
+    env = os.environ.copy()
+    env["PGPORT"] = PGPORT
     subprocess.check_call(['initdb', '-D', dbdir, '-E', 'UTF-8'],
-                          stdout=subprocess.DEVNULL, shell=False)
+                          stdout=subprocess.DEVNULL, env=env)
 
-    proc = subprocess.Popen(['postgres', '-D', dbdir], shell=False, stdout=subprocess.DEVNULL)
-    time.sleep(5)
-    subprocess.check_call(['createuser', '--createdb', '--no-superuser', '--no-createrole', username],
-                          stdout=subprocess.DEVNULL, shell=False)
-    subprocess.check_call(['createdb', '--owner', username, '--encoding', 'utf-8', database],
-                          stdout=subprocess.DEVNULL, shell=False)
-    time.sleep(5)
-    proc.terminate()
-    proc.wait()
+    proc = subprocess.Popen(['postgres', '-D', dbdir, '-c', 'unix_socket_directories=/tmp'],
+                            env=env,
+                            stdout=subprocess.DEVNULL)
+    try:
+        _wait_for_ready()
+        subprocess.check_call(['createuser', '--createdb', '--no-superuser', '--no-createrole', username],
+                              stdout=subprocess.DEVNULL, env=env)
+        subprocess.check_call(['createdb', '--owner', username, '--encoding', 'utf-8', database],
+                              stdout=subprocess.DEVNULL, env=env)
+        time.sleep(5)
+    finally:
+        proc.terminate()
+        proc.wait()
     return url
+
+
+def _wait_for_ready():
+    conn = psycopg2.connect("dbname=template1 unix_socket_directories=/tmp port={}".format(PGPORT))
 
 
 def installation_check():
