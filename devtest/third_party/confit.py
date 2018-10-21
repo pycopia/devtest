@@ -22,14 +22,13 @@ import sys
 import os
 import platform
 import pkgutil
-import collections
+from collections import abc, OrderedDict
 import re
 
 import yaml
 
 from devtest.core import exceptions
 
-OrderedDict = collections.OrderedDict
 
 UNIX_DIR_VAR = 'XDG_CONFIG_HOME'
 UNIX_DIR_FALLBACK = '~/.config'
@@ -1070,7 +1069,7 @@ class Choice(Template):
                 view
             )
 
-        if isinstance(self.choices, collections.Mapping):
+        if isinstance(self.choices, abc.Mapping):
             return self.choices[value]
         else:
             return value
@@ -1225,7 +1224,7 @@ class Filename(Template):
         return 'Filename({0})'.format(', '.join(args))
 
     def resolve_relative_to(self, view, template):
-        if not isinstance(template, (collections.Mapping, MappingTemplate)):
+        if not isinstance(template, (abc.Mapping, MappingTemplate)):
             # disallow config.get(Filename(relative_to='foo'))
             raise exceptions.ConfigTemplateError(
                 'relative_to may only be used when getting multiple values.'
@@ -1344,7 +1343,7 @@ def as_template(value):
     if isinstance(value, Template):
         # If it's already a Template, pass it through.
         return value
-    elif isinstance(value, collections.Mapping):
+    elif isinstance(value, abc.Mapping):
         # Dictionaries work as templates.
         return MappingTemplate(value)
     elif value is int:
@@ -1365,9 +1364,9 @@ def as_template(value):
     elif value is None:
         return Template()
     elif value is dict:
-        return TypeTemplate(collections.Mapping)
+        return TypeTemplate(abc.Mapping)
     elif value is list:
-        return TypeTemplate(collections.Sequence)
+        return TypeTemplate(abc.Sequence)
     elif isinstance(value, type):
         return TypeTemplate(value)
     else:
