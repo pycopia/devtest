@@ -18,6 +18,10 @@ if sys.platform == "darwin":
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx']))
 elif sys.platform.startswith("linux"):
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx'], libraries=["rt"]))
+    EXTENSIONS.append(Extension('devtest.usb',
+                                ['src/libusb.pyx'],
+                                libraries=["usb-1.0"],
+                                include_dirs=["/usr/include/libusb-1.0"]))
 
 setup(
     name=NAME,

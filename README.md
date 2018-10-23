@@ -39,15 +39,29 @@ $ brew services start postgresql
 
 ### Linux 
 
-TBD
+#### Debian or Ubuntu
+
+You'll need the postgres server.
+
+```shell
+$ sudo apt-get install postgresql
+```
+
+##### libusb
+
+You'll need the libusb dev package to compile extension module.
+
+```shell
+$ sudo apt-get install libusb-1.0-0-dev
+```
 
 ### Python Dependencies
 
 Now install some necessary Python packages.
 
 ```shell
-$ pip3.6 install cython
-$ pip3.6 install flake8
+$ python3 -m pip install cython
+$ python3 -m pip install flake8
 ```
 
 ### Devtest
@@ -75,7 +89,7 @@ $ make develop
 Initialize the database.
 
 ```shell
-$ python3.6 -m devtest.db.models_init
+$ python3 -m devtest.db.models_init
 ```
 
 Test that the installation and initialization worked.
