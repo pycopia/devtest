@@ -37,9 +37,9 @@ if subprocess.run(['pkg-config', LIBUSB_PKG, '--exists']).returncode == 0:
     lib = get_pkgconfig_value(LIBUSB_PKG, '--libs-only-l')
     EXTENSIONS.append(Extension('devtest.usb',
                                 ['src/libusb.pyx'],
-                                library_dirs=[libdir],
-                                libraries=[lib],
-                                include_dirs=[includedir]))
+                                library_dirs=([libdir] if libdir else None),
+                                libraries=([lib] if lib else None),
+                                include_dirs=([includedir] if includedir else None)))
 
 
 setup(
