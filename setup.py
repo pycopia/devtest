@@ -1,6 +1,7 @@
 
 import sys
 from glob import glob
+import subprocess
 from setuptools import setup, find_packages
 from distutils.extension import Extension
 
@@ -14,14 +15,32 @@ EXTENSIONS = [
     Extension('devtest.ringbuffer', ['src/ringbuffer.pyx'])
 ]
 
+def get_pkgconfig_value(pkgname, option):
+    cp = subprocess.run(['pkg-config', pkgname, option],
+                        capture_output=True, encoding="ascii")
+    return cp.stdout[2:].strip()  # chop flag prefixes
+
+
 if sys.platform == "darwin":
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx']))
 elif sys.platform.startswith("linux"):
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx'], libraries=["rt"]))
+
+# Build USB module if we can.
+# need: "brew install libusb" on MacOS
+# need libusb-1.0-dev package on Linux
+LIBUSB_PKG = "libusb-1.0"
+
+if subprocess.run(['pkg-config', LIBUSB_PKG, '--exists']).returncode == 0:
+    includedir = get_pkgconfig_value(LIBUSB_PKG, '--cflags-only-I')
+    libdir = get_pkgconfig_value(LIBUSB_PKG, '--libs-only-L')
+    lib = get_pkgconfig_value(LIBUSB_PKG, '--libs-only-l')
     EXTENSIONS.append(Extension('devtest.usb',
                                 ['src/libusb.pyx'],
-                                libraries=["usb-1.0"],
-                                include_dirs=["/usr/include/libusb-1.0"]))
+                                library_dirs=[libdir],
+                                libraries=[lib],
+                                include_dirs=[includedir]))
+
 
 setup(
     name=NAME,
