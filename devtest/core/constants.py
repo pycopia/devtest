@@ -91,6 +91,7 @@ class ConnectionType(Enum):
     Thunderbolt = 6
     JTAG = 7
     Bluetooth = 8
+    Power = 9
 
 
 class NetworkType(Enum):

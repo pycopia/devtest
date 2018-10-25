@@ -239,7 +239,6 @@ cdef extern from "libusb.h" nogil:
         # Number of possible configurations
         uint8_t  bNumConfigurations
 
-
     struct libusb_endpoint_descriptor:
         uint8_t  bLength
         uint8_t  bDescriptorType
@@ -251,7 +250,6 @@ cdef extern from "libusb.h" nogil:
         uint8_t  bSynchAddress
         const unsigned char *extra
         int extra_length
-
 
     struct libusb_interface_descriptor:
         uint8_t  bLength
@@ -371,6 +369,14 @@ cdef extern from "libusb.h" nogil:
                             unsigned char *endpoints, int num_endpoints)
     libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
     libusb_device *libusb_get_parent(libusb_device *dev)
+
+    unsigned char * libusb_dev_mem_alloc(libusb_device_handle *dev_handle, size_t length)
+    int libusb_dev_mem_free(libusb_device_handle *dev_handle, unsigned char *buffer, size_t length)
+
+    int libusb_kernel_driver_active(libusb_device_handle *dev_handle, int interface_number)
+    int libusb_detach_kernel_driver(libusb_device_handle *dev_handle, int interface_number)
+    int libusb_attach_kernel_driver(libusb_device_handle *dev_handle, int interface_number)
+    int libusb_set_auto_detach_kernel_driver( libusb_device_handle *dev_handle, int enable)
 
     int libusb_get_device_descriptor(libusb_device *dev, libusb_device_descriptor *desc)
     libusb_device *libusb_ref_device(libusb_device *dev)
@@ -603,9 +609,6 @@ cdef class UsbDevice:
     cdef libusb_device* _device
     cdef libusb_device_handle* _handle
 
-#    def __cinit__(self, libusb_device *dev):
-#        self._device = dev
-
     def __dealloc__(self):
         libusb_unref_device(self._device)
 
@@ -634,29 +637,4 @@ cdef class UsbDevice:
                 return <int> config
         else:
             return None
-
-# libusb_device **list;
-# libusb_device *found = NULL;
-# ssize_t cnt = libusb_get_device_list(NULL, &list);
-# ssize_t i = 0;
-# int err = 0;
-# if (cnt < 0)
-#     error();
-# for (i = 0; i < cnt; i++) {
-#     libusb_device *device = list[i];
-#     if (is_interesting(device)) {
-#         found = device;
-#         break;
-#     }
-# }
-# if (found) {
-#     libusb_device_handle *handle;
-#     err = libusb_open(found, &handle);
-#     if (err)
-#         error();
-#     // etc
-# }
-# libusb_free_device_list(list, 1);
-# 
-
 
