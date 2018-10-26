@@ -17,7 +17,7 @@ EXTENSIONS = [
 
 def get_pkgconfig_value(pkgname, option):
     cp = subprocess.run(['pkg-config', pkgname, option],
-                        capture_output=True, encoding="ascii")
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="ascii")
     return cp.stdout[2:].strip()  # chop flag prefixes
 
 
