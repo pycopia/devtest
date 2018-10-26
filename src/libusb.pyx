@@ -646,11 +646,11 @@ cdef class UsbSession:
                         if langid:
                             r = libusb_get_string_descriptor(handle,
                                        desc.iSerialNumber, langid, buf, 254)
-                            libusb_close(handle)
                             if r >= 2:
                                 s = PyUnicode_Decode(<char *>buf + 2, r - 2,
                                                         "UTF-16LE", "strict")
                                 if serial == s:
+                                    libusb_close(handle)
                                     device = check
                                     break
                         libusb_close(handle)
