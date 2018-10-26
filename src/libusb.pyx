@@ -653,6 +653,8 @@ cdef class UsbSession:
                                     libusb_close(handle)
                                     device = check
                                     break
+                                else:
+                                    device = NULL
                         libusb_close(handle)
                     else:
                         device = check
