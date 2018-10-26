@@ -3,6 +3,7 @@
 # Fast, Pythonic interface to libusb, and its asynchronous API.
 
 from libc.stdint cimport *
+from cpython.unicode cimport PyUnicode_Decode
 
 
 cdef extern from "time.h" nogil:
@@ -350,6 +351,26 @@ cdef extern from "libusb.h" nogil:
         # on a device that has left
         LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT    = 0x02
 
+    struct libusb_version:
+        const uint16_t major;
+        const uint16_t minor;
+        const uint16_t micro;
+        const uint16_t nano;
+        const char *rc;
+        const char* describe;
+
+    int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
+                                     uint8_t desc_index,
+                                     uint16_t langid,
+                                     unsigned char *data, int length)
+
+    void libusb_set_debug(libusb_context *ctx, int level)
+    libusb_version *libusb_get_version()
+    int libusb_has_capability(uint32_t capability)
+    char * libusb_error_name(int errcode)
+    int libusb_setlocale(const char *locale)
+    char * libusb_strerror(libusb_error errcode)
+
     int libusb_init(libusb_context **ctx)
     void libusb_exit(libusb_context *ctx)
     ssize_t libusb_get_device_list(libusb_context *ctx, libusb_device ***list)
@@ -543,8 +564,26 @@ class UsbError(Exception):
     pass
 
 
-class UsbApiError(UsbError):
-    pass
+cdef uint16_t get_langid(libusb_device_handle *dev):
+    cdef unsigned char buf[4]
+    cdef int ret
+    ret = libusb_get_string_descriptor(dev, 0, 0, buf, sizeof(buf))
+    if (ret != sizeof(buf)):
+        return 0
+    return buf[2] | (buf[3] << 8)
+
+
+class LibusbError(UsbError):
+
+    def __init__(self, int err):
+        self.errcode = err
+
+    def __str__(self):
+        cdef char *errstr
+        cdef libusb_error err
+        err = self.errcode
+        errstr = libusb_strerror(err)
+        return errstr.decode("utf-8")
 
 
 cdef inline double _timeval2float(timeval *tv):
@@ -556,10 +595,12 @@ cdef inline void _set_timeval(timeval *tv, double n):
     tv.tv_usec = <long> (fmod(n, 1.0) * 1000000.0)
 
 
-cdef class Usb:
-    """Entry point to USB.
+cdef class UsbSession:
+    """A USB Session.
 
-    Only instantiate this class, and use its methods to get other objects.
+    A unique session for accessing USB system. This is the only object you
+    instantiate. All others are obtained from methods here, or other objects
+    obtained from here.
     """
     cdef libusb_context* _ctx
 
@@ -579,26 +620,46 @@ cdef class Usb:
         libusb_free_device_list(usb_devices, 1)
         return <int>device_count
 
-    def find(self, int vid, int pid):
+    def find(self, int vid, int pid, str serial=None):
         cdef ssize_t device_count
         cdef libusb_device **usb_devices
         cdef libusb_device *device
         cdef libusb_device *check
         cdef libusb_device_descriptor desc
+        cdef libusb_device_handle *handle
+        cdef int r
+        cdef unsigned char buf[256]
 
         device_count = libusb_get_device_list(self._ctx, &usb_devices)
         if device_count < 0:
-            raise UsbApiError("Could not enumerate USB device list")
+            raise LibusbError(<int>device_count)
         if device_count > 0:
             for i in range(device_count):
                 check = usb_devices[i]
-                res = libusb_get_device_descriptor(check, &desc)
+                err = libusb_get_device_descriptor(check, &desc)
                 if (desc.idProduct == pid and desc.idVendor == vid):
-                    device = check
-                    break
+                    if serial and desc.iSerialNumber:
+                        err = libusb_open(check, &handle)
+                        if err:
+                            raise LibusbError(<int>err)
+                        langid = get_langid(handle)
+                        if langid:
+                            r = libusb_get_string_descriptor(handle,
+                                       desc.iSerialNumber, langid, buf, 254)
+                            libusb_close(handle)
+                            if r >= 2:
+                                s = PyUnicode_Decode(<char *>buf + 2, r - 2,
+                                                        "UTF-16LE", "strict")
+                                if serial == s:
+                                    device = check
+                                    break
+                        libusb_close(handle)
+                    else:
+                        device = check
+                        break
         libusb_free_device_list(usb_devices, 1)
         if device:
-            usbdev = UsbDevice()
+            usbdev = UsbDevice(self)
             usbdev._device = device
             return usbdev
         else:
@@ -606,19 +667,69 @@ cdef class Usb:
 
 
 cdef class UsbDevice:
+    #cdef libusb_context* _ctx
     cdef libusb_device* _device
     cdef libusb_device_handle* _handle
+    # This is here just to keep the context alive if the session is deleted
+    # before the devices.
+    cdef UsbSession _session
+    cdef str _serial
+
+    def __cinit__(self, UsbSession _session):
+        pass
+
+    def __init__(self, UsbSession _session):
+        self._session = _session
+        self._serial = None
+
+    def __del__(self):
+        self._session = None
 
     def __dealloc__(self):
+        if self._handle:
+            libusb_close(self._handle)
         libusb_unref_device(self._device)
+
+    def __str__(self):
+        cdef libusb_device_descriptor desc
+        cdef int r
+        cdef uint16_t langid
+        cdef unsigned char data[256]
+        if self._handle:
+            s = []
+            err = libusb_get_device_descriptor(self._device, &desc)
+            s.append("UsbDevice (open): VID:0x{:04x} PID:0x{:04x}".
+                                          format(desc.idVendor, desc.idProduct))
+            langid = get_langid(self._handle)
+            if langid:
+                if desc.iManufacturer:
+                    r = libusb_get_string_descriptor(self._handle,
+                                          desc.iManufacturer, langid, data, 254)
+                    if r >= 2:
+                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+                if desc.iProduct:
+                    r = libusb_get_string_descriptor(self._handle,
+                                          desc.iProduct, langid, data, 254)
+                    if r >= 2:
+                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+                if desc.iSerialNumber:
+                    r = libusb_get_string_descriptor(self._handle,
+                                          desc.iSerialNumber, langid, data, 254)
+                    if r >= 2:
+                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+            return " ".join(s)
+        else:
+            err = libusb_get_device_descriptor(self._device, &desc)
+            return "UsbDevice (closed): VID:0x{:04x} PID:0x{:04x}".format(
+                    desc.idVendor, desc.idProduct)
 
     def open(self):
         cdef libusb_device_handle *handle
         if self._handle:
             return
-        err = libusb_open(self._device, &handle);
+        err = libusb_open(self._device, &handle)
         if err:
-            raise UsbApiError("Failed to open device.", err)
+            raise LibusbError(<int>err)
         self._handle = handle
 
     def close(self):
@@ -627,14 +738,51 @@ cdef class UsbDevice:
             self._handle = NULL
 
     @property
+    def parent(self):
+        cdef libusb_device* parent
+        cdef libusb_device **usb_devices
+        libusb_get_device_list(self._session._ctx, &usb_devices)
+        parent = libusb_get_parent(self._device)
+        libusb_free_device_list(usb_devices, 1)
+        if parent:
+            usbdev = UsbDevice(self._session)
+            usbdev._device = parent
+            return usbdev
+        else:
+            return None
+
+    @property
     def config(self):
         cdef int config
         if self._handle:
             err = libusb_get_configuration(self._handle, &config)
             if err:
-                raise UsbApiError(<int>err)
+                raise LibusbError(<int>err)
             else:
                 return <int> config
         else:
             return None
+
+    @property
+    def serial(self):
+        cdef libusb_device_descriptor desc
+        cdef int r
+        cdef uint16_t langid
+        cdef unsigned char data[256]
+        if self._serial is not None:
+            return self._serial
+
+        if self._handle:
+            err = libusb_get_device_descriptor(self._device, &desc)
+            langid = get_langid(self._handle)
+            if langid:
+                if desc.iSerialNumber:
+                    r = libusb_get_string_descriptor(self._handle,
+                                          desc.iSerialNumber, langid, data, 254)
+                    if r >= 2:
+                        s = PyUnicode_Decode(<char *>data + 2, r - 2,
+                                                "UTF-16LE", "strict")
+                        self._serial = s
+                        return s
+        return None
 
