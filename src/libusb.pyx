@@ -33,6 +33,25 @@ cdef extern from "libusb.h" nogil:
         pass
     ctypedef _libusb_device libusb_device
 
+    enum libusb_class_code:
+        LIBUSB_CLASS_PER_INTERFACE = 0
+        LIBUSB_CLASS_AUDIO = 1
+        LIBUSB_CLASS_COMM = 2
+        LIBUSB_CLASS_HID = 3
+        LIBUSB_CLASS_PHYSICAL = 5
+        LIBUSB_CLASS_PRINTER = 7
+        LIBUSB_CLASS_IMAGE = 6
+        LIBUSB_CLASS_MASS_STORAGE = 8
+        LIBUSB_CLASS_HUB = 9
+        LIBUSB_CLASS_DATA = 10
+        LIBUSB_CLASS_SMART_CARD = 0x0b
+        LIBUSB_CLASS_CONTENT_SECURITY = 0x0d
+        LIBUSB_CLASS_VIDEO = 0x0e
+        LIBUSB_CLASS_PERSONAL_HEALTHCARE = 0x0f
+        LIBUSB_CLASS_DIAGNOSTIC_DEVICE = 0xdc
+        LIBUSB_CLASS_WIRELESS = 0xe0
+        LIBUSB_CLASS_APPLICATION = 0xfe
+        LIBUSB_CLASS_VENDOR_SPEC = 0xff
 
     enum libusb_transfer_status:
         # Transfer completed without error. Note that this does not indicate
@@ -369,7 +388,7 @@ cdef extern from "libusb.h" nogil:
     int libusb_has_capability(uint32_t capability)
     char * libusb_error_name(int errcode)
     int libusb_setlocale(const char *locale)
-    char * libusb_strerror(libusb_error errcode)
+    const char * libusb_strerror(libusb_error errcode)
 
     int libusb_init(libusb_context **ctx)
     void libusb_exit(libusb_context *ctx)
@@ -560,17 +579,29 @@ cdef extern from "libusb.h" nogil:
 
 # End cdef extern, Python objects follow.
 
+cpdef enum DeviceClass:
+    PerInterface = LIBUSB_CLASS_PER_INTERFACE
+    Audio = LIBUSB_CLASS_AUDIO
+    Communication = LIBUSB_CLASS_COMM
+    HID = LIBUSB_CLASS_HID
+    Physical = LIBUSB_CLASS_PHYSICAL
+    Printer = LIBUSB_CLASS_PRINTER
+    Image = LIBUSB_CLASS_IMAGE
+    MassStorage = LIBUSB_CLASS_MASS_STORAGE
+    Hub = LIBUSB_CLASS_HUB
+    Data = LIBUSB_CLASS_DATA
+    SmartCard = LIBUSB_CLASS_SMART_CARD
+    ContentSecurity = LIBUSB_CLASS_CONTENT_SECURITY
+    Video = LIBUSB_CLASS_VIDEO
+    PersonalHealthcare = LIBUSB_CLASS_PERSONAL_HEALTHCARE
+    DiagnosticDevice = LIBUSB_CLASS_DIAGNOSTIC_DEVICE
+    Wireless = LIBUSB_CLASS_WIRELESS
+    Application = LIBUSB_CLASS_APPLICATION
+    VendorSpecific = LIBUSB_CLASS_VENDOR_SPEC
+
+
 class UsbError(Exception):
     pass
-
-
-cdef uint16_t get_langid(libusb_device_handle *dev):
-    cdef unsigned char buf[4]
-    cdef int ret
-    ret = libusb_get_string_descriptor(dev, 0, 0, buf, sizeof(buf))
-    if (ret != sizeof(buf)):
-        return 0
-    return buf[2] | (buf[3] << 8)
 
 
 class LibusbError(UsbError):
@@ -579,7 +610,7 @@ class LibusbError(UsbError):
         self.errcode = err
 
     def __str__(self):
-        cdef char *errstr
+        cdef const char *errstr
         cdef libusb_error err
         err = self.errcode
         errstr = libusb_strerror(err)
@@ -593,6 +624,27 @@ cdef inline double _timeval2float(timeval *tv):
 cdef inline void _set_timeval(timeval *tv, double n):
     tv.tv_sec = <long> floor(n)
     tv.tv_usec = <long> (fmod(n, 1.0) * 1000000.0)
+
+
+cdef uint16_t get_langid(libusb_device_handle *dev):
+    cdef unsigned char buf[4]
+    cdef int ret
+    ret = libusb_get_string_descriptor(dev, 0, 0, buf, sizeof(buf))
+    if (ret != sizeof(buf)):
+        return 0
+    return buf[2] | (buf[3] << 8)
+
+
+cdef str get_string_descriptor(libusb_device_handle *handle, uint8_t descriptor,
+                               unsigned char *buf, int buflen):
+    cdef uint16_t langid
+    cdef int r
+    langid = get_langid(handle)
+    if langid:
+        r = libusb_get_string_descriptor(handle, descriptor, langid, buf, buflen)
+        if r >= 2:
+            return PyUnicode_Decode(<char *>buf + 2, r - 2, "UTF-16LE", "strict")
+    return ""
 
 
 cdef class UsbSession:
@@ -623,8 +675,8 @@ cdef class UsbSession:
     def find(self, int vid, int pid, str serial=None):
         cdef ssize_t device_count
         cdef libusb_device **usb_devices
-        cdef libusb_device *device
-        cdef libusb_device *check
+        cdef libusb_device *device = NULL
+        cdef libusb_device *check = NULL
         cdef libusb_device_descriptor desc
         cdef libusb_device_handle *handle
         cdef int r
@@ -705,20 +757,11 @@ cdef class UsbDevice:
             langid = get_langid(self._handle)
             if langid:
                 if desc.iManufacturer:
-                    r = libusb_get_string_descriptor(self._handle,
-                                          desc.iManufacturer, langid, data, 254)
-                    if r >= 2:
-                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+                    s.append(get_string_descriptor(self._handle, desc.iManufacturer, data, 256))
                 if desc.iProduct:
-                    r = libusb_get_string_descriptor(self._handle,
-                                          desc.iProduct, langid, data, 254)
-                    if r >= 2:
-                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+                    s.append(get_string_descriptor(self._handle, desc.iProduct, data, 256))
                 if desc.iSerialNumber:
-                    r = libusb_get_string_descriptor(self._handle,
-                                          desc.iSerialNumber, langid, data, 254)
-                    if r >= 2:
-                        s.append(PyUnicode_Decode(<char *>data + 2, r - 2, "UTF-16LE", "strict"))
+                    s.append(get_string_descriptor(self._handle, desc.iSerialNumber, data, 256))
             return " ".join(s)
         else:
             err = libusb_get_device_descriptor(self._device, &desc)
@@ -787,4 +830,22 @@ cdef class UsbDevice:
                         self._serial = s
                         return s
         return None
+
+    @property
+    def VID(self):
+        cdef libusb_device_descriptor desc
+        libusb_get_device_descriptor(self._device, &desc)
+        return <int> desc.idVendor
+
+    @property
+    def PID(self):
+        cdef libusb_device_descriptor desc
+        libusb_get_device_descriptor(self._device, &desc)
+        return <int> desc.idProduct
+
+    @property
+    def Class(self):
+        cdef libusb_device_descriptor desc
+        libusb_get_device_descriptor(self._device, &desc)
+        return DeviceClass(desc.bDeviceClass)
 

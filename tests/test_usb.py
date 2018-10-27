@@ -54,6 +54,16 @@ def test_parent():
     del session
 
 
+@pytest.mark.skipif(HOSTNAME != "mercury", reason="Needs author's host.")
+def test_device_class():
+    session = usb.UsbSession()
+    dev = session.find(0x0a12, 0x0001) # Cambridge Silicon Radio, Ltd Bluetooth Dongle (HCI mode)
+    assert dev is not None
+    print(dev)
+    print(dev.Class)
+    assert isinstance(dev.Class, usb.DeviceClass)
+
+
 @pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
 def test_open():
     session = usb.UsbSession()
