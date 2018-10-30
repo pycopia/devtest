@@ -4,6 +4,7 @@
 
 from libc.stdint cimport *
 from cpython.unicode cimport PyUnicode_Decode
+from cpython.bytes cimport PyBytes_AsStringAndSize, PyBytes_FromStringAndSize
 
 
 cdef extern from "time.h" nogil:
@@ -930,14 +931,33 @@ cdef class UsbDevice:
                          RequestRecipient recipient,
                          RequestType type,
                          EndpointDirection direction,
-                         ):
-        """Send a synchronous control transfer message.
+                         int request,
+                         int value,
+                         int index,
+                         bytes data):
+        """General synchronous control transfer message.
 
         Args:
-            x
+            recipient: A RequestRecipient indicating final destination.
+            type: A RequestType indicating Standard, Class, or Vendor.
+            direction: A EndpointDirection indicating In or Out transfer.
+            request: int that is a StandardRequest value if type is
+                     Standard, otherwise depends on application.
+            value: int The message value parameter (?)
+            index: int The message index parameter (?)
+            data: bytes Sent to recipient if direction is Out
+
+        Returns:
+            bytes of response if direction is In
+
+        Raises:
+            UsbUsageError if called when device is not open.
         """
         cdef int xfer = 0
         cdef uint8_t request_type
+        cdef char *bdata
+        cdef Py_ssize_t bdata_length
+        cdef bytes out
 
         if not self._handle:
             raise UsbUsageError("control_transfer on closed device.")
@@ -945,27 +965,26 @@ cdef class UsbDevice:
             # Bits 0:4 determine recipient, see libusb_request_recipient.
             # Bits 5:6 determine type, see libusb_request_type.
             # Bit 7 determines data transfer direction, see libusb_endpoint_direction.
-        request_type = direction & (((type & 0x60) << 5) | (recipient & 0x1F))
+        request_type = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
 
-        # bRequest	the request field for the setup packet
-
-# wValue	the value field for the setup packet
-# wIndex	the index field for the setup packet
-# data	a suitably-sized data buffer for either input or output (depending on direction bits within bmRequestType)
-# wLength	the length field for the setup packet. The data buffer should be at least this size.
-# timeout	timeout (in millseconds) that this function should wait before giving up due to no response being received. For an unlimited timeout, use value 0.
-
-#        xfer = libusb_control_transfer(self._handle,
-#                                       uint8_t request_type,
-#                                       uint8_t bRequest,
-#                                       uint16_t wValue,
-#                                       uint16_t wIndex,
-#                                       unsigned char *data,
-#                                       uint16_t wLength,
-#                                       unsigned int timeout)
+        if (direction & 0x80):  # In: device-to-host
+            out = PyBytes_FromStringAndSize(NULL, 65536)  # max size
+            PyBytes_AsStringAndSize(out, &bdata, &bdata_length)
+        else:  # host-to-device
+            PyBytes_AsStringAndSize(data, &bdata, &bdata_length)
+        xfer = libusb_control_transfer(self._handle,
+                                       request_type,
+                                       <uint8_t> request,
+                                       <uint16_t> value,
+                                       <uint16_t> index,
+                                       <unsigned char *> bdata,
+                                       <uint16_t> bdata_length,
+                                       1000) # timeout	timeout (in millseconds)
         if xfer < 0:
             raise LibusbError(<int>xfer)
         if xfer > 0:
-            pass
+            if (direction & 0x80):  # In: device-to-host
+                return out[:xfer]
+        return b""
 
-
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
