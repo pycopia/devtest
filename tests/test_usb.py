@@ -73,8 +73,19 @@ def test_open():
     conf = dev.config
     assert conf is not None, "Got None for config on opened device."
     dev.close()
-    conf = dev.config
-    assert conf is None, "Did not get None for config on closed device."
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_operate_on_closed():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7) # Google Pixel XL
+    assert dev is not None
+    try:
+        conf = dev.config
+    except usb.UsbUsageError as err:
+        pass
+    else:
+        raise AssertionError("Didn't raise UsbUsageError as expected.")
 
 
 @pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")

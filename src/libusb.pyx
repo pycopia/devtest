@@ -33,6 +33,7 @@ cdef extern from "libusb.h" nogil:
         pass
     ctypedef _libusb_device libusb_device
 
+
     enum libusb_class_code:
         LIBUSB_CLASS_PER_INTERFACE = 0
         LIBUSB_CLASS_AUDIO = 1
@@ -52,6 +53,7 @@ cdef extern from "libusb.h" nogil:
         LIBUSB_CLASS_WIRELESS = 0xe0
         LIBUSB_CLASS_APPLICATION = 0xfe
         LIBUSB_CLASS_VENDOR_SPEC = 0xff
+
 
     enum libusb_transfer_status:
         # Transfer completed without error. Note that this does not indicate
@@ -144,6 +146,13 @@ cdef extern from "libusb.h" nogil:
         LIBUSB_ERROR_OTHER = -99
 
 
+    enum libusb_endpoint_direction:
+        # In: device-to-host
+        LIBUSB_ENDPOINT_IN = 0x80,
+        # Out: host-to-device
+        LIBUSB_ENDPOINT_OUT = 0x00
+
+
     enum libusb_transfer_type:
         # Control endpoint /
         LIBUSB_TRANSFER_TYPE_CONTROL = 0
@@ -159,6 +168,29 @@ cdef extern from "libusb.h" nogil:
 
         # Stream endpoint
         LIBUSB_TRANSFER_TYPE_BULK_STREAM = 4
+
+
+    enum libusb_standard_request:
+        LIBUSB_REQUEST_GET_STATUS = 0x00
+        LIBUSB_REQUEST_CLEAR_FEATURE = 0x01
+        LIBUSB_REQUEST_SET_FEATURE = 0x03
+        LIBUSB_REQUEST_SET_ADDRESS = 0x05
+        LIBUSB_REQUEST_GET_DESCRIPTOR = 0x06
+        LIBUSB_REQUEST_SET_DESCRIPTOR = 0x07
+        LIBUSB_REQUEST_GET_CONFIGURATION = 0x08
+        LIBUSB_REQUEST_SET_CONFIGURATION = 0x09
+        LIBUSB_REQUEST_GET_INTERFACE = 0x0A
+        LIBUSB_REQUEST_SET_INTERFACE = 0x0B
+        LIBUSB_REQUEST_SYNCH_FRAME = 0x0C
+        LIBUSB_REQUEST_SET_SEL = 0x30
+        LIBUSB_SET_ISOCH_DELAY = 0x31
+
+
+    enum libusb_request_type:
+        LIBUSB_REQUEST_TYPE_STANDARD = (0x00 << 5)
+        LIBUSB_REQUEST_TYPE_CLASS = (0x01 << 5)
+        LIBUSB_REQUEST_TYPE_VENDOR = (0x02 << 5)
+        LIBUSB_REQUEST_TYPE_RESERVED = (0x03 << 5)
 
 
     enum libusb_speed:
@@ -183,8 +215,14 @@ cdef extern from "libusb.h" nogil:
         LIBUSB_HIGH_SPEED_OPERATION  = 4
         # Superspeed operation supported (5000MBit/s)
         LIBUSB_SUPER_SPEED_OPERATION = 8
-
         # Next will be SUPER_DUPER? ULTRA?
+
+    enum libusb_request_recipient:
+        LIBUSB_RECIPIENT_DEVICE = 0x00
+        LIBUSB_RECIPIENT_INTERFACE = 0x01
+        LIBUSB_RECIPIENT_ENDPOINT = 0x02
+        LIBUSB_RECIPIENT_OTHER = 0x03
+
 
     struct libusb_control_setup:
         # Request type.
@@ -600,6 +638,41 @@ cpdef enum DeviceClass:
     VendorSpecific = LIBUSB_CLASS_VENDOR_SPEC
 
 
+cpdef enum RequestType:
+    Standard = LIBUSB_REQUEST_TYPE_STANDARD
+    Class = LIBUSB_REQUEST_TYPE_CLASS
+    Vendor = LIBUSB_REQUEST_TYPE_VENDOR
+
+
+cpdef enum RequestRecipient:
+    Device = LIBUSB_RECIPIENT_DEVICE
+    Interface = LIBUSB_RECIPIENT_INTERFACE
+    Endpoint = LIBUSB_RECIPIENT_ENDPOINT
+    Other = LIBUSB_RECIPIENT_OTHER
+
+
+cpdef enum EndpointDirection:
+    In = LIBUSB_ENDPOINT_IN  # In: device-to-host
+    Out = LIBUSB_ENDPOINT_OUT  # Out: host-to-device
+
+
+# If RequestType is Standard, this is the request.
+cpdef enum StandardRequest:
+    GetStatus = LIBUSB_REQUEST_GET_STATUS
+    ClearFeature = LIBUSB_REQUEST_CLEAR_FEATURE
+    SetFeature = LIBUSB_REQUEST_SET_FEATURE
+    SetAddress = LIBUSB_REQUEST_SET_ADDRESS
+    GetDescriptor = LIBUSB_REQUEST_GET_DESCRIPTOR
+    SetDescriptor = LIBUSB_REQUEST_SET_DESCRIPTOR
+    GetConfiguration = LIBUSB_REQUEST_GET_CONFIGURATION
+    SetConfiguration = LIBUSB_REQUEST_SET_CONFIGURATION
+    GetInterface = LIBUSB_REQUEST_GET_INTERFACE
+    SetInterface = LIBUSB_REQUEST_SET_INTERFACE
+    SynchFrame = LIBUSB_REQUEST_SYNCH_FRAME
+    SetSel = LIBUSB_REQUEST_SET_SEL
+    SetIsochronousDelay = LIBUSB_SET_ISOCH_DELAY
+
+
 class UsbError(Exception):
     pass
 
@@ -615,6 +688,10 @@ class LibusbError(UsbError):
         err = self.errcode
         errstr = libusb_strerror(err)
         return errstr.decode("utf-8")
+
+
+class UsbUsageError(UsbError):
+    pass
 
 
 cdef inline double _timeval2float(timeval *tv):
@@ -806,7 +883,7 @@ cdef class UsbDevice:
             else:
                 return <int> config
         else:
-            return None
+            raise UsbUsageError("Operation on closed device.")
 
     @property
     def serial(self):
@@ -829,7 +906,7 @@ cdef class UsbDevice:
                                                 "UTF-16LE", "strict")
                         self._serial = s
                         return s
-        return None
+        raise UsbUsageError("Operation on closed device.")
 
     @property
     def VID(self):
@@ -848,4 +925,47 @@ cdef class UsbDevice:
         cdef libusb_device_descriptor desc
         libusb_get_device_descriptor(self._device, &desc)
         return DeviceClass(desc.bDeviceClass)
+
+    def control_transfer(self,
+                         RequestRecipient recipient,
+                         RequestType type,
+                         EndpointDirection direction,
+                         ):
+        """Send a synchronous control transfer message.
+
+        Args:
+            x
+        """
+        cdef int xfer = 0
+        cdef uint8_t request_type
+
+        if not self._handle:
+            raise UsbUsageError("control_transfer on closed device.")
+        # bmRequestType: the request type field for the setup packet
+            # Bits 0:4 determine recipient, see libusb_request_recipient.
+            # Bits 5:6 determine type, see libusb_request_type.
+            # Bit 7 determines data transfer direction, see libusb_endpoint_direction.
+        request_type = direction & (((type & 0x60) << 5) | (recipient & 0x1F))
+
+        # bRequest	the request field for the setup packet
+
+# wValue	the value field for the setup packet
+# wIndex	the index field for the setup packet
+# data	a suitably-sized data buffer for either input or output (depending on direction bits within bmRequestType)
+# wLength	the length field for the setup packet. The data buffer should be at least this size.
+# timeout	timeout (in millseconds) that this function should wait before giving up due to no response being received. For an unlimited timeout, use value 0.
+
+#        xfer = libusb_control_transfer(self._handle,
+#                                       uint8_t request_type,
+#                                       uint8_t bRequest,
+#                                       uint16_t wValue,
+#                                       uint16_t wIndex,
+#                                       unsigned char *data,
+#                                       uint16_t wLength,
+#                                       unsigned int timeout)
+        if xfer < 0:
+            raise LibusbError(<int>xfer)
+        if xfer > 0:
+            pass
+
 
