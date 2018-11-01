@@ -5,6 +5,7 @@
 from libc.stdint cimport *
 from cpython.unicode cimport PyUnicode_Decode
 from cpython.bytes cimport PyBytes_AsStringAndSize, PyBytes_FromStringAndSize
+from cpython.bool cimport bool
 
 
 cdef extern from "time.h" nogil:
@@ -491,6 +492,11 @@ cdef extern from "libusb.h" nogil:
     libusb_device *libusb_get_device(libusb_device_handle *dev_handle)
     libusb_device *libusb_get_parent(libusb_device *dev)
 
+    int libusb_set_interface_alt_setting(libusb_device_handle *dev_handle,
+                                         int interface_number, int alternate_setting)
+    int libusb_clear_halt(libusb_device_handle *dev_handle, unsigned char endpoint)
+    int libusb_reset_device(libusb_device_handle *dev_handle)
+
     unsigned char * libusb_dev_mem_alloc(libusb_device_handle *dev_handle, size_t length)
     int libusb_dev_mem_free(libusb_device_handle *dev_handle, unsigned char *buffer, size_t length)
 
@@ -913,6 +919,14 @@ cdef class UsbDevice:
             libusb_close(self._handle)
             self._handle = NULL
 
+    def reset(self):
+        if self._handle:
+            err = libusb_reset_device(self._handle)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
     @property
     def parent(self):
         cdef libusb_device* parent
@@ -1024,9 +1038,69 @@ cdef class UsbDevice:
         else:
             raise LibusbError(<int>rv)
 
+    def set_interface_alt_setting(self, int interface_number, int alternate_setting):
+        if self._handle:
+            err = libusb_set_interface_alt_setting(self._handle, <int> interface_number,
+                                                   <int> alternate_setting)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
 
-#    int libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number)
-#    int libusb_release_interface(libusb_device_handle *dev_handle, int interface_number)
+    def detach_kernel_driver(self, int interface_number):
+        if self._handle:
+            err = libusb_detach_kernel_driver(self._handle, <int> interface_number)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def attach_kernel_driver(self, int interface_number):
+        if self._handle:
+            err = libusb_attach_kernel_driver(self._handle, <int> interface_number)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def is_kernel_driver_active(self, int interface_number):
+        if self._handle:
+            err = libusb_kernel_driver_active(self._handle, <int> interface_number)
+            if err < 0:
+                raise LibusbError(<int>err)
+            if err == 0:
+                return False
+            if err == 1:
+                return True
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def set_auto_detach_kernel_driver(self, bool enable):
+        if self._handle:
+            err = libusb_set_auto_detach_kernel_driver(self._handle, <int> enable)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def claim_interface(self, int interface_number):
+        if self._handle:
+            err = libusb_claim_interface(self._handle, <int> interface_number)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def release_interface(self, int interface_number):
+        if self._handle:
+            err = libusb_release_interface(self._handle, <int> interface_number)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+#    int libusb_alloc_streams(libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
+#    int libusb_free_streams(libusb_device_handle *dev_handle, unsigned char *endpoints, int num_endpoints)
 
     def control_transfer(self,
                          RequestRecipient recipient,
@@ -1124,12 +1198,12 @@ cdef class Configuration:
     def interfaces(self):
         pass
 
-cdef class Interface:
-    pass
-
-
-cdef class Endpoint:
-    pass
+#cdef class Interface:
+#    pass
+#
+#
+#cdef class Endpoint:
+#    pass
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

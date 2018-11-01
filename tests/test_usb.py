@@ -12,7 +12,7 @@ from devtest import usb
 
 UNAME = os.uname()
 HOSTNAME = UNAME.nodename
-
+NOT_LINUX = UNAME.sysname != "Linux"
 NO_PIXEL = subprocess.run(['lsusb', '-d', '18d1:4ee7']).returncode != 0
 
 
@@ -129,6 +129,29 @@ def test_active_configuration():
     assert isinstance(cf, usb.Configuration)
     print(cf)
 
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+@pytest.mark.skipif(NOT_LINUX, reason="Needs Linux host.")
+@pytest.mark.skip(reason="TODO: Needs something that has kernel driver.")
+def test_is_kernel_driver_active():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    dev.open()
+    assert dev.is_kernel_driver_active(0) is True
+    dev.close()
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+@pytest.mark.skipif(NOT_LINUX, reason="Needs Linux host.")
+@pytest.mark.skip(reason="TODO: Needs something that has kernel driver.")
+def test_detach_kernel_driver():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    dev.open()
+    dev.detach_kernel_driver(0)
+    assert dev.is_kernel_driver_active(0) is False
+    dev.attach_kernel_driver(0)
+    dev.close()
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
