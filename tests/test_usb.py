@@ -13,10 +13,7 @@ from devtest import usb
 UNAME = os.uname()
 HOSTNAME = UNAME.nodename
 
-if UNAME.sysname == "Linux":
-    NO_PIXEL = subprocess.run(['lsusb', '-d', '18d1:4ee7']).returncode != 0
-else:
-    NO_PIXEL = True
+NO_PIXEL = subprocess.run(['lsusb', '-d', '18d1:4ee7']).returncode != 0
 
 
 def test_libusberror_str():
@@ -70,8 +67,8 @@ def test_open():
     dev = session.find(0x18d1, 0x4ee7) # Google Pixel XL
     assert dev is not None
     dev.open()
-    conf = dev.config
-    assert conf is not None, "Got None for config on opened device."
+    conf = dev.configuration
+    assert conf is not None, "Got None for configuration on opened device."
     dev.close()
 
 
@@ -81,7 +78,7 @@ def test_operate_on_closed():
     dev = session.find(0x18d1, 0x4ee7) # Google Pixel XL
     assert dev is not None
     try:
-        conf = dev.config
+        conf = dev.configuration
     except usb.UsbUsageError as err:
         pass
     else:
@@ -113,5 +110,25 @@ def test_find_device_with_serial():
     print(dev)
     assert dev.serial == ANDROID_SERIAL
     dev.close()
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_configurations():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    for cf in dev.configurations:
+        assert isinstance(cf, usb.Configuration)
+        print(cf)
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_active_configuration():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    cf = dev.active_configuration
+    assert isinstance(cf, usb.Configuration)
+    print(cf)
+
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

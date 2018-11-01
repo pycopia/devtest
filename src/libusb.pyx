@@ -35,6 +35,48 @@ cdef extern from "libusb.h" nogil:
     ctypedef _libusb_device libusb_device
 
 
+    # Descriptor types as defined by the USB specification.
+    enum libusb_descriptor_type:
+        # Device descriptor. See libusb_device_descriptor.
+        LIBUSB_DT_DEVICE = 0x01
+
+        # Configuration descriptor. See libusb_config_descriptor.
+        LIBUSB_DT_CONFIG = 0x02
+
+        # String descriptor
+        LIBUSB_DT_STRING = 0x03
+
+        # Interface descriptor. See libusb_interface_descriptor.
+        LIBUSB_DT_INTERFACE = 0x04
+
+        # Endpoint descriptor. See libusb_endpoint_descriptor.
+        LIBUSB_DT_ENDPOINT = 0x05
+
+        # BOS descriptor
+        LIBUSB_DT_BOS = 0x0f
+
+        # Device Capability descriptor
+        LIBUSB_DT_DEVICE_CAPABILITY = 0x10
+
+        # HID descriptor
+        LIBUSB_DT_HID = 0x21
+
+        # HID report descriptor
+        LIBUSB_DT_REPORT = 0x22
+
+        # Physical descriptor
+        LIBUSB_DT_PHYSICAL = 0x23
+
+        # Hub descriptor
+        LIBUSB_DT_HUB = 0x29
+
+        # SuperSpeed Hub descriptor
+        LIBUSB_DT_SUPERSPEED_HUB = 0x2a
+
+        # SuperSpeed Endpoint Companion descriptor
+        LIBUSB_DT_SS_ENDPOINT_COMPANION = 0x30
+
+
     enum libusb_class_code:
         LIBUSB_CLASS_PER_INTERFACE = 0
         LIBUSB_CLASS_AUDIO = 1
@@ -618,6 +660,18 @@ cdef extern from "libusb.h" nogil:
 
 # End cdef extern, Python objects follow.
 
+# Descriptor sizes per descriptor type
+DEF LIBUSB_DT_DEVICE_SIZE = 18
+DEF LIBUSB_DT_CONFIG_SIZE = 9
+DEF LIBUSB_DT_INTERFACE_SIZE = 9
+DEF LIBUSB_DT_ENDPOINT_SIZE = 7
+DEF LIBUSB_DT_ENDPOINT_AUDIO_SIZE = 9
+DEF LIBUSB_DT_HUB_NONVAR_SIZE = 7
+DEF LIBUSB_DT_SS_ENDPOINT_COMPANION_SIZE = 6
+DEF LIBUSB_DT_BOS_SIZE = 5
+DEF LIBUSB_DT_DEVICE_CAPABILITY_SIZE = 3
+
+
 cpdef enum DeviceClass:
     PerInterface = LIBUSB_CLASS_PER_INTERFACE
     Audio = LIBUSB_CLASS_AUDIO
@@ -799,7 +853,6 @@ cdef class UsbSession:
 
 
 cdef class UsbDevice:
-    #cdef libusb_context* _ctx
     cdef libusb_device* _device
     cdef libusb_device_handle* _handle
     # This is here just to keep the context alive if the session is deleted
@@ -875,7 +928,7 @@ cdef class UsbDevice:
             return None
 
     @property
-    def config(self):
+    def configuration(self):
         cdef int config
         if self._handle:
             err = libusb_get_configuration(self._handle, &config)
@@ -883,6 +936,15 @@ cdef class UsbDevice:
                 raise LibusbError(<int>err)
             else:
                 return <int> config
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    @configuration.setter
+    def configuration(self, int config):
+        if self._handle:
+            err = libusb_set_configuration(self._handle, <int> config)
+            if err < 0:
+                raise LibusbError(<int>err)
         else:
             raise UsbUsageError("Operation on closed device.")
 
@@ -926,6 +988,45 @@ cdef class UsbDevice:
         cdef libusb_device_descriptor desc
         libusb_get_device_descriptor(self._device, &desc)
         return DeviceClass(desc.bDeviceClass)
+
+    @property
+    def SubClass(self):
+        cdef libusb_device_descriptor desc
+        libusb_get_device_descriptor(self._device, &desc)
+        return DeviceClass(desc.bDeviceSubClass)
+
+    @property
+    def num_configurations(self):
+        cdef libusb_device_descriptor desc
+        libusb_get_device_descriptor(self._device, &desc)
+        return <int> desc.bNumConfigurations
+
+    @property
+    def configurations(self):
+        cdef libusb_device_descriptor desc
+        cdef libusb_config_descriptor *cfgdesc
+        libusb_get_device_descriptor(self._device, &desc)
+        for index in range(desc.bNumConfigurations):
+            rv = libusb_get_config_descriptor(self._device, <uint8_t> index, &cfgdesc)
+            if rv == 0:
+                cfg = Configuration(self._session)
+                cfg._descriptor = cfgdesc
+                yield cfg
+
+    @property
+    def active_configuration(self):
+        cdef libusb_config_descriptor *cfgdesc
+        rv = libusb_get_active_config_descriptor(self._device, &cfgdesc)
+        if rv == 0:
+            cfg = Configuration(self._session)
+            cfg._descriptor = cfgdesc
+            return cfg
+        else:
+            raise LibusbError(<int>rv)
+
+
+#    int libusb_claim_interface(libusb_device_handle *dev_handle, int interface_number)
+#    int libusb_release_interface(libusb_device_handle *dev_handle, int interface_number)
 
     def control_transfer(self,
                          RequestRecipient recipient,
@@ -979,12 +1080,56 @@ cdef class UsbDevice:
                                        <uint16_t> index,
                                        <unsigned char *> bdata,
                                        <uint16_t> bdata_length,
-                                       1000) # timeout	timeout (in millseconds)
+                                       1000) # timeout (in millseconds)
         if xfer < 0:
             raise LibusbError(<int>xfer)
         if xfer > 0:
             if (direction & 0x80):  # In: device-to-host
                 return out[:xfer]
         return b""
+
+
+cdef class Configuration:
+    cdef libusb_config_descriptor *_descriptor
+    cdef UsbSession _session  # For the context
+#        uint8_t  bLength
+#        uint8_t  bDescriptorType
+#        uint16_t wTotalLength
+#        uint8_t  bNumInterfaces
+#        uint8_t  bConfigurationValue
+#        uint8_t  iConfiguration
+#        uint8_t  bmAttributes
+#        uint8_t  MaxPower
+#        libusb_interface *interface
+#        unsigned char *extra
+#        int extra_length
+
+    def __cinit__(self, UsbSession _session):
+        self._descriptor = NULL
+
+    def __init__(self, UsbSession _session):
+        self._session = _session
+
+    def __del__(self):
+        self._session = None
+
+    def __dealloc__(self):
+        if self._descriptor:
+            libusb_free_config_descriptor(self._descriptor)
+
+    def __str__(self):
+        return "Configuration: interfaces: {:d}".format(<int> self._descriptor.bNumInterfaces)
+
+    @property
+    def interfaces(self):
+        pass
+
+cdef class Interface:
+    pass
+
+
+cdef class Endpoint:
+    pass
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
