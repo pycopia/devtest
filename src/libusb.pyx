@@ -1109,7 +1109,7 @@ cdef class UsbDevice:
                          int request,
                          int value,
                          int index,
-                         bytes data):
+                         object data):
         """General synchronous control transfer message.
 
         Args:
@@ -1120,7 +1120,8 @@ cdef class UsbDevice:
                      Standard, otherwise depends on application.
             value: int The message value parameter (?)
             index: int The message index parameter (?)
-            data: bytes Sent to recipient if direction is Out
+            data: bytes Sent to recipient if direction is Out, number of bytes
+                  to read if In.
 
         Returns:
             bytes of response if direction is In
@@ -1143,9 +1144,13 @@ cdef class UsbDevice:
         request_type = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
 
         if (direction & 0x80):  # In: device-to-host
-            out = PyBytes_FromStringAndSize(NULL, 65536)  # max size
+            if not isinstance(data, int):
+                raise TypeError("data values should be a length to read")
+            out = PyBytes_FromStringAndSize(NULL, <Py_ssize_t> data)
             PyBytes_AsStringAndSize(out, &bdata, &bdata_length)
         else:  # host-to-device
+            if not isinstance(data, bytes):
+                raise TypeError("data values should be a bytes buffer to send")
             PyBytes_AsStringAndSize(data, &bdata, &bdata_length)
         xfer = libusb_control_transfer(self._handle,
                                        request_type,
@@ -1160,7 +1165,7 @@ cdef class UsbDevice:
         if xfer > 0:
             if (direction & 0x80):  # In: device-to-host
                 return out[:xfer]
-        return b""
+        return <int> xfer
 
 
 cdef class Configuration:
