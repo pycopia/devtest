@@ -1125,9 +1125,12 @@ cdef class UsbDevice:
 
         Returns:
             bytes of response if direction is In
+            amount of data actually transferred as int, if direction was Out.
 
         Raises:
+            TypeError if data is not appropriate for the direction.
             UsbUsageError if called when device is not open.
+            LibusbError if libusb returns an error.
         """
         cdef int xfer = 0
         cdef uint8_t request_type
@@ -1166,6 +1169,121 @@ cdef class UsbDevice:
             if (direction & 0x80):  # In: device-to-host
                 return out[:xfer]
         return <int> xfer
+
+    def bulk_transfer(self,
+                      RequestRecipient recipient,
+                      RequestType type,
+                      EndpointDirection direction,
+                      object data_or_length,
+                      int timeout=5000):
+        """Synchronous bulk transfer method.
+
+        Args:
+            recipient: A RequestRecipient indicating final destination.
+            type: A RequestType indicating Standard, Class, or Vendor.
+            direction: A EndpointDirection indicating In or Out transfer.
+            data_or_length: bytes Sent to recipient if direction is Out, number of bytes
+                  to read if In.
+            timeout: timeout in int milliseconds. Default is 5000, or 5 seconds.
+
+        Returns:
+            bytes of response if direction is In
+            amount of data actually transferred as int, if direction was Out.
+
+        Raises:
+            TypeError if data_or_length is not appropriate for the direction.
+            UsbUsageError if called when device is not open.
+            LibusbError if libusb returns an error.
+        """
+        cdef unsigned char endpoint
+        cdef char *bdata
+        cdef Py_ssize_t bdata_length
+        cdef int transferred
+
+        if not self._handle:
+            raise UsbUsageError("bulk_transfer on closed device.")
+        endpoint = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
+
+        if direction == EndpointDirection.In:
+            if not isinstance(data_or_length, int):
+                raise TypeError("data_or_length must be int of amount to read.")
+            out = PyBytes_FromStringAndSize(NULL, <Py_ssize_t> data_or_length)
+            PyBytes_AsStringAndSize(out, &bdata, &bdata_length)
+        elif direction == EndpointDirection.Out:
+            if not isinstance(data_or_length, bytes):
+                raise TypeError("data_or_length must be bytes of data to send.")
+            PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
+        else:
+            raise UsbUsageError("Invalid direction")
+        err = libusb_bulk_transfer(self._handle, endpoint,
+                                   <unsigned char *> bdata,
+                                   bdata_length,
+                                   &transferred,
+                                   <unsigned int> timeout)
+        if err < 0:
+            raise LibusbError(<int>err)
+        if direction == EndpointDirection.In:
+            return out[:transferred]
+        else:
+            return <int> transferred
+
+    def interrupt_transfer(self,
+                      RequestRecipient recipient,
+                      RequestType type,
+                      EndpointDirection direction,
+                      object data_or_length,
+                      int timeout=5000):
+        """Synchronous interrupt transfer method.
+
+        Args:
+            recipient: A RequestRecipient indicating final destination.
+            type: A RequestType indicating Standard, Class, or Vendor.
+            direction: A EndpointDirection indicating In or Out transfer.
+            data_or_length: bytes Sent to recipient if direction is Out, number of bytes
+                  to read if In.
+            timeout: timeout in int milliseconds. Default is 5000, or 5 seconds.
+
+        Returns:
+            bytes of response if direction is In
+            amount of data actually transferred as int, if direction was Out.
+
+        Raises:
+            TypeError if data_or_length is not appropriate for the direction.
+            UsbUsageError if called when device is not open.
+            LibusbError if libusb returns an error.
+        """
+        cdef unsigned char endpoint
+        cdef char *bdata
+        cdef Py_ssize_t bdata_length
+        cdef int transferred
+
+        if not self._handle:
+            raise UsbUsageError("interrupt_transfer on closed device.")
+        endpoint = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
+
+        if direction == EndpointDirection.In:
+            if not isinstance(data_or_length, int):
+                raise TypeError("data_or_length must be int of amount to read.")
+            out = PyBytes_FromStringAndSize(NULL, <Py_ssize_t> data_or_length)
+            PyBytes_AsStringAndSize(out, &bdata, &bdata_length)
+        elif direction == EndpointDirection.Out:
+            if not isinstance(data_or_length, bytes):
+                raise TypeError("data_or_length must be bytes of data to send.")
+            PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
+        else:
+            raise UsbUsageError("Invalid direction")
+        err =  libusb_interrupt_transfer(self._handle,
+                                         endpoint,
+                                         <unsigned char *> bdata,
+                                         bdata_length,
+                                         &transferred,
+                                         <unsigned int> timeout)
+        if err < 0:
+            raise LibusbError(<int>err)
+        if direction == EndpointDirection.In:
+            return out[:transferred]
+        else:
+            return <int> transferred
 
 
 cdef class Configuration:
