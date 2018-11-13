@@ -198,19 +198,10 @@ cdef extern from "libusb.h" nogil:
 
 
     enum libusb_transfer_type:
-        # Control endpoint /
         LIBUSB_TRANSFER_TYPE_CONTROL = 0
-
-        # Isochronous endpoint
         LIBUSB_TRANSFER_TYPE_ISOCHRONOUS = 1
-
-        # Bulk endpoint
         LIBUSB_TRANSFER_TYPE_BULK = 2
-
-        # Interrupt endpoint
         LIBUSB_TRANSFER_TYPE_INTERRUPT = 3
-
-        # Stream endpoint
         LIBUSB_TRANSFER_TYPE_BULK_STREAM = 4
 
 
@@ -453,12 +444,62 @@ cdef extern from "libusb.h" nogil:
         LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT    = 0x02
 
     struct libusb_version:
-        const uint16_t major;
-        const uint16_t minor;
-        const uint16_t micro;
-        const uint16_t nano;
-        const char *rc;
-        const char* describe;
+        const uint16_t major
+        const uint16_t minor
+        const uint16_t micro
+        const uint16_t nano
+        const char *rc
+        const char* describe
+
+
+    struct libusb_ss_endpoint_companion_descriptor:
+        uint8_t  bLength
+        uint8_t  bDescriptorType
+        uint8_t  bMaxBurst
+        uint8_t  bmAttributes
+        uint16_t wBytesPerInterval
+
+    struct libusb_bos_dev_capability_descriptor:
+        uint8_t bLength
+        uint8_t bDescriptorType
+        uint8_t bDevCapabilityType
+        uint8_t dev_capability_data[0]
+
+    struct libusb_bos_descriptor:
+        uint8_t  bLength
+        uint8_t  bDescriptorType
+        uint16_t wTotalLength
+        uint8_t  bNumDeviceCaps
+        libusb_bos_dev_capability_descriptor *dev_capability[0]
+
+    struct libusb_usb_2_0_extension_descriptor:
+        uint8_t  bLength
+        uint8_t  bDescriptorType
+        uint8_t  bDevCapabilityType
+        uint32_t  bmAttributes
+
+    struct libusb_ss_usb_device_capability_descriptor:
+        uint8_t  bLength
+        uint8_t  bDescriptorType
+        uint8_t  bDevCapabilityType
+        uint8_t  bmAttributes
+        uint16_t wSpeedSupported
+        uint8_t  bFunctionalitySupport
+        uint8_t  bU1DevExitLat
+        uint16_t bU2DevExitLat
+
+    struct libusb_container_id_descriptor:
+        uint8_t  bLength
+        uint8_t  bDescriptorType
+        uint8_t  bDevCapabilityType
+        uint8_t bReserved
+        uint8_t  ContainerID[16]
+
+    ctypedef enum libusb_capability:
+        LIBUSB_CAP_HAS_CAPABILITY = 0x0000
+        LIBUSB_CAP_HAS_HOTPLUG = 0x0001
+        LIBUSB_CAP_HAS_HID_ACCESS = 0x0100
+        LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER = 0x0101
 
     int libusb_get_string_descriptor(libusb_device_handle *dev_handle,
                                      uint8_t desc_index,
@@ -516,6 +557,26 @@ cdef extern from "libusb.h" nogil:
             uint8_t bConfigurationValue,
             libusb_config_descriptor **config)
     void libusb_free_config_descriptor(libusb_config_descriptor *config)
+    int libusb_get_ss_endpoint_companion_descriptor(libusb_context *ctx,
+                                                    const libusb_endpoint_descriptor *endpoint,
+                                                    libusb_ss_endpoint_companion_descriptor **ep_comp)
+    void libusb_free_ss_endpoint_companion_descriptor(libusb_ss_endpoint_companion_descriptor *ep_comp)
+    int libusb_get_bos_descriptor(libusb_device_handle *dev_handle, libusb_bos_descriptor **bos)
+    void libusb_free_bos_descriptor(libusb_bos_descriptor *bos)
+    int libusb_get_usb_2_0_extension_descriptor(libusb_context *ctx,
+                                                libusb_bos_dev_capability_descriptor *dev_cap,
+                                                libusb_usb_2_0_extension_descriptor **usb_2_0_extension)
+    void libusb_free_usb_2_0_extension_descriptor(libusb_usb_2_0_extension_descriptor *usb_2_0_extension)
+    int libusb_get_ss_usb_device_capability_descriptor(libusb_context *ctx,
+                                                       libusb_bos_dev_capability_descriptor *dev_cap,
+                                                       libusb_ss_usb_device_capability_descriptor **ss_usb_device_cap)
+    void libusb_free_ss_usb_device_capability_descriptor(libusb_ss_usb_device_capability_descriptor *ss_usb_device_cap)
+    int libusb_get_container_id_descriptor(libusb_context *ctx,
+                                           libusb_bos_dev_capability_descriptor *dev_cap,
+                                           libusb_container_id_descriptor **container_id)
+    void libusb_free_container_id_descriptor(libusb_container_id_descriptor *container_id)
+    uint8_t libusb_get_bus_number(libusb_device *dev)
+    uint8_t libusb_get_port_number(libusb_device *dev)
 
     libusb_transfer *libusb_alloc_transfer(int iso_packets)
     int libusb_submit_transfer(libusb_transfer *transfer)
@@ -677,6 +738,13 @@ DEF LIBUSB_DT_SS_ENDPOINT_COMPANION_SIZE = 6
 DEF LIBUSB_DT_BOS_SIZE = 5
 DEF LIBUSB_DT_DEVICE_CAPABILITY_SIZE = 3
 
+# Masks
+DEF LIBUSB_ENDPOINT_ADDRESS_MASK = 0x0F
+DEF LIBUSB_ENDPOINT_DIR_MASK = 0x80
+DEF LIBUSB_TRANSFER_TYPE_MASK = 0x03
+DEF LIBUSB_ISO_SYNC_TYPE_MASK = 0x0C
+DEF LIBUSB_ISO_USAGE_TYPE_MASK = 0x30
+
 
 cpdef enum DeviceClass:
     PerInterface = LIBUSB_CLASS_PER_INTERFACE
@@ -734,6 +802,14 @@ cpdef enum StandardRequest:
     SetIsochronousDelay = LIBUSB_SET_ISOCH_DELAY
 
 
+cpdef enum TransferType:
+    Control = LIBUSB_TRANSFER_TYPE_CONTROL
+    Isochronous = LIBUSB_TRANSFER_TYPE_ISOCHRONOUS
+    Bulk = LIBUSB_TRANSFER_TYPE_BULK
+    Interrupt = LIBUSB_TRANSFER_TYPE_INTERRUPT
+    BulkStream = LIBUSB_TRANSFER_TYPE_BULK_STREAM
+
+
 class UsbError(Exception):
     pass
 
@@ -773,13 +849,14 @@ cdef uint16_t get_langid(libusb_device_handle *dev):
     return buf[2] | (buf[3] << 8)
 
 
-cdef str get_string_descriptor(libusb_device_handle *handle, uint8_t descriptor,
-                               unsigned char *buf, int buflen):
+cdef str get_string_descriptor(libusb_device_handle *handle, uint8_t descriptor):
     cdef uint16_t langid
     cdef int r
+    cdef unsigned char buf[256]
+
     langid = get_langid(handle)
     if langid:
-        r = libusb_get_string_descriptor(handle, descriptor, langid, buf, buflen)
+        r = libusb_get_string_descriptor(handle, descriptor, langid, buf, sizeof(buf))
         if r >= 2:
             return PyUnicode_Decode(<char *>buf + 2, r - 2, "UTF-16LE", "strict")
     return ""
@@ -809,6 +886,18 @@ cdef class UsbSession:
         device_count = libusb_get_device_list(self._ctx, &usb_devices)
         libusb_free_device_list(usb_devices, 1)
         return <int>device_count
+
+    @property
+    def has_hotplug(self):
+        return bool(<int> libusb_has_capability(libusb_capability.LIBUSB_CAP_HAS_HOTPLUG))
+
+    @property
+    def has_hid_access(self):
+        return bool(<int> libusb_has_capability(libusb_capability.LIBUSB_CAP_HAS_HID_ACCESS))
+
+    @property
+    def supports_detach_kernel_driver(self):
+        return bool(<int> libusb_has_capability(libusb_capability.LIBUSB_CAP_SUPPORTS_DETACH_KERNEL_DRIVER))
 
     def find(self, int vid, int pid, str serial=None):
         cdef ssize_t device_count
@@ -885,20 +974,17 @@ cdef class UsbDevice:
         cdef libusb_device_descriptor desc
         cdef int r
         cdef uint16_t langid
-        cdef unsigned char data[256]
         if self._handle:
             s = []
             err = libusb_get_device_descriptor(self._device, &desc)
             s.append("UsbDevice (open): VID:0x{:04x} PID:0x{:04x}".
                                           format(desc.idVendor, desc.idProduct))
-            langid = get_langid(self._handle)
-            if langid:
-                if desc.iManufacturer:
-                    s.append(get_string_descriptor(self._handle, desc.iManufacturer, data, 256))
-                if desc.iProduct:
-                    s.append(get_string_descriptor(self._handle, desc.iProduct, data, 256))
-                if desc.iSerialNumber:
-                    s.append(get_string_descriptor(self._handle, desc.iSerialNumber, data, 256))
+            if desc.iManufacturer:
+                s.append(get_string_descriptor(self._handle, desc.iManufacturer))
+            if desc.iProduct:
+                s.append(get_string_descriptor(self._handle, desc.iProduct))
+            if desc.iSerialNumber:
+                s.append(get_string_descriptor(self._handle, desc.iSerialNumber))
             return " ".join(s)
         else:
             err = libusb_get_device_descriptor(self._device, &desc)
@@ -922,6 +1008,14 @@ cdef class UsbDevice:
     def reset(self):
         if self._handle:
             err = libusb_reset_device(self._handle)
+            if err < 0:
+                raise LibusbError(<int>err)
+        else:
+            raise UsbUsageError("Operation on closed device.")
+
+    def clear_halt(self, int endpoint):
+        if self._handle:
+            err = libusb_clear_halt(self._handle, <unsigned char> endpoint)
             if err < 0:
                 raise LibusbError(<int>err)
         else:
@@ -998,13 +1092,21 @@ cdef class UsbDevice:
         return <int> desc.idProduct
 
     @property
+    def bus_number(self):
+        return <int> libusb_get_bus_number(self._device)
+
+    @property
+    def port_number(self):
+        return <int> libusb_get_port_number(self._device)
+
+    @property
     def Class(self):
         cdef libusb_device_descriptor desc
         libusb_get_device_descriptor(self._device, &desc)
         return DeviceClass(desc.bDeviceClass)
 
     @property
-    def SubClass(self):
+    def subclass(self):
         cdef libusb_device_descriptor desc
         libusb_get_device_descriptor(self._device, &desc)
         return DeviceClass(desc.bDeviceSubClass)
@@ -1099,9 +1201,6 @@ cdef class UsbDevice:
         else:
             raise UsbUsageError("Operation on closed device.")
 
-#    int libusb_alloc_streams(libusb_device_handle *dev_handle, uint32_t num_streams, unsigned char *endpoints, int num_endpoints)
-#    int libusb_free_streams(libusb_device_handle *dev_handle, unsigned char *endpoints, int num_endpoints)
-
     def control_transfer(self,
                          RequestRecipient recipient,
                          RequestType type,
@@ -1109,7 +1208,7 @@ cdef class UsbDevice:
                          int request,
                          int value,
                          int index,
-                         object data):
+                         object data_or_length):
         """General synchronous control transfer message.
 
         Args:
@@ -1120,8 +1219,8 @@ cdef class UsbDevice:
                      Standard, otherwise depends on application.
             value: int The message value parameter (?)
             index: int The message index parameter (?)
-            data: bytes Sent to recipient if direction is Out, number of bytes
-                  to read if In.
+            data_or_length: bytes Sent to recipient if direction is Out,
+                            number of bytes to read if In.
 
         Returns:
             bytes of response if direction is In
@@ -1147,14 +1246,14 @@ cdef class UsbDevice:
         request_type = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
 
         if (direction & 0x80):  # In: device-to-host
-            if not isinstance(data, int):
+            if not isinstance(data_or_length, int):
                 raise TypeError("data values should be a length to read")
-            out = PyBytes_FromStringAndSize(NULL, <Py_ssize_t> data)
+            out = PyBytes_FromStringAndSize(NULL, <Py_ssize_t> data_or_length)
             PyBytes_AsStringAndSize(out, &bdata, &bdata_length)
         else:  # host-to-device
-            if not isinstance(data, bytes):
+            if not isinstance(data_or_length, bytes):
                 raise TypeError("data values should be a bytes buffer to send")
-            PyBytes_AsStringAndSize(data, &bdata, &bdata_length)
+            PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
         xfer = libusb_control_transfer(self._handle,
                                        request_type,
                                        <uint8_t> request,
@@ -1289,17 +1388,6 @@ cdef class UsbDevice:
 cdef class Configuration:
     cdef libusb_config_descriptor *_descriptor
     cdef UsbSession _session  # For the context
-#        uint8_t  bLength
-#        uint8_t  bDescriptorType
-#        uint16_t wTotalLength
-#        uint8_t  bNumInterfaces
-#        uint8_t  bConfigurationValue
-#        uint8_t  iConfiguration
-#        uint8_t  bmAttributes
-#        uint8_t  MaxPower
-#        libusb_interface *interface
-#        unsigned char *extra
-#        int extra_length
 
     def __cinit__(self, UsbSession _session):
         self._descriptor = NULL
@@ -1319,14 +1407,72 @@ cdef class Configuration:
 
     @property
     def interfaces(self):
-        pass
+        for ifnum in range(<int> self._descriptor.bNumInterfaces):
+            c_intf = self._descriptor.interface[ifnum]
+            for altsetting_i in range(<int> c_intf.num_altsetting):
+                intf = UsbInterface()
+                # TODO(dart) copy?
+                intf._interface = &c_intf.altsetting[altsetting_i]
+                yield intf
 
-#cdef class Interface:
-#    pass
-#
-#
-#cdef class Endpoint:
-#    pass
 
+cdef class UsbInterface:
+    cdef const libusb_interface_descriptor *_interface
+
+    def __str__(self):
+        return "UsbInterface(class: {:s})".format(self.Class.name)
+
+    @property
+    def endpoints(self):
+        for i in range(self._interface.bNumEndpoints):
+            ep_desc = self._interface.endpoint[i]
+            # TODO(dart) copy?
+            ep = UsbEndpoint()
+            ep._endpoint = &ep_desc
+            yield ep
+
+    @property
+    def Class(self):
+        return DeviceClass(self._interface.bInterfaceClass)
+
+    @property
+    def subclass(self):
+        return <int> self._interface.bInterfaceSubClass
+
+    @property
+    def protocol(self):
+        return <int> self._interface.bInterfaceProtocol
+
+
+cdef class UsbEndpoint:
+    cdef libusb_endpoint_descriptor *_endpoint
+
+    def __str__(self):
+        ttype = TransferType(<int> self._endpoint.bmAttributes & LIBUSB_TRANSFER_TYPE_MASK)
+        return "UsbEndpoint({:d}, {:s}, {:s})".format(
+            <int> self._endpoint.bEndpointAddress & LIBUSB_ENDPOINT_ADDRESS_MASK,
+            "In" if self._endpoint.bEndpointAddress & LIBUSB_ENDPOINT_DIR_MASK else "Out",
+            ttype.name)
+
+    @property
+    def transfer_type(self):
+        return TransferType(<int> self._endpoint.bmAttributes & LIBUSB_TRANSFER_TYPE_MASK)
+
+    @property
+    def direction(self):
+        return EndpointDirection(<int> self._endpoint.bEndpointAddress & LIBUSB_ENDPOINT_DIR_MASK)
+
+    @property
+    def address(self):
+        return <int> self._endpoint.bEndpointAddress & LIBUSB_ENDPOINT_ADDRESS_MASK
+
+    @property
+    def max_packet_size(self):
+        return <int> self._endpoint.wMaxPacketSize
+
+    @property
+    def extra(self):
+        return PyBytes_FromStringAndSize(<const char *> self._endpoint.extra,
+                                         <Py_ssize_t> self._endpoint.extra_length)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

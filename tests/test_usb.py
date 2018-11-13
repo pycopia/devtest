@@ -28,6 +28,33 @@ def test_device_count():
     del session
 
 
+def test_has_hotplug():
+    session = usb.UsbSession()
+    if session.has_hotplug:
+        print("has hotplug!")
+    else:
+        print("Does NOT have hotplug!")
+    assert isinstance(session.has_hotplug, bool)
+
+
+def test_has_hid_access():
+    session = usb.UsbSession()
+    if session.has_hid_access:
+        print("has HID access!")
+    else:
+        print("Does NOT have HID access!")
+    assert isinstance(session.has_hid_access, bool)
+
+
+def test_supports_detach_kernel_driver():
+    session = usb.UsbSession()
+    if session.supports_detach_kernel_driver:
+        print("Supports detach kernel driver!")
+    else:
+        print("Does NOT support detach kernel driver!")
+    assert isinstance(session.supports_detach_kernel_driver, bool)
+
+
 def test_find_device():
     session = usb.UsbSession()
     if sys.platform == "darwin":  # TODO a better MacOS selector
@@ -128,6 +155,31 @@ def test_active_configuration():
     cf = dev.active_configuration
     assert isinstance(cf, usb.Configuration)
     print(cf)
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_interfaces():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    cf = dev.active_configuration
+    for interface in cf.interfaces:
+        print(interface)
+    assert isinstance(interface, usb.UsbInterface)
+
+
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_endpoints():
+    session = usb.UsbSession()
+    dev = session.find(0x18d1, 0x4ee7)
+    cf = dev.active_configuration
+    for interface in cf.interfaces:
+        for endpoint in interface.endpoints:
+            print(endpoint)
+    assert isinstance(endpoint, usb.UsbEndpoint)
+    print("Last endpoint direction:", endpoint.direction)
+    print("Last endpoint transfer_type:", endpoint.transfer_type)
+    print("Last endpoint address:", endpoint.address)
+    print("Last endpoint extra:", endpoint.extra)
 
 
 @pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
