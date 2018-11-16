@@ -3,6 +3,29 @@
 """Simple Monsoon interface using synchronous USB.
 """
 
+# Portions of this code were copied from the Monsoon open-source Python
+# interface. It has the following license.
+
+# Copyright 2017 Monsoon Solutions, Inc
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of
+# this software and associated documentation files (the "Software"), to deal in
+# the Software without restriction, including without limitation the rights to
+# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+# of the Software, and to permit persons to whom the Software is furnished to do
+# so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import enum
 import struct
 
@@ -20,9 +43,16 @@ class HVPM(Monsoon):
     """A Monsoon HVPM Power Monitor."""
     VID = 0x2AB9
     PID = 0x0001
+    # read-only instance attributes
+    main_voltage_scale = property(lambda s: 4)
+    usb_voltage_scale = property(lambda s: 2)
+    ADCRatio = property(lambda s: 62.5 / 1e6)  # Each tick of the ADC represents this much voltage
 
     def __init__(self):
         self._dev = None
+        self._voltage = None
+        self.fine_threshold = 64000
+        self.aux_fine_threshold = 30000
 
     def __del__(self):
         self.close()
@@ -44,7 +74,7 @@ class HVPM(Monsoon):
             self._dev.close()
             self._dev = None
 
-    def get_raw_value(self, opcode):
+    def _get_raw_value(self, opcode):
         resp = self._dev.control_transfer(usb.RequestRecipient.Device,
                                           usb.RequestType.Vendor,
                                           usb.EndpointDirection.In,
@@ -53,8 +83,24 @@ class HVPM(Monsoon):
 
     def get_value(self, code):
         opcode, fmt = code.value
-        raw = self.get_raw_value(opcode)
+        raw = self._get_raw_value(opcode)
         return struct.unpack(fmt, raw[:struct.calcsize(fmt)])[0]
+
+    def send_command(self, code, value):
+        opcode, _ = code.value
+        buf = struct.pack("I", value)
+        wValue = value & 0xFFFF
+        wIndex = (opcode & 0xFF) | ((value & 0xFF0000) >> 8)
+        self._dev.control_transfer(usb.RequestRecipient.Device,
+                                   usb.RequestType.Vendor,
+                                   usb.EndpointDirection.Out,
+                                   ControlCodes.USB_SET_VALUE, wValue, wIndex, buf)
+
+    def reset(self):
+        self.send_command(OpCodes.ResetPowerMonitor, 0)
+
+    def calibrate_voltage(self):
+        self.send_command(OpCodes.CalibrateMainVoltage, 0)
 
     @property
     def hardware_model(self):
@@ -66,7 +112,52 @@ class HVPM(Monsoon):
 
     @property
     def status(self):
-        return self.get_value(OpCodes.getStartStatus)
+        return self.get_value(OpCodes.GetStartStatus)
+
+    @property
+    def voltage(self):
+        return self._voltage
+
+    @voltage.setter
+    def voltage(self, value):
+        vout = int(value * FLOAT_TO_INT)
+        self.send_command(OpCodes.SetMainVoltage, vout)
+        self._voltage = value
+
+    @property
+    def voltage_channel(self):
+        val = self.get_value(OpCodes.SetVoltageChannel)
+        return VoltageChannel(val)
+
+    @voltage_channel.setter
+    def voltage_channel(self, chan):
+        self.send_command(OpCodes.SetVoltageChannel, int(chan))
+
+    def start_sampling(self, caltime, maxtime):
+        buf = b'\xff\xff\xff\xff'
+        self._dev.control_transfer(usb.RequestRecipient.Device,
+                                   usb.RequestType.Vendor,
+                                   usb.EndpointDirection.Out,
+                                   ControlCodes.USB_REQUEST_START, caltime, 0, buf)
+
+    def stop_sampling(self):
+        self._dev.control_transfer(usb.RequestRecipient.Device,
+                                   usb.RequestType.Vendor,
+                                   usb.EndpointDirection.Out,
+                                   ControlCodes.USB_REQUEST_STOP, 0, 0, b'')
+
+
+class HardwareModel(enum.IntEnum):
+    UNKNOWN = 0
+    LVPM = 1
+    HVPM = 2
+
+
+class USBPassthrough(enum.IntEnum):
+    """Values for setting or retrieving the USB Passthrough mode."""
+    Off = 0
+    On = 1
+    Auto = 2
 
 
 class OpCodes(enum.Enum):
@@ -95,21 +186,21 @@ class OpCodes(enum.Enum):
     SetPowerupTime = (0x0C, "B")  # time in milliseconds that the powerup current limit is in effect.
     SetRunCurrentLimit = (0x44, "H")  # Sets runtime current limit        HV Amps = 15.625*(1.0-powerupCurrentLimit/65535) #LV amps = 8.0*(1.0-powerupCurrentLimit/1023.0)
     SetTemperatureLimit = (0x29, "H")  # Temperature limit in Signed Q7.8 format
-    SetUsbCoarseResistorOffset = (0x12, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetUSBCoarseResistorOffset = (0x12, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
     SetUSBCoarseScale = (0x1D, "H")  # HVPM Calibration value, 32-bits, unsigned
     SetUSBCoarseZeroOffset = (0x28, "h")  # Zero-level offset
-    SetUsbFineResistorOffset = (0x0D, "b")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetUSBFineResistorOffset = (0x0D, "b")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
     SetUSBFineScale = (0x1C, "H")  # HVPM Calibration value, 32-bits, unsigned
     SetUSBFineZeroOffset = (0x27, "h")  # Zero-level offset
-    SetUsbPassthroughMode = (0x10, "B")  # Sets USB Passthrough mode according to value.  Off = 0, On = 1, Auto = 2
-    SetVoltageChannel = (0x23, None)  # Sets voltage channel:  Value 00 = Main & USB voltage measurements.  Value 01 = Main & Aux voltage measurements
+    SetUSBPassthroughMode = (0x10, "B")  # Sets USB Passthrough mode according to value.  Off = 0, On = 1, Auto = 2
+    SetVoltageChannel = (0x23, "B")  # Sets voltage channel:  Value 00 = Main & USB voltage measurements.  Value 01 = Main & Aux voltage measurements
     Stop = (0xFF, None)
 
 
-class HardwareModel(enum.IntEnum):
-    UNKNOWN = 0
-    LVPM = 1
-    HVPM = 2
+class VoltageChannel(enum.IntEnum):
+    """Values for setting or retrieving the Voltage Channel."""
+    MainAndUSB = 0
+    MainAndAux = 1
 
 
 class ControlCodes(enum.IntEnum):
@@ -119,56 +210,40 @@ class ControlCodes(enum.IntEnum):
     USB_REQUEST_RESET_TO_BOOTLOADER = 0xFF
 
 
-class USBPassthrough(enum.IntEnum):
-    """Values for setting or retrieving the USB Passthrough mode."""
-    Off = 0
-    On = 1
-    Auto = 2
-
-
-class VoltageChannel(enum.IntEnum):
-    """Values for setting or retrieving the Voltage Channel."""
-    Main = 0
-    USB = 1
-    Aux = 2
-
-
 class MonsoonInfo:
-    """Values stored in the Power Monitor EEPROM.  Each corresponds to an opcode"""
-    FirmwareVersion = 0  # Firmware version number.
-    ProtocolVersion = 0  # Protocol version number.
-    Temperature = 0  # Current temperature reading from the board.
-    SerialNumber = 0  # Unit's serial number.
-    PowerupCurrentLimit = 0   # Max current during startup before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
-    RuntimeCurrentLimit = 0  # Max current during runtime before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
-    PowerupTime = 0  # Time in ms the powerupcurrent limit will be used.
-    TemperatureLimit = 0  # Temperature limit in Signed Q7.8 format
-    UsbPassthroughMode = 0  #  Off = 0, On = 1, Auto = 2
-
-    MainFineScale = 0  # HVPM Calibration value, 32-bits, unsigned
-    MainCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
-    UsbFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
-    UsbCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
-    AuxFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
-    AuxCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
-
-    MainFineZeroOffset = 0  # HVPM-only, Zero-level offset
-    MainCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
-    UsbFineZeroOffset = 0  # HVPM-only, Zero-level offset
-    UsbCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
-    HardwareModel = 0  # HVPM-only, Zero-level offset
-
-    MainFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    MainCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    UsbFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    UsbCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    AuxFineResistorOffset = 0  # signed, ohms = 0.10 + 0.0001*offset
+    """Values stored in the Power Monitor EEPROM.  Each corresponds to an opcode.
+    """
     AuxCoarseResistorOffset = 0  # signed, ohms = 0.10 + 0.0001*offset
-
-    DacCalLow = 0
+    AuxCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    AuxFineResistorOffset = 0  # signed, ohms = 0.10 + 0.0001*offset
+    AuxFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
     DacCalHigh = 0
+    DacCalLow = 0
+    FirmwareVersion = 0  # Firmware version number.
+    HardwareModel = HardwareModel(0)
+    MainCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
+    MainCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    MainCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
+    MainFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
+    MainFineScale = 0  # HVPM Calibration value, 32-bits, unsigned
+    MainFineZeroOffset = 0  # HVPM-only, Zero-level offset
+    PowerupCurrentLimit = 0   # Max current during startup before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
+    PowerupTime = 0  # Time in ms the powerupcurrent limit will be used.
+    ProtocolVersion = 0  # Protocol version number.
+    RuntimeCurrentLimit = 0  # Max current during runtime before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
+    SerialNumber = 0  # Unit's serial number.
+    TemperatureLimit = 0  # Temperature limit in Signed Q7.8 format
+    UsbCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
+    UsbCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    UsbCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
+    UsbFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
+    UsbFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    UsbFineZeroOffset = 0  # HVPM-only, Zero-level offset
+    UsbPassthroughMode = USBPassthrough(0)  #  Off = 0, On = 1, Auto = 2
+    VoltageChannel = VoltageChannel(0)
 
     def populate(self, dev):
+        self.SerialNumber = dev.serial
         self.AuxCoarseResistorOffset = float(dev.get_value(OpCodes.SetAuxCoarseResistorOffset))
         self.AuxCoarseScale = float(dev.get_value(OpCodes.SetAuxCoarseScale))
         self.AuxFineResistorOffset = float(dev.get_value(OpCodes.SetAuxFineResistorOffset))
@@ -176,70 +251,70 @@ class MonsoonInfo:
         self.DacCalHigh = dev.get_value(OpCodes.DacCalHigh)
         self.DacCalLow = dev.get_value(OpCodes.DacCalLow)
         self.FirmwareVersion = dev.get_value(OpCodes.FirmwareVersion)
-        self.HardwareModel = dev.get_value(OpCodes.HardwareModel)
+        self.HardwareModel = HardwareModel(dev.get_value(OpCodes.HardwareModel))
         self.MainCoarseResistorOffset = float(dev.get_value(OpCodes.SetMainCoarseResistorOffset))
         self.MainCoarseScale = float(dev.get_value(OpCodes.SetMainCoarseScale))
         self.MainCoarseZeroOffset = float(dev.get_value(OpCodes.SetMainCoarseZeroOffset))
         self.MainFineResistorOffset = float(dev.get_value(OpCodes.SetMainFineResistorOffset))
         self.MainFineScale = float(dev.get_value(OpCodes.SetMainFineScale))
         self.MainFineZeroOffset = float(dev.get_value(OpCodes.SetMainFineZeroOffset))
-        self.PowerupCurrentLimit = self.amps_from_raw(dev.get_value(OpCodes.SetPowerUpCurrentLimit))
+        self.PowerupCurrentLimit = _amps_from_raw(dev.get_value(OpCodes.SetPowerUpCurrentLimit))
         self.PowerupTime = dev.get_value(OpCodes.SetPowerupTime)
         self.ProtocolVersion = dev.get_value(OpCodes.ProtocolVersion)
-        self.RuntimeCurrentLimit = self.amps_from_raw(dev.get_value(OpCodes.SetRunCurrentLimit))
-        self.TemperatureLimit = self.degrees_from_raw(dev.get_value(OpCodes.SetTemperatureLimit))
-        self.UsbCoarseResistorOffset = float(dev.get_value(OpCodes.SetUsbCoarseResistorOffset))
+        self.RuntimeCurrentLimit = _amps_from_raw(dev.get_value(OpCodes.SetRunCurrentLimit))
+        self.TemperatureLimit = _degrees_from_raw(dev.get_value(OpCodes.SetTemperatureLimit))
+        self.UsbCoarseResistorOffset = float(dev.get_value(OpCodes.SetUSBCoarseResistorOffset))
         self.UsbCoarseScale = float(dev.get_value(OpCodes.SetUSBCoarseScale))
         self.UsbCoarseZeroOffset = float(dev.get_value(OpCodes.SetUSBCoarseZeroOffset))
-        self.UsbFineResistorOffset = float(dev.get_value(OpCodes.SetUsbFineResistorOffset))
+        self.UsbFineResistorOffset = float(dev.get_value(OpCodes.SetUSBFineResistorOffset))
         self.UsbFineScale = float(dev.get_value(OpCodes.SetUSBFineScale))
         self.UsbFineZeroOffset = float(dev.get_value(OpCodes.SetUSBFineZeroOffset))
-        self.UsbPassthroughMode = dev.get_value(OpCodes.SetUsbPassthroughMode)
-
-    def amps_from_raw(self, raw):
-        offset = 3840.0 # == 0x0F00
-        scale = float((raw - offset) / (65535.0 - offset))
-        return 15.625 * scale
-
-    def raw_from_amps(self, value):
-        return (65535 - 0x0F00) * (value / 15.625) + 0x0F00
-
-    def degrees_from_raw(self, value):
-        """For setting the fan temperature limit.  Only valid in HVPM"""
-        bytes_ = struct.unpack("BB", struct.pack("H", value)) #Firmware swizzles these bytes_.
-        return bytes_[1] + (bytes_[0] * 2**-8)
+        self.UsbPassthroughMode = USBPassthrough(dev.get_value(OpCodes.SetUSBPassthroughMode))
+        self.VoltageChannel = VoltageChannel(dev.get_value(OpCodes.SetVoltageChannel))
 
     def __str__(self):
         s = []
-        s.append("FirmwareVersion: {}".format(self.FirmwareVersion))
-        s.append("ProtocolVersion: {}".format(self.ProtocolVersion))
-        s.append("Temperature: {}".format(self.Temperature))
         s.append("SerialNumber: {}".format(self.SerialNumber))
-        s.append("PowerupCurrentLimit: {}".format(self.PowerupCurrentLimit))
-        s.append("RuntimeCurrentLimit: {}".format(self.RuntimeCurrentLimit))
-        s.append("PowerupTime: {}".format(self.PowerupTime))
-        s.append("TemperatureLimit: {}".format(self.TemperatureLimit))
-        s.append("UsbPassthroughMode: {}".format(self.UsbPassthroughMode))
-        s.append("MainFineScale: {}".format(self.MainFineScale))
-        s.append("MainCoarseScale: {}".format(self.MainCoarseScale))
-        s.append("UsbFineScale: {}".format(self.UsbFineScale))
-        s.append("UsbCoarseScale: {}".format(self.UsbCoarseScale))
-        s.append("AuxFineScale: {}".format(self.AuxFineScale))
-        s.append("AuxCoarseScale: {}".format(self.AuxCoarseScale))
-        s.append("MainFineZeroOffset: {}".format(self.MainFineZeroOffset))
-        s.append("MainCoarseZeroOffset: {}".format(self.MainCoarseZeroOffset))
-        s.append("UsbFineZeroOffset: {}".format(self.UsbFineZeroOffset))
-        s.append("UsbCoarseZeroOffset: {}".format(self.UsbCoarseZeroOffset))
-        s.append("HardwareModel: {}".format(self.HardwareModel))
-        s.append("MainFineResistorOffset: {}".format(self.MainFineResistorOffset))
-        s.append("MainCoarseResistorOffset: {}".format(self.MainCoarseResistorOffset))
-        s.append("UsbFineResistorOffset: {}".format(self.UsbFineResistorOffset))
-        s.append("UsbCoarseResistorOffset: {}".format(self.UsbCoarseResistorOffset))
-        s.append("AuxFineResistorOffset: {}".format(self.AuxFineResistorOffset))
         s.append("AuxCoarseResistorOffset: {}".format(self.AuxCoarseResistorOffset))
-        s.append("DacCalLow: {}".format(self.DacCalLow))
+        s.append("AuxCoarseScale: {}".format(self.AuxCoarseScale))
+        s.append("AuxFineResistorOffset: {}".format(self.AuxFineResistorOffset))
+        s.append("AuxFineScale: {}".format(self.AuxFineScale))
         s.append("DacCalHigh: {}".format(self.DacCalHigh))
+        s.append("DacCalLow: {}".format(self.DacCalLow))
+        s.append("FirmwareVersion: {}".format(self.FirmwareVersion))
+        s.append("HardwareModel: {!r}".format(self.HardwareModel))
+        s.append("MainCoarseResistorOffset: {}".format(self.MainCoarseResistorOffset))
+        s.append("MainCoarseScale: {}".format(self.MainCoarseScale))
+        s.append("MainCoarseZeroOffset: {}".format(self.MainCoarseZeroOffset))
+        s.append("MainFineResistorOffset: {}".format(self.MainFineResistorOffset))
+        s.append("MainFineScale: {}".format(self.MainFineScale))
+        s.append("MainFineZeroOffset: {}".format(self.MainFineZeroOffset))
+        s.append("PowerupCurrentLimit: {}".format(self.PowerupCurrentLimit))
+        s.append("PowerupTime: {}".format(self.PowerupTime))
+        s.append("ProtocolVersion: {}".format(self.ProtocolVersion))
+        s.append("RuntimeCurrentLimit: {}".format(self.RuntimeCurrentLimit))
+        s.append("TemperatureLimit: {}".format(self.TemperatureLimit))
+        s.append("UsbCoarseResistorOffset: {}".format(self.UsbCoarseResistorOffset))
+        s.append("UsbCoarseScale: {}".format(self.UsbCoarseScale))
+        s.append("UsbCoarseZeroOffset: {}".format(self.UsbCoarseZeroOffset))
+        s.append("UsbFineResistorOffset: {}".format(self.UsbFineResistorOffset))
+        s.append("UsbFineScale: {}".format(self.UsbFineScale))
+        s.append("UsbFineZeroOffset: {}".format(self.UsbFineZeroOffset))
+        s.append("UsbPassthroughMode: {!r}".format(self.UsbPassthroughMode))
+        s.append("VoltageChannel: {!r}".format(self.VoltageChannel))
         return "\n".join(s)
+
+
+def _amps_from_raw(raw):
+    return 15.625 * (raw - 3840.0) / 61695.0
+
+
+def _raw_from_amps(value):
+    return 61695 * (value / 15.625) + 0x0F00
+
+
+def _degrees_from_raw(value):
+    return ((value & 0xFF00) >> 8) + ((value & 0xFF) * 0.00390625)
 
 
 class BootloaderCommands(enum.IntEnum):
@@ -278,6 +353,13 @@ def _test(argv):
     info = MonsoonInfo()
     info.populate(dev)
     print(info)
+
+    dev.voltage = 4.2
+    dev.voltage_channel = VoltageChannel.MainAndUSB
+
+#    info.populate(dev)
+#    print(info)
+
     dev.close()
 
 
