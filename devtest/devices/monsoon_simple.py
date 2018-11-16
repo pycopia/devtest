@@ -103,6 +103,12 @@ class HVPM(Monsoon):
         self.send_command(OpCodes.CalibrateMainVoltage, 0)
 
     @property
+    def info(self):
+        info = MonsoonInfo()
+        info.populate(self)
+        return info
+
+    @property
     def hardware_model(self):
         return self.get_value(OpCodes.HardwareModel)
 
@@ -145,6 +151,13 @@ class HVPM(Monsoon):
                                    usb.RequestType.Vendor,
                                    usb.EndpointDirection.Out,
                                    ControlCodes.USB_REQUEST_STOP, 0, 0, b'')
+
+    def read_sample(self):
+        resp = self._dev.bulk_transfer(usb.RequestRecipient.Interface,
+                                       usb.RequestType.Standard,
+                                       usb.EndpointDirection.In,
+                                       64, timeout=1000)
+        return resp
 
 
 class HardwareModel(enum.IntEnum):
@@ -347,12 +360,14 @@ class SampleType(enum.IntEnum):
 
 
 def _test(argv):
+    from devtest import timers
     serial = argv[1] if len(argv) > 1 else "20420"
     dev = HVPM()
     dev.open(serial)
     info = MonsoonInfo()
     info.populate(dev)
     print(info)
+    print()
 
     dev.voltage = 4.2
     dev.voltage_channel = VoltageChannel.MainAndUSB
@@ -360,7 +375,15 @@ def _test(argv):
 #    info.populate(dev)
 #    print(info)
 
-    dev.close()
+    try:
+        dev.start_sampling(1250, 5000)
+        timers.nanosleep(0.001)
+        for i in range(5000):
+            print(repr(dev.read_sample()))
+            timers.nanosleep(0.000002)
+        dev.stop_sampling()
+    finally:
+        dev.close()
 
 
 if __name__ == "__main__":
