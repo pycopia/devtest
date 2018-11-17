@@ -1270,16 +1270,14 @@ cdef class UsbDevice:
         return <int> xfer
 
     def bulk_transfer(self,
-                      RequestRecipient recipient,
-                      RequestType type,
+                      int endpoint,
                       EndpointDirection direction,
                       object data_or_length,
                       int timeout=5000):
         """Synchronous bulk transfer method.
 
         Args:
-            recipient: A RequestRecipient indicating final destination.
-            type: A RequestType indicating Standard, Class, or Vendor.
+            endpint: An integer (bEndpointAddress) of the target endpoint.
             direction: A EndpointDirection indicating In or Out transfer.
             data_or_length: bytes Sent to recipient if direction is Out, number of bytes
                   to read if In.
@@ -1294,15 +1292,14 @@ cdef class UsbDevice:
             UsbUsageError if called when device is not open.
             LibusbError if libusb returns an error.
         """
-        cdef unsigned char endpoint
+        cdef unsigned char bEndpointAddress
         cdef char *bdata
         cdef Py_ssize_t bdata_length
         cdef int transferred
 
         if not self._handle:
             raise UsbUsageError("bulk_transfer on closed device.")
-        endpoint = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
-
+        bEndpointAddress = (direction & LIBUSB_ENDPOINT_DIR_MASK) | (endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK)
         if direction == EndpointDirection.In:
             if not isinstance(data_or_length, int):
                 raise TypeError("data_or_length must be int of amount to read.")
@@ -1314,7 +1311,8 @@ cdef class UsbDevice:
             PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
         else:
             raise UsbUsageError("Invalid direction")
-        err = libusb_bulk_transfer(self._handle, endpoint,
+        err = libusb_bulk_transfer(self._handle,
+                                   bEndpointAddress,
                                    <unsigned char *> bdata,
                                    bdata_length,
                                    &transferred,
@@ -1327,16 +1325,14 @@ cdef class UsbDevice:
             return <int> transferred
 
     def interrupt_transfer(self,
-                      RequestRecipient recipient,
-                      RequestType type,
+                      int endpoint,
                       EndpointDirection direction,
                       object data_or_length,
                       int timeout=5000):
         """Synchronous interrupt transfer method.
 
         Args:
-            recipient: A RequestRecipient indicating final destination.
-            type: A RequestType indicating Standard, Class, or Vendor.
+            endpint: An integer (bEndpointAddress) of the target endpoint.
             direction: A EndpointDirection indicating In or Out transfer.
             data_or_length: bytes Sent to recipient if direction is Out, number of bytes
                   to read if In.
@@ -1351,14 +1347,14 @@ cdef class UsbDevice:
             UsbUsageError if called when device is not open.
             LibusbError if libusb returns an error.
         """
-        cdef unsigned char endpoint
+        cdef unsigned char bEndpointAddress
         cdef char *bdata
         cdef Py_ssize_t bdata_length
         cdef int transferred
 
         if not self._handle:
             raise UsbUsageError("interrupt_transfer on closed device.")
-        endpoint = (direction & 0x80) | (type & 0x60) | (recipient & 0x1F)
+        bEndpointAddress = (direction & LIBUSB_ENDPOINT_DIR_MASK) | (endpoint & LIBUSB_ENDPOINT_ADDRESS_MASK)
 
         if direction == EndpointDirection.In:
             if not isinstance(data_or_length, int):
@@ -1372,7 +1368,7 @@ cdef class UsbDevice:
         else:
             raise UsbUsageError("Invalid direction")
         err =  libusb_interrupt_transfer(self._handle,
-                                         endpoint,
+                                         bEndpointAddress,
                                          <unsigned char *> bdata,
                                          bdata_length,
                                          &transferred,

@@ -50,6 +50,7 @@ class HVPM(Monsoon):
 
     def __init__(self):
         self._dev = None
+        self._sess = None
         self._voltage = None
         self.fine_threshold = 64000
         self.aux_fine_threshold = 30000
@@ -58,8 +59,8 @@ class HVPM(Monsoon):
         self.close()
 
     def open(self, serial):
-        sess = usb.UsbSession()
-        usbdev = sess.find(HVPM.VID, HVPM.PID, serial=serial)
+        self._sess = usb.UsbSession()
+        usbdev = self._sess.find(HVPM.VID, HVPM.PID, serial=serial)
         if not usbdev:
             raise ValueError("No device with that serial found.")
         usbdev.open()
@@ -73,6 +74,7 @@ class HVPM(Monsoon):
         if self._dev is not None:
             self._dev.close()
             self._dev = None
+        self._sess = None
 
     def _get_raw_value(self, opcode):
         resp = self._dev.control_transfer(usb.RequestRecipient.Device,
@@ -130,6 +132,16 @@ class HVPM(Monsoon):
         self.send_command(OpCodes.SetMainVoltage, vout)
         self._voltage = value
 
+    def disable_vout(self):
+        self.send_command(OpCodes.SetMainVoltage, 0)
+
+    def enable_vout(self):
+        if self._voltage:
+            self.send_command(OpCodes.SetMainVoltage, int(self._voltage * FLOAT_TO_INT))
+        else:
+            self._voltage = 1.5
+            self.send_command(OpCodes.SetMainVoltage, int(self._voltage * FLOAT_TO_INT))
+
     @property
     def voltage_channel(self):
         val = self.get_value(OpCodes.SetVoltageChannel)
@@ -139,24 +151,35 @@ class HVPM(Monsoon):
     def voltage_channel(self, chan):
         self.send_command(OpCodes.SetVoltageChannel, int(chan))
 
+    @property
+    def usb_passthrough(self):
+        return self.get_value(OpCodes.SetUSBPassthroughMode)
+
+    @usb_passthrough.setter
+    def usb_passthrough(self, value):
+        self.send_command(OpCodes.SetUSBPassthroughMode, int(value))
+
+    def verify_ready(self):
+        status = self.get_value(OpCodes.GetStartStatus)
+        return not status & 0x80
+
     def start_sampling(self, caltime, maxtime):
-        buf = b'\xff\xff\xff\xff'
+        #buf = b'\xff\xff\xff\xff'
+        buf = struct.pack("<I", maxtime)
         self._dev.control_transfer(usb.RequestRecipient.Device,
                                    usb.RequestType.Vendor,
                                    usb.EndpointDirection.Out,
                                    ControlCodes.USB_REQUEST_START, caltime, 0, buf)
 
     def stop_sampling(self):
+        buf = b'\xff\xff\xff\xff'
         self._dev.control_transfer(usb.RequestRecipient.Device,
                                    usb.RequestType.Vendor,
                                    usb.EndpointDirection.Out,
-                                   ControlCodes.USB_REQUEST_STOP, 0, 0, b'')
+                                   ControlCodes.USB_REQUEST_STOP, 0, 0, buf)
 
     def read_sample(self):
-        resp = self._dev.bulk_transfer(usb.RequestRecipient.Interface,
-                                       usb.RequestType.Standard,
-                                       usb.EndpointDirection.In,
-                                       64, timeout=1000)
+        resp = self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
         return resp
 
 
@@ -364,26 +387,28 @@ def _test(argv):
     serial = argv[1] if len(argv) > 1 else "20420"
     dev = HVPM()
     dev.open(serial)
-    info = MonsoonInfo()
-    info.populate(dev)
-    print(info)
-    print()
+    print(dev.info)
 
-    dev.voltage = 4.2
     dev.voltage_channel = VoltageChannel.MainAndUSB
-
-#    info.populate(dev)
-#    print(info)
-
-    try:
-        dev.start_sampling(1250, 5000)
-        timers.nanosleep(0.001)
-        for i in range(5000):
-            print(repr(dev.read_sample()))
-            timers.nanosleep(0.000002)
+    dev.usb_passthrough = USBPassthrough.On
+#    timers.nanosleep(1)
+#    dev.disable_vout()
+#    timers.nanosleep(1)
+    if dev.verify_ready():
+        dev.voltage = 4.2
+        try:
+            dev.start_sampling(1250, 5000)
+            #timers.nanosleep(0.001)
+            for i in range(5000):
+                print(repr(dev.read_sample()))
+                #timers.nanosleep(0.000002)
+            #timers.nanosleep(1.1)
+        finally:
+            dev.stop_sampling()
+    else:
+        print("Not ready!")
         dev.stop_sampling()
-    finally:
-        dev.close()
+    dev.close()
 
 
 if __name__ == "__main__":
