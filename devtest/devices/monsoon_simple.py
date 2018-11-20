@@ -62,16 +62,25 @@ class HVPM(Monsoon):
         self._sess = usb.UsbSession()
         usbdev = self._sess.find(HVPM.VID, HVPM.PID, serial=serial)
         if not usbdev:
-            raise ValueError("No device with that serial found.")
+            raise usb.UsbUsageError("No device with that serial found.")
         usbdev.open()
+        usbdev.set_auto_detach_kernel_driver(True)
         usbdev.configuration = 0
+        try:
+            usbdev.claim_interface(0)
+        except usb.LibusbError:
+            pass
         self._dev = usbdev
         if self.hardware_model != HardwareModel.HVPM:
             self.close()
-            raise ValueError("Didn't get right model for this controller.")
+            raise usb.UsbUsageError("Didn't get right model for this controller.")
 
     def close(self):
         if self._dev is not None:
+            try:
+                self._dev.release_interface(0)
+            except usb.LibusbError:
+                pass
             self._dev.close()
             self._dev = None
         self._sess = None
@@ -99,7 +108,11 @@ class HVPM(Monsoon):
                                    ControlCodes.USB_SET_VALUE, wValue, wIndex, buf)
 
     def reset(self):
-        self.send_command(OpCodes.ResetPowerMonitor, 0)
+        try:
+            self.send_command(OpCodes.ResetPowerMonitor, 0)
+        except usb.LibusbError:
+            pass
+        self.close()
 
     def calibrate_voltage(self):
         self.send_command(OpCodes.CalibrateMainVoltage, 0)
@@ -159,12 +172,11 @@ class HVPM(Monsoon):
     def usb_passthrough(self, value):
         self.send_command(OpCodes.SetUSBPassthroughMode, int(value))
 
-    def verify_ready(self):
+    def is_sampling(self):
         status = self.get_value(OpCodes.GetStartStatus)
-        return not status & 0x80
+        return bool(status & 0x80)
 
     def start_sampling(self, caltime, maxtime):
-        #buf = b'\xff\xff\xff\xff'
         buf = struct.pack("<I", maxtime)
         self._dev.control_transfer(usb.RequestRecipient.Device,
                                    usb.RequestType.Vendor,
@@ -391,18 +403,16 @@ def _test(argv):
 
     dev.voltage_channel = VoltageChannel.MainAndUSB
     dev.usb_passthrough = USBPassthrough.On
-#    timers.nanosleep(1)
-#    dev.disable_vout()
-#    timers.nanosleep(1)
-    if dev.verify_ready():
+
+    if not dev.is_sampling():
         dev.voltage = 4.2
+        timers.nanosleep(0.2)
         try:
-            dev.start_sampling(1250, 5000)
-            #timers.nanosleep(0.001)
-            for i in range(5000):
+            dev.start_sampling(1250, 5000 * 5)
+            timers.nanosleep(0.002)
+            for i in range(5000 * 5):
                 print(repr(dev.read_sample()))
-                #timers.nanosleep(0.000002)
-            #timers.nanosleep(1.1)
+                timers.nanosleep(0.000002)
         finally:
             dev.stop_sampling()
     else:
