@@ -65,7 +65,7 @@ class HVPM(Monsoon):
             raise usb.UsbUsageError("No device with that serial found.")
         usbdev.open()
         usbdev.set_auto_detach_kernel_driver(True)
-        usbdev.configuration = 0
+        usbdev.configuration = 1
         try:
             usbdev.claim_interface(0)
         except usb.LibusbError:
@@ -176,12 +176,12 @@ class HVPM(Monsoon):
         status = self.get_value(OpCodes.GetStartStatus)
         return bool(status & 0x80)
 
-    def start_sampling(self, caltime, maxtime):
-        buf = struct.pack("<I", maxtime)
+    def start_sampling(self, samples, calsamples=1250):
+        buf = struct.pack("<I", samples)
         self._dev.control_transfer(usb.RequestRecipient.Device,
                                    usb.RequestType.Vendor,
                                    usb.EndpointDirection.Out,
-                                   ControlCodes.USB_REQUEST_START, caltime, 0, buf)
+                                   ControlCodes.USB_REQUEST_START, calsamples, 0, buf)
 
     def stop_sampling(self):
         buf = b'\xff\xff\xff\xff'
@@ -191,8 +191,7 @@ class HVPM(Monsoon):
                                    ControlCodes.USB_REQUEST_STOP, 0, 0, buf)
 
     def read_sample(self):
-        resp = self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
-        return resp
+        return self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
 
 
 class HardwareModel(enum.IntEnum):
@@ -395,26 +394,38 @@ class SampleType(enum.IntEnum):
 
 
 def _test(argv):
-    from devtest import timers
     serial = argv[1] if len(argv) > 1 else "20420"
+
+    samples = 5000
+    unpacker = struct.Struct("HBB")
+    dropped_count = 0
+    sample_count = 0
+
     dev = HVPM()
     dev.open(serial)
-    print(dev.info)
-
     dev.voltage_channel = VoltageChannel.MainAndUSB
     dev.usb_passthrough = USBPassthrough.On
 
     if not dev.is_sampling():
+        outf = open("samples.dat", "wb")
+
         dev.voltage = 4.2
-        timers.nanosleep(0.2)
         try:
-            dev.start_sampling(1250, 5000 * 5)
-            timers.nanosleep(0.002)
-            for i in range(5000 * 5):
-                print(repr(dev.read_sample()))
-                timers.nanosleep(0.000002)
+            dev.start_sampling(samples)
+            while sample_count < samples:
+                try:
+                    data = dev.read_sample()
+                    dropped, flags, number = unpacker.unpack(data[:4])
+                    dropped_count += dropped
+                    sample_count += number
+                    outf.write(data)
+                except usb.LibusbError as e:
+                    print(e)
+                    break
         finally:
             dev.stop_sampling()
+            outf.close()
+        print("samples:", sample_count, "dropped:", dropped_count)
     else:
         print("Not ready!")
         dev.stop_sampling()
