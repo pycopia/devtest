@@ -396,8 +396,8 @@ class SampleType(enum.IntEnum):
 def _test(argv):
     serial = argv[1] if len(argv) > 1 else "20420"
 
-    samples = 5000
-    unpacker = struct.Struct("HBB")
+    samples = 5000 * 5
+    unpacker = struct.Struct("<HBB")
     dropped_count = 0
     sample_count = 0
 
@@ -412,11 +412,11 @@ def _test(argv):
         dev.voltage = 4.2
         try:
             dev.start_sampling(samples)
-            while sample_count < samples:
+            while (sample_count + dropped_count) < samples:
                 try:
                     data = dev.read_sample()
                     dropped, flags, number = unpacker.unpack(data[:4])
-                    dropped_count += dropped
+                    dropped_count = dropped  # device accumulates dropped sample count.
                     sample_count += number
                     outf.write(data)
                 except usb.LibusbError as e:
