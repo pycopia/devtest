@@ -193,6 +193,46 @@ class HVPM(Monsoon):
     def read_sample(self):
         return self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
 
+    def capture(self, samples=None, duration=None, handler=None, calsamples=1250):
+        if samples is None and duration is None:
+            raise ValueError("You must supply either number of samples or sampling duration.")
+        if duration:
+            samples = 5000 * int(duration)
+        else:
+            samples = int(samples)
+
+        if handler is None:
+            def handler(sample):
+                print(repr(sample))
+
+        headreader = struct.Struct("<HBB")
+        datareader = struct.Struct("<HHHHhhHHBB")
+        dropped_count = 0
+        sample_count = 0
+        try:
+            self.start_sampling(samples, calsamples)
+            while (sample_count + dropped_count) < samples:
+                try:
+                    data = self.read_sample()
+                    dropped, flags, number = headreader.unpack(data[:headreader.size])
+                    dropped_count = dropped  # device accumulates dropped sample count.
+                    sample_count += number
+                    for start, end in zip(
+                            range(headreader.size,
+                                  datareader.size * (number + 1),
+                                  datareader.size),
+                            range(datareader.size + headreader.size,
+                                  datareader.size * (number + 1),
+                                  datareader.size)):
+                        sample = datareader.unpack(data[start:end])
+                        handler(sample)
+                except usb.LibusbError as e:
+                    print(e)
+                    break
+        finally:
+            self.stop_sampling()
+        return sample_count, dropped_count
+
 
 class HardwareModel(enum.IntEnum):
     UNKNOWN = 0
@@ -209,38 +249,56 @@ class USBPassthrough(enum.IntEnum):
 
 class OpCodes(enum.Enum):
     """USB Control Transfer operation codes: (code, struct_format)"""
-    CalibrateMainVoltage = (0x03, None)  # Internal voltage calibration, affects accuracy of setHVMainVoltage
-    DacCalHigh = (0x89, "H")  # 4.096V ADC Reference Calibration
-    DacCalLow = (0x88, "H")  # 2.5V ADC Reference Calibration
-    FirmwareVersion = (0xC0, "H")  # Read-only, gets the firmware version
-    GetSerialNumber = (0x42, "I")
+    # Internal voltage calibration, affects accuracy of setHVMainVoltage.
+    CalibrateMainVoltage = (0x03, None)
+    DacCalHigh = (0x89, "<H")  # 4.096V ADC Reference Calibration
+    DacCalLow = (0x88, "<H")  # 2.5V ADC Reference Calibration
+    FirmwareVersion = (0xC0, "<H")  # Read-only, gets the firmware version
+    GetSerialNumber = (0x42, "<I")
     GetStartStatus = (0xC4, "B")
-    HardwareModel = (0x45, "H")  # 0 = unknown, 1 = LV, 2 = HV
+    HardwareModel = (0x45, "<H")  # 0 = unknown, 1 = LV, 2 = HV
     ProtocolVersion = (0xC1, "B")  # Read-only, gets the Protocol version
     ResetPowerMonitor = (0x05, None)  # Reset the PIC.  Causes disconnect.
-    SetAuxCoarseResistorOffset = (0x13, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.1 + 0.0001*offset
-    SetAuxCoarseScale = (0x1F, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetAuxFineResistorOffset = (0x0E, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.1 + 0.0001*offset
-    SetAuxFineScale = (0x1E, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetMainCoarseResistorOffset = (0x11, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
-    SetMainCoarseScale = (0x1B, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetMainCoarseZeroOffset = (0x26, "h")  # Zero-level offset
-    SetMainFineResistorOffset = (0x02, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
-    SetMainFineScale = (0x1A, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetMainFineZeroOffset = (0x25, "h")  # Zero-level offset
-    SetMainVoltage = (0x41, None)  #  Voltage = value * 1048576
-    SetPowerUpCurrentLimit = (0x43, "H")  # Sets power-up current limit.  HV Amps = 15.625*(1.0-powerupCurrentLimit/65535) #LV amps = 8.0*(1.0-powerupCurrentLimit/1023.0)
-    SetPowerupTime = (0x0C, "B")  # time in milliseconds that the powerup current limit is in effect.
-    SetRunCurrentLimit = (0x44, "H")  # Sets runtime current limit        HV Amps = 15.625*(1.0-powerupCurrentLimit/65535) #LV amps = 8.0*(1.0-powerupCurrentLimit/1023.0)
-    SetTemperatureLimit = (0x29, "H")  # Temperature limit in Signed Q7.8 format
-    SetUSBCoarseResistorOffset = (0x12, "B")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
-    SetUSBCoarseScale = (0x1D, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetUSBCoarseZeroOffset = (0x28, "h")  # Zero-level offset
-    SetUSBFineResistorOffset = (0x0D, "b")  # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
-    SetUSBFineScale = (0x1C, "H")  # HVPM Calibration value, 32-bits, unsigned
-    SetUSBFineZeroOffset = (0x27, "h")  # Zero-level offset
-    SetUSBPassthroughMode = (0x10, "B")  # Sets USB Passthrough mode according to value.  Off = 0, On = 1, Auto = 2
-    SetVoltageChannel = (0x23, "B")  # Sets voltage channel:  Value 00 = Main & USB voltage measurements.  Value 01 = Main & Aux voltage measurements
+    # LVPM Calibration value, 8-bits signed, ohms = 0.1 + 0.0001*offset
+    SetAuxCoarseResistorOffset = (0x13, "b")
+    SetAuxCoarseScale = (0x1F, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    # LVPM Calibration value, 8-bits signed, ohms = 0.1 + 0.0001*offset
+    SetAuxFineResistorOffset = (0x0E, "B")
+    SetAuxFineScale = (0x1E, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetMainCoarseResistorOffset = (0x11, "b")
+    SetMainCoarseScale = (0x1B, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    SetMainCoarseZeroOffset = (0x26, "<h")  # Zero-level offset
+    # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetMainFineResistorOffset = (0x02, "b")
+    SetMainFineScale = (0x1A, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    SetMainFineZeroOffset = (0x25, "<h")  # Zero-level offset
+    SetMainVoltage = (0x41, None)  # Voltage = value * 1048576
+    # Sets power-up current limit.
+    # HV Amps = 15.625*(1.0-powerupCurrentLimit/65535)
+    # LV amps = 8.0*(1.0-powerupCurrentLimit/1023.0)
+    SetPowerUpCurrentLimit = (0x43, "<H")
+    # time in milliseconds that the powerup current limit is in effect.
+    SetPowerupTime = (0x0C, "B")
+    # Sets runtime current limit
+    # HV Amps = 15.625*(1.0-powerupCurrentLimit/65535)
+    # LV amps = 8.0*(1.0-powerupCurrentLimit/1023.0)
+    SetRunCurrentLimit = (0x44, "<H")
+    SetTemperatureLimit = (0x29, "<H")  # Temperature limit in Signed Q7.8 format
+    # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetUSBCoarseResistorOffset = (0x12, "B")
+    SetUSBCoarseScale = (0x1D, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    SetUSBCoarseZeroOffset = (0x28, "<h")  # Zero-level offset
+    # LVPM Calibration value, 8-bits signed, ohms = 0.05 + 0.0001*offset
+    SetUSBFineResistorOffset = (0x0D, "b")
+    SetUSBFineScale = (0x1C, "<H")  # HVPM Calibration value, 32-bits, unsigned
+    SetUSBFineZeroOffset = (0x27, "<h")  # Zero-level offset
+    # Sets USB Passthrough mode according to value. Off = 0, On = 1, Auto = 2
+    SetUSBPassthroughMode = (0x10, "B")
+    # Sets voltage channel:
+    # Value 00 = Main & USB voltage measurements.
+    # Value 01 = Main & Aux voltage measurements
+    SetVoltageChannel = (0x23, "B")
     Stop = (0xFF, None)
 
 
@@ -261,32 +319,36 @@ class MonsoonInfo:
     """Values stored in the Power Monitor EEPROM.  Each corresponds to an opcode.
     """
     AuxCoarseResistorOffset = 0  # signed, ohms = 0.10 + 0.0001*offset
-    AuxCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    AuxCoarseScale = 0  # HVPM Calibration value, 32-bits, unsigned
     AuxFineResistorOffset = 0  # signed, ohms = 0.10 + 0.0001*offset
-    AuxFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    AuxFineScale = 0  # HVPM Calibration value, 32-bits, unsigned
     DacCalHigh = 0
     DacCalLow = 0
     FirmwareVersion = 0  # Firmware version number.
     HardwareModel = HardwareModel(0)
     MainCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    MainCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    MainCoarseScale = 0  # HVPM Calibration value, 32-bits, unsigned
     MainCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
     MainFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
     MainFineScale = 0  # HVPM Calibration value, 32-bits, unsigned
     MainFineZeroOffset = 0  # HVPM-only, Zero-level offset
-    PowerupCurrentLimit = 0   # Max current during startup before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
+    # Max current during startup before overcurrent protection circuit activates.
+    # LVPM is 0-8A, HVPM is 0-15A.
+    PowerupCurrentLimit = 0
     PowerupTime = 0  # Time in ms the powerupcurrent limit will be used.
     ProtocolVersion = 0  # Protocol version number.
-    RuntimeCurrentLimit = 0  # Max current during runtime before overcurrent protection circuit activates.  LVPM is 0-8A, HVPM is 0-15A.
+    # Max current during runtime before overcurrent protection circuit activates.
+    # LVPM is 0-8A, HVPM is 0-15A.
+    RuntimeCurrentLimit = 0
     SerialNumber = 0  # Unit's serial number.
     TemperatureLimit = 0  # Temperature limit in Signed Q7.8 format
     UsbCoarseResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    UsbCoarseScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    UsbCoarseScale = 0  # HVPM Calibration value, 32-bits, unsigned
     UsbCoarseZeroOffset = 0  # HVPM-only, Zero-level offset
     UsbFineResistorOffset = 0  # signed, ohms = 0.05 + 0.0001*offset
-    UsbFineScale = 0 # HVPM Calibration value, 32-bits, unsigned
+    UsbFineScale = 0  # HVPM Calibration value, 32-bits, unsigned
     UsbFineZeroOffset = 0  # HVPM-only, Zero-level offset
-    UsbPassthroughMode = USBPassthrough(0)  #  Off = 0, On = 1, Auto = 2
+    UsbPassthroughMode = USBPassthrough(0)  # Off = 0, On = 1, Auto = 2
     VoltageChannel = VoltageChannel(0)
 
     def populate(self, dev):
@@ -394,7 +456,7 @@ class SampleType(enum.IntEnum):
 
 
 def _test(argv):
-    serial = argv[1] if len(argv) > 1 else "20420"
+    serial = argv[1] if len(argv) > 1 else None
 
     samples = 5000 * 5
     unpacker = struct.Struct("<HBB")
@@ -435,4 +497,3 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
-
