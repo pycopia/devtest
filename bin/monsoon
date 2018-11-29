@@ -1,0 +1,66 @@
+#!/usr/bin/env python3.6
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Capture monsoon data to a file in various forms.
+"""
+
+import sys
+
+import docopt
+
+from devtest.devices.monsoon import measure
+
+
+def main(argv):
+    """Capture current draw data from a Monsoon HVPM device to a file.
+
+    Usage:
+        monsoon [options]
+
+    Options:
+        --voltage=<voltage>           Voltage to set output to. [default: 4.2]
+        --samples=<number>            Number of samples to take. [default: 25000]
+        --duration=<seconds>          Alternatively, specify run time in seconds.
+        --serial=<serialno>           Serial number of device to use. Defaults to
+                                      first found if not given.
+        --passthrough=(on|off|auto)   USB Passthrough mode. Either on, off, or
+                                      auto. [default: auto]
+        --output=(raw|count|hdf5)     Output format.
+                                      raw: write data as it comes from device.
+                                      hdf5: Write data as an HDF5 file with
+                                      standard types.
+                                      count: Simply count and report cumulative
+                                      values.
+                                      [default: hdf5]
+    """
+    arguments = docopt.docopt(main.__doc__, argv=argv[1:])
+    measure_context = {
+            "serialno": arguments["--serial"],
+            "passthrough": arguments["--passthrough"],
+            "voltage": float(arguments["--voltage"]),
+            "numsamples": int(arguments["--samples"]),
+            "duration": int(arguments["--duration"]) if arguments["--duration"] else None,
+            "output": arguments["--output"],
+    }
+
+    measurer = measure.MonsoonCurrentMeasurer(measure_context)
+    result = measurer.measure()
+    print(result)
+    return result.dropped
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
