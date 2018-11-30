@@ -32,6 +32,7 @@ def main(argv):
         --voltage=<voltage>           Voltage to set output to. [default: 4.2]
         --samples=<number>            Number of samples to take. [default: 25000]
         --duration=<seconds>          Alternatively, specify run time in seconds.
+        --calsamples=<milliseconds>   Interval for calibration samples.  [default: 1250]
         --serial=<serialno>           Serial number of device to use. Defaults to
                                       first found if not given.
         --passthrough=(on|off|auto)   USB Passthrough mode. Either on, off, or
@@ -50,6 +51,7 @@ def main(argv):
             "passthrough": arguments["--passthrough"],
             "voltage": float(arguments["--voltage"]),
             "numsamples": int(arguments["--samples"]),
+            "calsamples": int(arguments["--calsamples"]),
             "duration": int(arguments["--duration"]) if arguments["--duration"] else None,
             "output": arguments["--output"],
     }

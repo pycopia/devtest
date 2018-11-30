@@ -149,6 +149,9 @@ class MonsoonInfo:
     def populate(self, dev):
         self.SerialNumber = dev.serial
         self.Voltage = dev.voltage
+        self.MainVoltageScale = dev.main_voltage_scale
+        self.USBVoltageScale = dev.usb_voltage_scale
+        self.ADCRatio = dev.ADCRatio
         self.AuxCoarseResistorOffset = float(dev.get_value(OpCodes.SetAuxCoarseResistorOffset))
         self.AuxCoarseScale = float(dev.get_value(OpCodes.SetAuxCoarseScale))
         self.AuxFineResistorOffset = float(dev.get_value(OpCodes.SetAuxFineResistorOffset))
@@ -181,6 +184,9 @@ class MonsoonInfo:
         s = []
         s.append("SerialNumber: {}".format(self.SerialNumber))
         s.append("Voltage: {}".format(self.Voltage))
+        s.append("MainVoltageScale: {}".format( self.MainVoltageScale))
+        s.append("USBVoltageScale: {}".format(self.USBVoltageScale))
+        s.append("ADCRatio: {}".format(self.ADCRatio))
         s.append("AuxCoarseResistorOffset: {}".format(self.AuxCoarseResistorOffset))
         s.append("AuxCoarseScale: {}".format(self.AuxCoarseScale))
         s.append("AuxFineResistorOffset: {}".format(self.AuxFineResistorOffset))
@@ -248,8 +254,8 @@ class SampleType(enum.IntEnum):
     """Corresponds to the sampletype field from a sample packet."""
     Measurement = 0x00
     ZeroCal = 0x10
-    invalid = 0x20
-    refCal = 0x30
+    Invalid = 0x20
+    RefCal = 0x30
 
 
 if __name__ == "__main__":
