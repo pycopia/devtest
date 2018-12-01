@@ -206,7 +206,7 @@ class HVPM(Monsoon):
                 print(repr(sample))
 
         headreader = struct.Struct("<HBB")
-        datareader = struct.Struct("<HHHHhhHHBB")
+        datareader = struct.Struct(">HHHHHHHHBB")
         dropped_count = 0
         sample_count = 0
         try:
@@ -224,8 +224,21 @@ class HVPM(Monsoon):
                             range(datareader.size + headreader.size,
                                   datareader.size * (number + 1),
                                   datareader.size)):
-                        sample = datareader.unpack(data[start:end])
-                        handler(sample)
+                        (main_coarse, main_fine, usb_coarse, usb_fine,
+                         aux_coarse, aux_fine, main_voltage, usb_voltage,
+                         main_gain, flags) = datareader.unpack(data[start:end])
+                        main_coarse_gain = (main_gain & 0xFF00) >> 8
+                        main_fine_gain =  main_gain & 0xFF
+                        # flags: usb sense D- (D7), usb sense D+ (D6); mode
+                        # (D5…4) 0 is a measurement, 1 is zero calibration, 2 is
+                        # a first sample (invalid), and 3 is a reference
+                        # calibration, and finally usb gain (D3…0).
+                        usb_gain = flags & 0X0F
+                        sampletype = flags & 0x30
+                        handler((main_coarse, main_fine, usb_coarse, usb_fine,
+                                 aux_coarse, aux_fine, main_voltage, usb_voltage,
+                                 main_coarse_gain, main_fine_gain, usb_gain,
+                                 sampletype))
                 except usb.LibusbError as e:
                     print(e)
                     break

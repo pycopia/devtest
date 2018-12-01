@@ -152,6 +152,8 @@ class MonsoonInfo:
         self.MainVoltageScale = dev.main_voltage_scale
         self.USBVoltageScale = dev.usb_voltage_scale
         self.ADCRatio = dev.ADCRatio
+        self.FineThreshold = dev.fine_threshold
+        self.AuxFineThreshold = dev.aux_fine_threshold
         self.AuxCoarseResistorOffset = float(dev.get_value(OpCodes.SetAuxCoarseResistorOffset))
         self.AuxCoarseScale = float(dev.get_value(OpCodes.SetAuxCoarseScale))
         self.AuxFineResistorOffset = float(dev.get_value(OpCodes.SetAuxFineResistorOffset))
