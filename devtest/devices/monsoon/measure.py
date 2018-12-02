@@ -1,13 +1,13 @@
-#!/usr/bin/env python3.6
+# python3.6
 
-
-"""Capture Monsoon data to file.
+"""Capture and calibrate Monsoon measurements. Different actions may be taken
+with different measurement handlers.
 """
 
 import collections
 import math
 
-import h5py
+# import h5py
 
 from devtest.devices.monsoon import simple as monsoon_simple
 from devtest.devices.monsoon import core
@@ -74,11 +74,15 @@ class MeasurementHandler:
         self._main_cal = CalibrationData(calsize)
         self._usb_cal = CalibrationData(calsize)
         self._aux_cal = CalibrationData(calsize)
+        self.initialize(context)
 
     @property
     def is_calibrated(self):
         return (self._main_cal.is_calibrated and self._usb_cal.is_calibrated and
                 self._aux_cal.is_calibrated)
+
+    def initialize(self, context):
+        pass
 
     def finalize(self, captured, dropped):
         self.captured = captured
@@ -97,20 +101,9 @@ class MeasurementHandler:
         s.append("  invalid: {}".format(self.invalid_count))
         return "\n".join(s)
 
-
-class RawHandler(MeasurementHandler):
-
-    def __call__(self, sample):
+    def _process_raw(self, sample):
         SampleType = core.SampleType
         self.sample_count += 1
-        # 0 MainCoarse 2 UInt16 Calibration or measurement value.
-        # 2 MainFine 2 UInt16 Calibration or measurement value.
-        # 4 USBCoarse 2 UInt16 Calibration or measurement value.
-        # 6 USBFine 2 UInt16 Calibration or measurement value.
-        # 8 AuxCoarse 2 UInt16 Calibration or measurement value.
-        # 10 AuxFine 2 UInt16 Calibration or measurement value.
-        # 12 Main Voltage 2 UInt16 Main Voltage measurement, or Aux voltage measurement if setVoltageChannel = 1
-        # 14 USB Voltage 2 UInt16 USB Voltage
         (main_coarse, main_fine, usb_coarse, usb_fine, aux_coarse, aux_fine,
          main_voltage, usb_voltage, main_coarse_gain, main_fine_gain, usb_gain,
          sampletype) = sample
@@ -118,54 +111,68 @@ class RawHandler(MeasurementHandler):
             self.measure_count += 1
             if self.is_calibrated:
                 # Main Coarse
-                scale = self.metadata.MainCoarseScale
                 zero_offset = self.metadata.MainCoarseZeroOffset
                 cal_ref = self._main_cal.ref_coarse
-                cal_zero = self._main_cal.zero_coarse
-                zero_offset += cal_zero
+                zero_offset += self._main_cal.zero_coarse
                 if not math.isclose(cal_ref, zero_offset):
-                    slope = scale / (cal_ref - zero_offset)
+                    slope = self.metadata.MainCoarseScale / (cal_ref - zero_offset)
                 else:
                     slope = 0.
                 main_coarse_current = (main_coarse - zero_offset) * slope
-#                #Main Fine
-                scale = self.metadata.MainFineScale
+                # Main Fine
                 zero_offset = self.metadata.MainFineZeroOffset
                 cal_ref = self._main_cal.ref_fine
-                cal_zero = self._main_cal.zero_fine
-                zero_offset += cal_zero
+                zero_offset += self._main_cal.zero_fine
                 if not math.isclose(cal_ref, zero_offset):
-                    slope = scale / (cal_ref - zero_offset)
+                    slope = self.metadata.MainFineScale / (cal_ref - zero_offset)
                 else:
                     slope = 0.
                 main_fine_current = (main_fine - zero_offset) * slope / 1000.
-                main_current = main_fine_current if main_fine < self.metadata.FineThreshold else main_coarse_current
-                print("XXX main current:", main_current)
+                main_current = main_fine_current if main_fine < self.metadata.FineThreshold else main_coarse_current  # noqa
 
-#                #USB Coarse
-                scale = self.metadata.UsbCoarseScale
+                # USB Coarse
                 zero_offset = self.metadata.UsbCoarseZeroOffset
                 cal_ref = self._usb_cal.ref_coarse
-                cal_zero = self._usb_cal.zero_coarse
-                zero_offset += cal_zero
+                zero_offset += self._usb_cal.zero_coarse
                 if not math.isclose(cal_ref, zero_offset):
-                    slope = scale / (cal_ref - zero_offset)
+                    slope = self.metadata.UsbCoarseScale / (cal_ref - zero_offset)
                 else:
                     slope = 0.
                 usb_coarse_current = (usb_coarse - zero_offset) * slope
-#                #USB Fine
-                scale = self.metadata.UsbFineScale
+                # USB Fine
                 zero_offset = self.metadata.UsbFineZeroOffset
                 cal_ref = self._usb_cal.ref_fine
-                cal_zero = self._usb_cal.zero_fine
-                zero_offset += cal_zero
+                zero_offset += self._usb_cal.zero_fine
                 if not math.isclose(cal_ref, zero_offset):
-                    slope = scale / (cal_ref - zero_offset)
+                    slope = self.metadata.UsbFineScale / (cal_ref - zero_offset)
                 else:
                     slope = 0.
                 usb_fine_current = (usb_fine - zero_offset) * slope / 1000.
-                usb_current = usb_fine_current if usb_fine < self.metadata.FineThreshold else usb_coarse_current
-                print("XXX USB", usb_current)
+                usb_current = usb_fine_current if usb_fine < self.metadata.FineThreshold else usb_coarse_current  # noqa
+
+                # AUX Coarse
+                cal_ref = self._aux_cal.ref_coarse
+                zero_offset = self._aux_cal.zero_coarse
+                if not math.isclose(cal_ref, zero_offset):
+                    slope = self.metadata.AuxCoarseScale / (cal_ref - zero_offset)
+                else:
+                    slope = 0.
+                aux_coarse_current = (aux_coarse - zero_offset) * slope
+                # AUX Fine
+                cal_ref = self._aux_cal.ref_fine
+                zero_offset = self._aux_cal.zero_fine
+                if not math.isclose(cal_ref, zero_offset):
+                    slope = self.metadata.AuxFineScale / (cal_ref - zero_offset)
+                else:
+                    slope = 0.
+                aux_fine_current = (aux_fine - zero_offset) * slope / 1000.
+                aux_current = aux_fine_current if aux_fine < self.metadata.FineThreshold else aux_coarse_current  # noqa
+
+                # Voltage
+                main_voltage = main_voltage * self.metadata.ADCRatio * self.metadata.MainVoltageScale  # noqa
+                usb_voltage = usb_voltage * self.metadata.ADCRatio * self.metadata.USBVoltageScale  # noqa
+
+                return main_current, usb_current, aux_current, main_voltage, usb_voltage
 
         elif sampletype == SampleType.ZeroCal:
             self.zerocal_count += 1
@@ -175,6 +182,7 @@ class RawHandler(MeasurementHandler):
             self._usb_cal.add_zerocal_fine(usb_fine)
             self._aux_cal.add_zerocal_coarse(aux_coarse)
             self._aux_cal.add_zerocal_fine(aux_fine)
+            return None, None, None, None, None
         elif sampletype == SampleType.RefCal:
             self.refcal_count += 1
             self._main_cal.add_refcal_coarse(main_coarse)
@@ -183,8 +191,52 @@ class RawHandler(MeasurementHandler):
             self._usb_cal.add_refcal_fine(usb_fine)
             self._aux_cal.add_refcal_coarse(aux_coarse)
             self._aux_cal.add_refcal_fine(aux_fine)
+            return None, None, None, None, None
         elif sampletype == SampleType.Invalid:
             self.invalid_count += 1
+            return None, None, None, None, None
+        else:
+            return None, None, None, None, None
+
+
+class StdoutHandler(MeasurementHandler):
+    """Handler that emits sample data as tab seperated values to stdout."""
+
+    def initialize(self, context):
+        print("main_current", "usb_current", "aux_current", "main_voltage", "usb_voltage",
+              sep="\t")
+
+    def __call__(self, sample):
+        (main_current, usb_current, aux_current,
+         main_voltage, usb_voltage) = self._process_raw(sample)
+        if main_current is not None:
+            print(main_current, usb_current, aux_current, main_voltage, usb_voltage, sep="\t")
+
+
+class AverageHandler(MeasurementHandler):
+    """Print average of all measurements."""
+
+    def initialize(self, context):
+        self.main_current = self.usb_current = self.aux_current = self.main_voltage = self.usb_voltage = 0.  # noqa
+        print("main_current", "usb_current", "aux_current", "main_voltage", "usb_voltage",
+              sep="\t")
+
+    def __call__(self, sample):
+        main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
+        if main_current is not None:
+            self.main_current += main_current
+            self.usb_current += usb_current
+            self.aux_current += aux_current
+            self.main_voltage += main_voltage
+            self.usb_voltage += usb_voltage
+
+    def finalize(self, counted, dropped):
+        super().finalize(counted, dropped)
+        print(self.main_current / self.measure_count,
+              self.usb_current / self.measure_count,
+              self.aux_current / self.measure_count,
+              self.main_voltage / self.measure_count,
+              self.usb_voltage / self.measure_count, sep="\t")
 
 
 class HDF5Handler(MeasurementHandler):
@@ -210,6 +262,10 @@ class CountingHandler(MeasurementHandler):
         elif sampletype == SampleType.Invalid:
             self.invalid_count += 1
 
+    def finalize(self, counted, dropped):
+        super().finalize(counted, dropped)
+        print(self)
+
 
 class Measurer:
     pass
@@ -227,17 +283,18 @@ class MonsoonCurrentMeasurer(Measurer):
         dev.open(ctx["serialno"])
         dev.voltage_channel = core.VoltageChannel.MainAndUSB
         passthrough = {
-                "on": core.USBPassthrough.On,
-                "off": core.USBPassthrough.Off,
-                "auto": core.USBPassthrough.Auto,
+            "on": core.USBPassthrough.On,
+            "off": core.USBPassthrough.Off,
+            "auto": core.USBPassthrough.Auto,
         }.get(ctx["passthrough"], core.USBPassthrough.Auto)
         dev.usb_passthrough = passthrough
         dev.voltage = ctx["voltage"]
         handlerclass = {
-                "raw": RawHandler,
-                "count": CountingHandler,
-                "hdf5": HDF5Handler,
-        }.get(ctx["output"], HDF5Handler)
+            "stdout": StdoutHandler,
+            "count": CountingHandler,
+            "average": AverageHandler,
+            "hdf5": HDF5Handler,
+        }.get(ctx["output"], StdoutHandler)
         handler = handlerclass(ctx, dev.info)
         # Perform the capture run.
         captured, dropped = dev.capture(samples=ctx["numsamples"],
@@ -247,10 +304,5 @@ class MonsoonCurrentMeasurer(Measurer):
         dev.close()
         handler.finalize(captured, dropped)
         return handler
-
-
-
-if __name__ == "__main__":
-    pass
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

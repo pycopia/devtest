@@ -37,13 +37,12 @@ def main(argv):
                                       first found if not given.
         --passthrough=(on|off|auto)   USB Passthrough mode. Either on, off, or
                                       auto. [default: auto]
-        --output=(raw|count|hdf5)     Output format.
-                                      raw: write data as it comes from device.
-                                      hdf5: Write data as an HDF5 file with
-                                      standard types.
-                                      count: Simply count and report cumulative
-                                      values.
-                                      [default: hdf5]
+        --output=<reportname>         Output format.
+                                      stdout: write data as it comes from device to stdout.
+                                      average: Write only average of values from run.
+                                      hdf5: Write data as an HDF5 file with standard types.
+                                      count: Simply count and report cumulative values.
+                                      [default: stdout]
     """
     arguments = docopt.docopt(main.__doc__, argv=argv[1:])
     measure_context = {
@@ -58,7 +57,6 @@ def main(argv):
 
     measurer = measure.MonsoonCurrentMeasurer(measure_context)
     result = measurer.measure()
-    print(result)
     return result.dropped
 
 
