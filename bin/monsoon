@@ -37,6 +37,7 @@ def main(argv):
                                       first found if not given.
         --passthrough=(on|off|auto)   USB Passthrough mode. Either on, off, or
                                       auto. [default: auto]
+        --channel=(usb|aux)           Additional measurement channel, usb or aux. [default: usb]
         --output=<reportname>         Output format.
                                       stdout: write data as it comes from device to stdout.
                                       average: Write only average of values from run.
@@ -48,6 +49,7 @@ def main(argv):
     measure_context = {
             "serialno": arguments["--serial"],
             "passthrough": arguments["--passthrough"],
+            "channel": arguments["--channel"],
             "voltage": float(arguments["--voltage"]),
             "numsamples": int(arguments["--samples"]),
             "calsamples": int(arguments["--calsamples"]),
@@ -57,6 +59,7 @@ def main(argv):
 
     measurer = measure.MonsoonCurrentMeasurer(measure_context)
     result = measurer.measure()
+    print(result, file=sys.stderr)  # not to mix with redirected stdout
     return result.dropped
 
 

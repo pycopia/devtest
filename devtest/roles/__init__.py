@@ -14,6 +14,14 @@ class BaseRole(metaclass=abc.ABCMeta):
         self._equipment = equipment
 
 
+    def initialize(self):
+        pass
+
+
+    def finalize(self):
+        pass
+
+
 class SoftwareRole(metaclass=abc.ABCMeta):
     def __init__(self, software):
         self._software = software

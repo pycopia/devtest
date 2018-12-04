@@ -7,8 +7,6 @@ with different measurement handlers.
 import collections
 import math
 
-# import h5py
-
 from devtest.devices.monsoon import simple as monsoon_simple
 from devtest.devices.monsoon import core
 
@@ -214,7 +212,10 @@ class StdoutHandler(MeasurementHandler):
 
 
 class AverageHandler(MeasurementHandler):
-    """Print average of all measurements."""
+    """Compute only average of all measurements.
+
+    Emit a TSV format text of just the average of the run.
+    """
 
     def initialize(self, context):
         self.main_current = self.usb_current = self.aux_current = self.main_voltage = self.usb_voltage = 0.  # noqa
@@ -224,25 +225,33 @@ class AverageHandler(MeasurementHandler):
     def __call__(self, sample):
         main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
         if main_current is not None:
-            self.main_current += main_current
-            self.usb_current += usb_current
-            self.aux_current += aux_current
-            self.main_voltage += main_voltage
-            self.usb_voltage += usb_voltage
+            if self.main_current == 0.:  # First measurement; don't average the initial zero.
+                self.main_current = main_current
+                self.usb_current = usb_current
+                self.aux_current = aux_current
+                self.main_voltage = main_voltage
+                self.usb_voltage = usb_voltage
+            else:  # Maintain a running average. May run indefinitely.
+                self.main_current = (main_current + self.main_current) / 2.
+                self.usb_current = (usb_current + self.usb_current) / 2.
+                self.main_voltage = (main_voltage + self.main_voltage) / 2.
+                self.usb_voltage = (usb_voltage + self.usb_voltage) / 2.
+                self.aux_current = (aux_current + self.aux_current) / 2.
 
     def finalize(self, counted, dropped):
         super().finalize(counted, dropped)
-        print(self.main_current / self.measure_count,
-              self.usb_current / self.measure_count,
-              self.aux_current / self.measure_count,
-              self.main_voltage / self.measure_count,
-              self.usb_voltage / self.measure_count, sep="\t")
+        print(self.main_current, self.usb_current, self.aux_current,
+              self.main_voltage, self.usb_voltage, sep="\t")
 
-
-class HDF5Handler(MeasurementHandler):
-
-    def __call__(self, sample):
-        self.sample_count += 1
+    def __str__(self):
+        s = [super().__str__()]
+        s.append("Measured values:")
+        s.append("  main_voltage: {:>11.4f} V".format(self.main_voltage))
+        s.append("   usb_voltage: {:>11.4f} V".format(self.usb_voltage))
+        s.append("  main_current: {:>11.4f} mA".format(self.main_current))
+        s.append("   usb_current: {:>11.4f} mA".format(self.usb_current))
+        s.append("   aux_current: {:>11.4f} ?".format(self.aux_current))
+        return "\n".join(s)
 
 
 class CountingHandler(MeasurementHandler):
@@ -262,10 +271,6 @@ class CountingHandler(MeasurementHandler):
         elif sampletype == SampleType.Invalid:
             self.invalid_count += 1
 
-    def finalize(self, counted, dropped):
-        super().finalize(counted, dropped)
-        print(self)
-
 
 class Measurer:
     pass
@@ -277,24 +282,31 @@ class MonsoonCurrentMeasurer(Measurer):
         self.context = context
         self._dev = monsoon_simple.HVPM()
 
-    def measure(self):
+    def measure(self, handlerclass=None):
         ctx = self.context  # shorthand
         dev = self._dev
         dev.open(ctx["serialno"])
-        dev.voltage_channel = core.VoltageChannel.MainAndUSB
+        channel = {
+            "usb": core.VoltageChannel.MainAndUSB,
+            "aux": core.VoltageChannel.MainAndAux,
+        }.get(ctx.get("channel", "usb"))
+        dev.voltage_channel = channel
         passthrough = {
             "on": core.USBPassthrough.On,
             "off": core.USBPassthrough.Off,
             "auto": core.USBPassthrough.Auto,
-        }.get(ctx["passthrough"], core.USBPassthrough.Auto)
+        }.get(ctx.get("passthrough", "auto"))
         dev.usb_passthrough = passthrough
         dev.voltage = ctx["voltage"]
-        handlerclass = {
-            "stdout": StdoutHandler,
-            "count": CountingHandler,
-            "average": AverageHandler,
-            "hdf5": HDF5Handler,
-        }.get(ctx["output"], StdoutHandler)
+        if handlerclass is None:
+            handlerclass = {
+                "stdout": StdoutHandler,
+                "count": CountingHandler,
+                "average": AverageHandler,
+            }.get(ctx.get("output"))
+        if handlerclass is None or not issubclass(handlerclass, MeasurementHandler):
+            raise ValueError("Measure handler class must be standard name or "
+                             "subclass of MeasurementHandler.")
         handler = handlerclass(ctx, dev.info)
         # Perform the capture run.
         captured, dropped = dev.capture(samples=ctx["numsamples"],

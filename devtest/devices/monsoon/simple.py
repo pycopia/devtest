@@ -26,6 +26,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import sys
 import struct
 
 from devtest import usb
@@ -194,6 +195,21 @@ class HVPM(Monsoon):
         return self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
 
     def capture(self, samples=None, duration=None, handler=None, calsamples=1250):
+        """Perform a measurement series.
+
+        Arguments:
+            samples: An int, number of samples to take.
+            duration: Number of seconds to run. Overrides samples, and one of
+                      these two must be provided.
+            handler: callabled that gets called for each sample, like so:
+                     handler((main_coarse, main_fine, usb_coarse, usb_fine,
+                             aux_coarse, aux_fine, main_voltage, usb_voltage,
+                             main_coarse_gain, main_fine_gain, usb_gain,
+                             sampletype))
+                    This is, a single tuple of those items.
+            calsamples: Time in milliseconds between calibration samples.
+                        Default is 1250.
+        """
         if samples is None and duration is None:
             raise ValueError("You must supply either number of samples or sampling duration.")
         if duration:
@@ -240,7 +256,7 @@ class HVPM(Monsoon):
                                  main_coarse_gain, main_fine_gain, usb_gain,
                                  sampletype))
                 except usb.LibusbError as e:
-                    print(e)
+                    print(e, file=sys.stderr)
                     break
         finally:
             self.stop_sampling()
@@ -288,5 +304,4 @@ def _test(argv):
 
 
 if __name__ == "__main__":
-    import sys
     _test(sys.argv)
