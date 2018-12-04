@@ -41,7 +41,6 @@ def main(argv):
         --output=<reportname>         Output format.
                                       stdout: write data as it comes from device to stdout.
                                       average: Write only average of values from run.
-                                      hdf5: Write data as an HDF5 file with standard types.
                                       count: Simply count and report cumulative values.
                                       [default: stdout]
     """
