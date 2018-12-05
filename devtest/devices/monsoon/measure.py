@@ -5,7 +5,6 @@ with different measurement handlers.
 """
 
 import collections
-import math
 
 from devtest.devices.monsoon import simple as monsoon_simple
 from devtest.devices.monsoon import core
@@ -112,18 +111,18 @@ class MeasurementHandler:
                 zero_offset = self.metadata.MainCoarseZeroOffset
                 cal_ref = self._main_cal.ref_coarse
                 zero_offset += self._main_cal.zero_coarse
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.MainCoarseScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 main_coarse_current = (main_coarse - zero_offset) * slope
                 # Main Fine
                 zero_offset = self.metadata.MainFineZeroOffset
                 cal_ref = self._main_cal.ref_fine
                 zero_offset += self._main_cal.zero_fine
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.MainFineScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 main_fine_current = (main_fine - zero_offset) * slope / 1000.
                 main_current = main_fine_current if main_fine < self.metadata.FineThreshold else main_coarse_current  # noqa
@@ -132,18 +131,18 @@ class MeasurementHandler:
                 zero_offset = self.metadata.UsbCoarseZeroOffset
                 cal_ref = self._usb_cal.ref_coarse
                 zero_offset += self._usb_cal.zero_coarse
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.UsbCoarseScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 usb_coarse_current = (usb_coarse - zero_offset) * slope
                 # USB Fine
                 zero_offset = self.metadata.UsbFineZeroOffset
                 cal_ref = self._usb_cal.ref_fine
                 zero_offset += self._usb_cal.zero_fine
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.UsbFineScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 usb_fine_current = (usb_fine - zero_offset) * slope / 1000.
                 usb_current = usb_fine_current if usb_fine < self.metadata.FineThreshold else usb_coarse_current  # noqa
@@ -151,17 +150,17 @@ class MeasurementHandler:
                 # AUX Coarse
                 cal_ref = self._aux_cal.ref_coarse
                 zero_offset = self._aux_cal.zero_coarse
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.AuxCoarseScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 aux_coarse_current = (aux_coarse - zero_offset) * slope
                 # AUX Fine
                 cal_ref = self._aux_cal.ref_fine
                 zero_offset = self._aux_cal.zero_fine
-                if not math.isclose(cal_ref, zero_offset):
+                try:
                     slope = self.metadata.AuxFineScale / (cal_ref - zero_offset)
-                else:
+                except ZeroDivisionError:
                     slope = 0.
                 aux_fine_current = (aux_fine - zero_offset) * slope / 1000.
                 aux_current = aux_fine_current if aux_fine < self.metadata.FineThreshold else aux_coarse_current  # noqa
