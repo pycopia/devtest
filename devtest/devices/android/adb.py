@@ -239,6 +239,12 @@ class AndroidDeviceClient:
                                                          hostport, devport)
         get_kernel().run(_command_transact(self._conn, msg))
 
+    def kill_forward(self, hostport):
+        """Tell server to remove forwarding TCP ports.
+        """
+        msg = b"host-serial:%b:killforward:tcp:%d" % (self.serial, hostport)
+        get_kernel().run(_command_transact(self._conn, msg))
+
     def wait_for(self, state: str):
         """Wait for device to be in a particular state.
 
@@ -363,6 +369,7 @@ class ShellProtocol:
 class AndroidDevice:
 
     def __init__(self, serial, product, model, device):
+        self.type = "phone"
         self.serial = serial
         self.product = product
         self.model = model
