@@ -20,26 +20,6 @@ from devtest.devices.monsoon import measure
 from . import BaseRole
 
 
-class AveragePowerHandler(measure.MeasurementHandler):
-
-    def initialize(self, context):
-        self.main_current = self.usb_current = self.aux_current = self.main_voltage = self.usb_voltage = 0.  # noqa
-        self.usb_power = 0.
-
-    def __call__(self, sample):
-        main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
-        if main_current is not None:  # actual sample
-            self.main_current = (main_current + ((self.measure_count - 1) * self.main_current) ) / self.measure_count
-            self.main_voltage = (main_voltage + ((self.measure_count - 1) * self.main_voltage) ) / self.measure_count
-            self.usb_current = (usb_current + ((self.measure_count - 1) * self.usb_current) ) / self.measure_count
-            self.usb_voltage = (usb_voltage + ((self.measure_count - 1) * self.usb_voltage) ) / self.measure_count
-
-    def finalize(self, counted, dropped):
-        super().finalize(counted, dropped)
-        self.main_power = self.main_voltage * (self.main_current / 1000.)
-        self.usb_power = self.usb_voltage * (self.usb_current / 1000.)
-
-
 class PowerMeterRole(BaseRole):
     """Provide power meter role controller.
 
@@ -56,7 +36,7 @@ class PowerMeterRole(BaseRole):
             "duration": duration,
         }
         measurer = measure.MonsoonCurrentMeasurer(measure_context)
-        result = measurer.measure(handlerclass=AveragePowerHandler)
+        result = measurer.measure(handlerclass=measure.AveragePowerHandler)
         return result.main_power, result.usb_power
 
 
