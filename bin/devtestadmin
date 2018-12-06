@@ -94,6 +94,10 @@ def main(argv):
                                               [--ipaddr6=<ipaddr6>]
                                               [--network=<network>]
         devtestadmin eq <name> iface del <iface> [--modelname=<modelname>]
+        devtestadmin eq <name> connection add <type> <othername> [--modelname=<modelname>]
+                                                                 [--othermodelname=<othermodelname>]
+        devtestadmin eq <name> connection del <type> <othername> [--modelname=<modelname>]
+                                                                 [--othermodelname=<othermodelname>]
         devtestadmin networks list [-v] [<like>]
         devtestadmin networks show [-v] <name>
         devtestadmin networks create <name> [--ipnetwork=<ipnetwork>]
@@ -393,6 +397,30 @@ def main(argv):
                 iface = arguments["<iface>"]
                 modelname = arguments["--modelname"]
                 controllers.EquipmentController.del_interface(name, iface, modelname=modelname)
+
+        elif arguments["connection"]:
+            # devtestadmin eq <name> connection add <type> <othername> ...
+            if arguments["add"]:
+                name = arguments["<name>"]
+                conntype = arguments["<type>"]
+                othername = arguments["<othername>"]
+                modelname = arguments["--modelname"]
+                othermodelname = arguments["--othermodelname"]
+                controllers.EquipmentController.add_connection(name, othername, conntype,
+                                                               modelname=modelname,
+                                                               othermodelname=othermodelname)
+            # devtestadmin eq <name> connection del <type> <othername> ...
+            elif arguments["del"]:
+                name = arguments["<name>"]
+                conntype = arguments["<type>"]
+                othername = arguments["<othername>"]
+                modelname = arguments["--modelname"]
+                othermodelname = arguments["--othermodelname"]
+                controllers.EquipmentController.del_connection(name, othername,
+                                                               conntype,
+                                                               modelname=modelname,
+                                                               othermodelname=othermodelname)
+
         elif arguments["list"]:
             list_equipment(arguments["<like>"], arguments["-v"])
     # Networks

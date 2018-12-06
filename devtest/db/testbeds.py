@@ -369,6 +369,12 @@ class EquipmentRuntime:
         role = self._attributes["role"]
         return [EquipmentRuntime(eq, role) for eq in self._equipment.subcomponents]
 
+    def service_want(self, name):
+        signals.service_want.send(self, service=name)
+
+    def service_dontwant(self, name):
+        signals.service_dontwant.send(self, service=name)
+
 
 class SoftwareRuntime:
     """Runtime container of data about software defined in the testbed."""

@@ -150,6 +150,19 @@ class TestBedController(Controller):
 
 class EquipmentController(Controller):
 
+    CONNECTION_TYPES = {
+        "unknown": constants.ConnectionType.Unknown,
+        "serial": constants.ConnectionType.Serial,
+        "usb2": constants.ConnectionType.USB2,
+        "usb3": constants.ConnectionType.USB3,
+        "firewire": constants.ConnectionType.Firewire,
+        "lightning": constants.ConnectionType.Lightning,
+        "thunderbolt": constants.ConnectionType.Thunderbolt,
+        "jtag": constants.ConnectionType.JTAG,
+        "bluetooth": constants.ConnectionType.Bluetooth,
+        "power": constants.ConnectionType.Power,
+    }
+
     @staticmethod
     def all(like=None):
         q = models.Equipment.select().order_by(models.Equipment.name)
@@ -280,6 +293,26 @@ class EquipmentController(Controller):
         eq = EquipmentController.get(name, modelname)
         if eq:
             eq.del_interface(iface)
+        return eq
+
+    @staticmethod
+    def add_connection(name, othername, conntype, modelname=None,
+                       othermodelname=None):
+        conntype = EquipmentController.CONNECTION_TYPES.get(conntype, conntype)
+        eq = EquipmentController.get(name, modelname)
+        if eq:
+            other = EquipmentController.get(othername, othermodelname)
+            eq.add_connection(other, conntype)
+        return eq
+
+    @staticmethod
+    def del_connection(name, othername, conntype=None, modelname=None,
+                       othermodelname=None):
+        conntype = EquipmentController.CONNECTION_TYPES.get(conntype)
+        eq = EquipmentController.get(name, modelname)
+        if eq:
+            other = EquipmentController.get(othername, othermodelname)
+            eq.remove_connection(other, conntype)
         return eq
 
 
