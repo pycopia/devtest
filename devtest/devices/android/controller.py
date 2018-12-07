@@ -97,7 +97,7 @@ class AndroidController(devices.Controller):
         if es:
             return stdout
         else:
-            raise AndroidControllerError((es, stdout))
+            raise AndroidControllerError((es, stderr))
 
     def get_property(self, name):
         """Get a single Android property.
