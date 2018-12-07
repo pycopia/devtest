@@ -12,19 +12,28 @@ from .. import importlib
 class BaseRole(metaclass=abc.ABCMeta):
     def __init__(self, equipment):
         self._equipment = equipment
-
+        self.initialize()
 
     def initialize(self):
         pass
 
-
     def finalize(self):
+        pass
+
+    def close(self):
         pass
 
 
 class SoftwareRole(metaclass=abc.ABCMeta):
     def __init__(self, software):
         self._software = software
+        self.initialize()
+
+    def initialize(self):
+        pass
+
+    def finalize(self):
+        pass
 
 
 def get_role(classpath):
