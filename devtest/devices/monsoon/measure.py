@@ -247,10 +247,26 @@ class AverageHandler(MeasurementHandler):
 
 
 class AveragePowerHandler(MeasurementHandler):
+    """Handler for keeping a running average of measured values, and compute
+    average power.
+
+    After finalization, an instance of this object will have the following
+    attributes.
+
+    Attributes:
+        main_current: float of average current on the main port, in mA.
+        main_voltage: float of average voltage on the main port, in Volts.
+        usb_current: float of average current on the USB port, in mA.
+        usb_voltage: float of average voltage on the USB port, in Volts.
+        main_power: float of average power during the measurement duration,
+                    main port, in Watts.
+        usb_power: float of average power during the measurement duration,
+                   USB port, in Watts.
+    """
 
     def initialize(self, context):
         self.main_current = self.usb_current = self.aux_current = self.main_voltage = self.usb_voltage = 0.  # noqa
-        self.usb_power = 0.
+        self.main_power = self.usb_power = 0.
 
     def __call__(self, sample):
         main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
@@ -267,6 +283,10 @@ class AveragePowerHandler(MeasurementHandler):
 
 
 class CountingHandler(MeasurementHandler):
+    """Simply count the number of types of samples the Monsoon sends.
+
+    Used for debugging and checking transfer performance.
+    """
 
     def __call__(self, sample):
         SampleType = core.SampleType  # eliminate some dict lookups
@@ -289,12 +309,25 @@ class Measurer:
 
 
 class MonsoonCurrentMeasurer(Measurer):
+    """Sets up a Monsoon for measuring from context dictionary.
+    """
 
     def __init__(self, context):
         self.context = context
         self._dev = monsoon_simple.HVPM()
 
     def measure(self, handlerclass=None):
+        """Perform a measurment run.
+
+        Opens device, captures samples,and closes the device.
+
+        Args:
+            handlerclass: a subclass of MeasurementHandler that is callable. It
+            will be instantiated here with the device metadata and context.
+
+        Returns:
+            The handler instance.
+        """
         ctx = self.context  # shorthand
         dev = self._dev
         dev.open(ctx["serialno"])

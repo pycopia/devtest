@@ -30,10 +30,16 @@ import sys
 import struct
 
 from devtest import usb
+from devtest import logging
 from devtest.devices.monsoon import core
 
 
-FLOAT_TO_INT = 1048576
+_VOLTAGE_SCALE = 1048576
+
+
+class StopSampling(Exception):
+    """Used to signal a long-running capture to stop.
+    """
 
 
 class Monsoon:
@@ -142,7 +148,7 @@ class HVPM(Monsoon):
 
     @voltage.setter
     def voltage(self, value):
-        vout = int(value * FLOAT_TO_INT)
+        vout = int(value * _VOLTAGE_SCALE)
         self.send_command(core.OpCodes.SetMainVoltage, vout)
         self._voltage = value
 
@@ -151,10 +157,10 @@ class HVPM(Monsoon):
 
     def enable_vout(self):
         if self._voltage:
-            self.send_command(core.OpCodes.SetMainVoltage, int(self._voltage * FLOAT_TO_INT))
+            self.send_command(core.OpCodes.SetMainVoltage, int(self._voltage * _VOLTAGE_SCALE))
         else:
             self._voltage = 1.5
-            self.send_command(core.OpCodes.SetMainVoltage, int(self._voltage * FLOAT_TO_INT))
+            self.send_command(core.OpCodes.SetMainVoltage, int(self._voltage * _VOLTAGE_SCALE))
 
     @property
     def voltage_channel(self):
@@ -218,7 +224,7 @@ class HVPM(Monsoon):
             samples = int(samples)
 
         if handler is None:
-            def handler(sample):
+            def handler(sample):  # Used for self test
                 print(repr(sample))
 
         headreader = struct.Struct("<HBB")
@@ -256,52 +262,10 @@ class HVPM(Monsoon):
                                  main_coarse_gain, main_fine_gain, usb_gain,
                                  sampletype))
                 except usb.LibusbError as e:
-                    print(e, file=sys.stderr)
+                    logging.exception_error("USB error while sampling", e)
+                    break
+                except StopSampling:
                     break
         finally:
             self.stop_sampling()
         return sample_count, dropped_count
-
-
-
-def _test(argv):
-    serial = argv[1] if len(argv) > 1 else None
-
-    samples = 5000 * 5
-    unpacker = struct.Struct("<HBB")
-    dropped_count = 0
-    sample_count = 0
-
-    dev = HVPM()
-    dev.open(serial)
-    dev.voltage_channel = core.VoltageChannel.MainAndUSB
-    dev.usb_passthrough = core.USBPassthrough.On
-
-    if not dev.is_sampling():
-        outf = open("samples.dat", "wb")
-
-        dev.voltage = 4.2
-        try:
-            dev.start_sampling(samples)
-            while (sample_count + dropped_count) < samples:
-                try:
-                    data = dev.read_sample()
-                    dropped, flags, number = unpacker.unpack(data[:4])
-                    dropped_count = dropped  # device accumulates dropped sample count.
-                    sample_count += number
-                    outf.write(data)
-                except usb.LibusbError as e:
-                    print(e)
-                    break
-        finally:
-            dev.stop_sampling()
-            outf.close()
-        print("samples:", sample_count, "dropped:", dropped_count)
-    else:
-        print("Not ready!")
-        dev.stop_sampling()
-    dev.close()
-
-
-if __name__ == "__main__":
-    _test(sys.argv)
