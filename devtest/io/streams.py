@@ -1,13 +1,13 @@
-"""
-IO for streams. Use the Stream object from here.
+"""IO for streams.
+
+Use the Stream object from here. Collects the curio supplies Stream objects and
+adds some new ones.
 """
 
 from __future__ import generator_stop
 
-# For now we can just use the "stock" Stream from curio. In the future we can
-# change the implementation here, if necessary, without changing other client
-# code.
-from curio.io import FileStream, SocketStream, Socket  # noqa
+from curio.io import _Fd, StreamBase, FileStream, SocketStream, Socket  # noqa
+from curio.channel import Connection, Channel
 
 
 def _test(argv):

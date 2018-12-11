@@ -4,9 +4,11 @@ Simple, asynchronous process spawner and manager.
 
 from __future__ import generator_stop
 
+import sys
 import os
 import signal
 import atexit
+import multiprocessing
 
 import psutil
 
@@ -22,8 +24,10 @@ from subprocess import (  # noqa
 from devtest import logging
 from devtest.textutils import shparser
 from devtest.io import subprocess
-from devtest.io.reactor import (get_kernel, sleep, spawn, timeout_after,
-                                CancelledError, TaskTimeout)
+from devtest.io import streams
+from devtest.io import socket
+from devtest.io.reactor import (get_kernel, sleep, spawn,
+                                timeout_after, CancelledError, TaskTimeout)
 from devtest.os import procutils
 from devtest.os import exitstatus
 
@@ -156,6 +160,155 @@ class PipeProcess(Process):
         return rv
 
 
+# Co-process server commands
+CMD_CALL = 1
+CMD_EXIT = 2
+CMD_PING = 3
+
+
+class CoProcess(Process):
+    def __init__(self, pid, conn):
+        self._init(pid, _ignore_nsp=True)
+        self._conn = conn
+
+    def start(self, func, args=()):
+        return get_kernel().run(self._start, func, args)
+
+    async def _start(self, func, args):
+        msg = (CMD_CALL, func, args)
+        try:
+            await self._conn.send(msg)
+            # resp, result = await self._conn.recv()
+        except CancelledError:
+            await self.close()
+            raise
+
+    def wait(self):
+        return get_kernel().run(self._wait)
+
+    def poll(self):
+        pid, sts = os.waitpid(self.pid, os.WNOHANG)
+        if pid == self.pid:
+            return sts
+
+    async def _wait(self):
+        resp, result = await self._conn.recv()
+        if resp:
+            return result
+        else:
+            raise result
+
+    def close(self):
+        get_kernel().run(self._close)
+
+    async def _close(self):
+        msg = (CMD_EXIT, )
+        await self._conn.send(msg)
+        await self._conn.close()
+
+    def ping(self):
+        return get_kernel().run(self._ping)
+
+    async def _ping(self):
+        msg = (CMD_PING,)
+        await self._conn.send(msg)
+        resp, result = await self._conn.recv()
+        if resp and result == "PONG":
+            return True
+        return False
+
+
+def _start_coprocess(cwd):
+    mysock, childsock = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    os.set_inheritable(childsock.fileno(), True)
+    pid = os.fork()
+    if pid == 0:  # child
+        if cwd is not None:
+            os.chdir(str(cwd))
+        mysock._socket.close()
+        del mysock
+        childsock = childsock.as_stream()
+        conn = streams.Connection(childsock, childsock)
+        return pid, conn
+    else:
+        childsock._socket.close()
+        del childsock
+        mysock = mysock.as_stream()
+        conn = streams.Connection(mysock, mysock)
+        return pid, conn
+
+
+def _coprocess_server(conn):
+    kern = get_kernel()
+    try:
+        kern.run(_coprocess_server_coro, conn, shutdown=True)
+    except KeyboardInterrupt:
+        pass
+
+
+async def _coprocess_server_coro(conn):
+    while True:
+        msg = await conn.recv()
+        cmd = msg[0]
+        if cmd == CMD_CALL:
+            func, args = msg[1:]
+            if isinstance(func, str):
+                local_ns = {}
+                global_ns = globals()
+                code = compile(func, "coprocess", "exec")
+                exec(code, global_ns, local_ns)
+                await conn.send((True, local_ns))
+            else:
+                try:
+                    rv = func(*args)
+                except SystemExit as ex:
+                    await conn.close()
+                    await conn.send((False, ex))
+                except Exception as ex:
+                    await conn.send((False, ex))
+                await conn.send((True, rv))
+        elif cmd == CMD_EXIT:
+            await conn.close()
+            break
+        elif cmd == CMD_PING:
+            await conn.send((True, "PONG"))
+
+
+def _close_stdin():
+    if sys.stdin is None:
+        return
+
+    try:
+        sys.stdin.close()
+    except (OSError, ValueError):
+        pass
+
+    try:
+        fd = os.open(os.devnull, os.O_RDONLY)
+        try:
+            sys.stdin = open(fd, closefd=False)
+        except:
+            os.close(fd)
+            raise
+    except (OSError, ValueError):
+        pass
+
+
+def _redirect_stderr(name):
+    fd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
+                 mode=0o644)
+    stderr_orig = os.dup(2)
+    os.dup2(fd, 2)
+    os.close(fd)
+    return stderr_orig
+
+
+def _restore_stderr(oldfd):
+    sys.stderr.flush()
+    os.dup2(oldfd, 2)
+    os.close(oldfd)
+
+
 class ProcessManager:
     """Starts and keeps track of subprocesses.
     """
@@ -201,6 +354,37 @@ class ProcessManager:
         proc.progname = progname
         proc.exit_handler = exit_handler
         logging.notice("ProcessManager: started: {!r} with PID: {}".format(progname, proc.pid))
+        return proc
+
+    def coprocess(self, directory=None):
+        pid, conn = _start_coprocess(directory)
+        if pid == 0:  # child
+            proc = None
+            signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+            self._procs = {}
+            self._zombies = {}
+            self.splitter = None
+            sys.stdout.flush()
+            sys.stderr.flush()
+            sys.excepthook = sys.__excepthook__
+            _close_stdin()
+            origfd = _redirect_stderr("/tmp/devtest.stderr")
+
+            #os.close(sys.__stdin__.fileno())
+            #os.close(sys.__stdout__.fileno())
+            #os.close(sys.__stderr__.fileno())
+            #sys.stdin = open("/dev/null", 'r')
+            #os.close(1)
+            #os.close(2)
+            #sys.stdout = open("/tmp/coproc{}.stdout".format(os.getpid()), 'w')
+            #sys.stderr = open("/tmp/coproc{}.stderr".format(os.getpid()), 'w', 0)
+            _coprocess_server(conn)
+            os._exit(0)
+        else:
+            proc = CoProcess(pid, conn)
+            proc.progname = "CoProcess"
+            self._procs[proc.pid] = proc
+        logging.notice("ProcessManager: coprocess server with PID: {}".format(pid))
         return proc
 
     def _sigchild(self, sig, stack):
@@ -284,7 +468,7 @@ def get_manager():
     global _manager
     if _manager is None:
         _manager = ProcessManager()
-        atexit.register(_manager.killall)
+        atexit.register(_manager.close)
     return _manager
 
 
