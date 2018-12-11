@@ -65,6 +65,7 @@ setup(
         'docopt',
         'docutils>=0.13',
         'peewee>=3.0',
+        'portpicker',
         'psutil',
         'psycopg2',
         'pygments',
