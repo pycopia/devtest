@@ -1,1 +1,3 @@
-# __import__('pkg_resources').declare_namespace(__name__)
+# Reset the except hook to something sane on some Linux distros.
+import sys
+sys.excepthook = sys.__excepthook__
