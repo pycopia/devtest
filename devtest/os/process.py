@@ -171,7 +171,7 @@ class CoProcess(Process):
         self._init(pid, _ignore_nsp=True)
         self._conn = conn
 
-    def start(self, func, args=()):
+    def start(self, func, *args):
         return get_kernel().run(self._start, func, args)
 
     async def _start(self, func, args):
@@ -183,13 +183,13 @@ class CoProcess(Process):
             await self.close()
             raise
 
-    def wait(self):
-        return get_kernel().run(self._wait)
-
     def poll(self):
         pid, sts = os.waitpid(self.pid, os.WNOHANG)
         if pid == self.pid:
             return sts
+
+    def wait(self):
+        return get_kernel().run(self._wait)
 
     async def _wait(self):
         resp, result = await self._conn.recv()
@@ -218,7 +218,7 @@ class CoProcess(Process):
         return False
 
 
-def _start_coprocess(cwd):
+def _fork_coprocess(cwd):
     mysock, childsock = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
     os.set_inheritable(childsock.fileno(), True)
     pid = os.fork()
@@ -253,19 +253,24 @@ async def _coprocess_server_coro(conn):
         if cmd == CMD_CALL:
             func, args = msg[1:]
             if isinstance(func, str):
-                local_ns = {}
+                local_ns = {"args": args}
                 global_ns = globals()
-                code = compile(func, "coprocess", "exec")
-                exec(code, global_ns, local_ns)
+                try:
+                    code = compile(func, "coprocess", "exec")
+                    exec(code, global_ns, local_ns)
+                except Exception as ex:  # noqa
+                    await conn.send((False, ex))
                 await conn.send((True, local_ns))
             else:
                 try:
                     rv = func(*args)
                 except SystemExit as ex:
+                    await conn.send((False, ex))
                     await conn.close()
+                    break
+                except Exception as ex:  # noqa
                     await conn.send((False, ex))
-                except Exception as ex:
-                    await conn.send((False, ex))
+                    break
                 await conn.send((True, rv))
         elif cmd == CMD_EXIT:
             await conn.close()
@@ -294,13 +299,13 @@ def _close_stdin():
         pass
 
 
-def _redirect_stderr(name):
-    fd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
-                 mode=0o644)
-    stderr_orig = os.dup(2)
-    os.dup2(fd, 2)
-    os.close(fd)
-    return stderr_orig
+def _redirect(fd, name):
+    newfd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
+                    mode=0o644)
+    orig_fd = os.dup(fd)
+    os.dup2(newfd, fd)
+    os.close(newfd)
+    return orig_fd
 
 
 def _restore_stderr(oldfd):
@@ -357,7 +362,7 @@ class ProcessManager:
         return proc
 
     def coprocess(self, directory=None):
-        pid, conn = _start_coprocess(directory)
+        pid, conn = _fork_coprocess(directory)
         if pid == 0:  # child
             proc = None
             signal.signal(signal.SIGCHLD, signal.SIG_DFL)
@@ -368,16 +373,8 @@ class ProcessManager:
             sys.stderr.flush()
             sys.excepthook = sys.__excepthook__
             _close_stdin()
-            origfd = _redirect_stderr("/tmp/devtest.stderr")
-
-            #os.close(sys.__stdin__.fileno())
-            #os.close(sys.__stdout__.fileno())
-            #os.close(sys.__stderr__.fileno())
-            #sys.stdin = open("/dev/null", 'r')
-            #os.close(1)
-            #os.close(2)
-            #sys.stdout = open("/tmp/coproc{}.stdout".format(os.getpid()), 'w')
-            #sys.stderr = open("/tmp/coproc{}.stderr".format(os.getpid()), 'w', 0)
+            _redirect(1, "/tmp/devtest.stdout")
+            _redirect(2, "/tmp/devtest.stderr")
             _coprocess_server(conn)
             os._exit(0)
         else:
