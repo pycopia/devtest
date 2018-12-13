@@ -292,6 +292,20 @@ class AndroidDeviceClient:
                     returncode=rc)
                 )
 
+    async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
+        """Coroutine for streaming logcat output to the provided file-like
+        streams.
+        """
+        logtags = os.environ.get("ANDROID_LOG_TAGS", logtags)
+        logtags = logtags.replace('"', '\\"')
+        longopt = "-v long" if longform else ""
+        cmdline = 'export ANDROID_LOG_TAGS="{}"; exec logcat {}'.format(logtags,
+                                                                    longopt)
+        cmdline = cmdline.encode("utf8")
+        await _start_shell(self.serial, self._conn, False, cmdline)
+        sp = ShellProtocol(self._conn.socket)
+        await sp.run(None, stdoutstream, stderrstream)
+
 
 # Perform shell request, connection stays open
 async def _start_shell(serial, conn, usepty, cmdline):
@@ -392,27 +406,33 @@ def _device_factory(line):
 
 
 if __name__ == "__main__":
+    import sys
     from devtest import debugger
     debugger.autodebug()
     start_server()
-    print("Test AdbClient")
+    print("Test AdbClient:")
     c = AdbClient()
-    print(c.server_version)
+    print("  Server version:", c.server_version)
     for devinfo in c.get_device_list():
-        print(devinfo)
-    # c.forward(devinfo.serial, 8080, 8080)
+        print("    ", devinfo)
     c.close()
     del c
 
-    print("Test AndroidDeviceClient")
+    print("Test AndroidDeviceClient:")
     ac = AndroidDeviceClient(devinfo.serial)
-    print("features:", ac.features)
-    print(ac.get_state())
+    print("  features:", ac.features)
+    print("  state:", ac.get_state())
+    print("  running 'ls /sdcard':")
     stdout, stderr, es = ac.command(["ls", "/sdcard"])
-    print(es)
-    print("stdout:", repr(stdout))
-    print("stderr:", repr(stderr))
-    print(ac.wait_for("device"))
-    ac.close()
-
+    print("    ", es)
+    print("    stdout:", repr(stdout))
+    print("    stderr:", repr(stderr))
+    ac.wait_for("device")
+    try:
+        try:
+            get_kernel().run(ac.logcat, sys.stdout.buffer, sys.stderr.buffer)
+        except KeyboardInterrupt:
+            pass
+    finally:
+        ac.close()
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

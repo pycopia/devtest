@@ -45,6 +45,12 @@ class AndroidController(devices.Controller):
             self._adb = adb.AndroidDeviceClient(self._equipment["serno"])
         return self._adb
 
+    @adb.deleter
+    def adb(self):
+        if self._adb is not None:
+            self._adb.close()
+            self._adb = None
+
     @property
     def uia(self):
         if self._uia is None:
