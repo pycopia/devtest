@@ -8,7 +8,8 @@ import sys
 import os
 import signal
 import atexit
-import multiprocessing
+import traceback
+import inspect
 
 import psutil
 
@@ -33,6 +34,10 @@ from devtest.os import exitstatus
 
 
 class ManagerError(Exception):
+    pass
+
+
+class CoProcessError(Exception):
     pass
 
 
@@ -167,18 +172,21 @@ CMD_PING = 3
 
 
 class CoProcess(Process):
+    """Main thread representation of coprocess server.
+
+    Contains both synchrnous and asychronous methods.
+    """
     def __init__(self, pid, conn):
         self._init(pid, _ignore_nsp=True)
         self._conn = conn
 
     def start(self, func, *args):
-        return get_kernel().run(self._start, func, args)
+        return get_kernel().run(self.astart, func, args)
 
-    async def _start(self, func, args):
+    async def astart(self, func, args):
         msg = (CMD_CALL, func, args)
         try:
             await self._conn.send(msg)
-            # resp, result = await self._conn.recv()
         except CancelledError:
             await self.close()
             raise
@@ -189,27 +197,30 @@ class CoProcess(Process):
             return sts
 
     def wait(self):
-        return get_kernel().run(self._wait)
+        return get_kernel().run(self.a_wait)
 
-    async def _wait(self):
+    async def a_wait(self):
         resp, result = await self._conn.recv()
         if resp:
             return result
         else:
-            raise result
+            if result is not None:
+                raise CoProcessError("wait") from result
+            else:
+                await self._conn.close()
 
     def close(self):
-        get_kernel().run(self._close)
+        get_kernel().run(self.aclose)
 
-    async def _close(self):
+    async def aclose(self):
         msg = (CMD_EXIT, )
         await self._conn.send(msg)
         await self._conn.close()
 
     def ping(self):
-        return get_kernel().run(self._ping)
+        return get_kernel().run(self.aping)
 
-    async def _ping(self):
+    async def aping(self):
         msg = (CMD_PING,)
         await self._conn.send(msg)
         resp, result = await self._conn.recv()
@@ -238,15 +249,14 @@ def _fork_coprocess(cwd):
         return pid, conn
 
 
-def _coprocess_server(conn):
-    kern = get_kernel()
-    try:
-        kern.run(_coprocess_server_coro, conn, shutdown=True)
-    except KeyboardInterrupt:
-        pass
-
-
 async def _coprocess_server_coro(conn):
+    """This bit runs the coprocess server, waiting for commands.
+
+    The usual command will the CMD_CALL, sent by the CoProcess start method.
+
+    You can pass an function or method object. But since coroutines are not
+    pickle-able, you need a coroutine factory function to invoke one.
+    """
     while True:
         msg = await conn.recv()
         cmd = msg[0]
@@ -264,11 +274,15 @@ async def _coprocess_server_coro(conn):
             else:
                 try:
                     rv = func(*args)
-                except SystemExit as ex:
-                    await conn.send((False, ex))
+                    if inspect.iscoroutine(rv):
+                        task = await spawn(rv)
+                        rv = await task.join()
+                except (KeyboardInterrupt, SystemExit) as ex:
+                    await conn.send((False, None))
                     await conn.close()
                     break
                 except Exception as ex:  # noqa
+                    traceback.print_exc(file=sys.stderr)
                     await conn.send((False, ex))
                     break
                 await conn.send((True, rv))
@@ -364,18 +378,25 @@ class ProcessManager:
     def coprocess(self, directory=None):
         pid, conn = _fork_coprocess(directory)
         if pid == 0:  # child
+            sys.excepthook = sys.__excepthook__
             proc = None
             signal.signal(signal.SIGCHLD, signal.SIG_DFL)
             self._procs = {}
             self._zombies = {}
             self.splitter = None
+            atexit._run_exitfuncs()
+            atexit._clear()
             sys.stdout.flush()
             sys.stderr.flush()
-            sys.excepthook = sys.__excepthook__
             _close_stdin()
             _redirect(1, "/tmp/devtest.stdout")
             _redirect(2, "/tmp/devtest.stderr")
-            _coprocess_server(conn)
+            try:
+                get_kernel().run(_coprocess_server_coro, conn)
+            except KeyboardInterrupt:
+                pass
+            except:  # noqa
+                traceback.print_exc(file=sys.stderr)
             os._exit(0)
         else:
             proc = CoProcess(pid, conn)
@@ -467,6 +488,14 @@ def get_manager():
         _manager = ProcessManager()
         atexit.register(_manager.close)
     return _manager
+
+
+def close_manager():
+    global _manager
+    if _manager is not None:
+        _manager.close()
+        _manager = None
+        atexit.unregister(_manager.close)
 
 
 async def start_and_delay(cmd, waittime, **kwargs):
