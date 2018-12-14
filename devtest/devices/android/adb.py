@@ -189,6 +189,125 @@ class AdbClient:
         return int(resp, 16)
 
 
+class AsyncAndroidDeviceClient:
+    """An active adb client per device.
+
+    For device specific operations.
+    For use in asynchronous event loops.
+    """
+    def __init__(self, serial, host="localhost", port=ADB_PORT):
+        self.serial = serial.encode("ascii")
+        self._conn = AdbConnection(host=host, port=port)
+        self.features = None
+
+    async def _message(self, msg):
+        if self._conn is None:
+            raise Error("Operation on a closed device client.")
+        return await _transact(self._conn, msg)
+
+    async def get_features(self):
+        msg = b"host-serial:%b:features" % (self.serial,)
+        resp = await self._message(msg)
+        self.features = resp.decode("ascii")
+        return self.features
+
+    async def close(self):
+        if self._conn is not None:
+            await self._conn.close()
+            self._conn = None
+
+    async def get_state(self):
+        msg = b"host-serial:%b:get-state" % (self.serial,)
+        resp = await self._message(msg)
+        return resp.decode("ascii")
+
+    async def reboot(self):
+        await _connect_command(self.serial, self._conn, b"reboot:")
+
+    async def remount(self):
+        resp = await _special_command(self.serial, self._conn, b"remount:")
+        return resp.decode("ascii")
+
+    async def root(self):
+        resp = await _special_command(self.serial, self._conn, b"root:")
+        return resp.decode("ascii")
+
+    async def forward(self, hostport, devport):
+        """Tell server to start forwarding TCP ports.
+        """
+        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (self.serial,
+                                                         hostport, devport)
+        await _command_transact(self._conn, msg)
+
+    async def kill_forward(self, hostport):
+        """Tell server to remove forwarding TCP ports.
+        """
+        msg = b"host-serial:%b:killforward:tcp:%d" % (self.serial, hostport)
+        await _command_transact(self._conn, msg)
+
+    async def wait_for(self, state: str):
+        """Wait for device to be in a particular state.
+
+        State must be one of {"any", "bootloader", "device", "recovery", "sideload"}
+        """
+        if state not in {"any", "bootloader", "device", "recovery", "sideload"}:
+            raise ValueError("Invalid state to wait for.")
+        msg = b"host-serial:%b:wait-for-usb-%b" % (self.serial, state.encode("ascii"))
+        await _command_transact(self._conn, msg)
+
+    async def command(self, cmdline, usepty=False):
+        """Run a non-interactive shell command.
+
+        Uses ring buffers to collect outputs to avoid a runaway device command
+        from filling host memory. However, this might possibly truncate output.
+
+        Returns:
+            stdout (string): output of command
+            stderr (string): error output of command
+            exitstatus (ExitStatus): the exit status of the command.
+        """
+        if self.features is None:
+            await self.get_features()
+        if "shell_v2" not in self.features:
+            raise AdbCommandFail("Only shell v2 protocol currently supported.")
+        if isinstance(cmdline, list):
+            name = cmdline[0]
+            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
+        else:
+            name = cmdline.split()[0]
+        cmdline = cmdline.encode("utf8")
+        await _start_shell(self.serial, self._conn, usepty, cmdline)
+        sp = ShellProtocol(self._conn.socket)
+        stdout = ringbuffer.RingBuffer(MAX_PAYLOAD)
+        stderr = ringbuffer.RingBuffer(MAX_PAYLOAD)
+        resp = await sp.run(None, stdout, stderr)
+        await self._conn.close()
+        rc = resp[0]
+        if rc & 0x80:
+            rc = -(rc & 0x7F)
+        return (stdout.read().decode("utf8"),
+                stderr.read().decode("utf8"),
+                exitstatus.ExitStatus(
+                    None,
+                    name="{}@{}".format(name, self.serial.decode("ascii")),
+                    returncode=rc)
+                )
+
+    async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
+        """Coroutine for streaming logcat output to the provided file-like
+        streams.
+        """
+        logtags = os.environ.get("ANDROID_LOG_TAGS", logtags)
+        logtags = logtags.replace('"', '\\"')
+        longopt = "-v long" if longform else ""
+        cmdline = 'export ANDROID_LOG_TAGS="{}"; exec logcat {}'.format(logtags,
+                                                                    longopt)
+        cmdline = cmdline.encode("utf8")
+        await _start_shell(self.serial, self._conn, False, cmdline)
+        sp = ShellProtocol(self._conn.socket)
+        await sp.run(None, stdoutstream, stderrstream)
+
+
 class AndroidDeviceClient:
     """An active adb client per device.
 
@@ -407,6 +526,8 @@ def _device_factory(line):
 
 if __name__ == "__main__":
     import sys
+    import signal
+    from devtest.io.reactor import SignalEvent, spawn
     from devtest import debugger
     debugger.autodebug()
     start_server()
@@ -420,6 +541,7 @@ if __name__ == "__main__":
 
     print("Test AndroidDeviceClient:")
     ac = AndroidDeviceClient(devinfo.serial)
+    ac.wait_for("device")
     print("  features:", ac.features)
     print("  state:", ac.get_state())
     print("  running 'ls /sdcard':")
@@ -427,12 +549,28 @@ if __name__ == "__main__":
     print("    ", es)
     print("    stdout:", repr(stdout))
     print("    stderr:", repr(stderr))
-    ac.wait_for("device")
-    try:
+    ac.close()
+    del ac
+
+    # Test async with logcat. ^C to stop it.
+    async def dostuff():
+        ac = AsyncAndroidDeviceClient(devinfo.serial)
+
+        stdout, stderr, es = await ac.command(["ls", "/sdcard"])
+        print("    ", es)
+        print("    stdout:", repr(stdout))
+        print("    stderr:", repr(stderr))
+
+        signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
+        await ac.wait_for("device")
         try:
-            get_kernel().run(ac.logcat, sys.stdout.buffer, sys.stderr.buffer)
-        except KeyboardInterrupt:
-            pass
-    finally:
-        ac.close()
+            task = await spawn(ac.logcat(sys.stdout.buffer, sys.stdout.buffer))
+            await signalset.wait()
+            await task.cancel()
+        finally:
+            await ac.close()
+
+    kern = get_kernel()
+    kern.run(dostuff)
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
