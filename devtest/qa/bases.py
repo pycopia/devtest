@@ -154,10 +154,7 @@ class TestCase:
             if self._debug:
                 debugger.post_mortem(tb)
                 tb = None
-            self.diagnostic("{} ({})".format(ex.__name__, val))
-            while val.__cause__ is not None:
-                val = val.__cause__
-                self.diagnostic("Because: {} ({})".format(val.__class__.__name__, val))
+            self._exception_diagnostic(ex, val)
             self.incomplete("Uncaught Exception: ({})".format(ex.__name__))
         test_end.send(self, time=datetime.now(timezone.utc))
         self._finalize()
@@ -168,8 +165,8 @@ class TestCase:
             self.initialize()
         except:  # noqa
             ex, val, tb = sys.exc_info()
-            self.diagnostic("{} ({})".format(ex.__name__, val))
             logging.exception_error("Error in TestCase.initialize", val)
+            self._exception_diagnostic(ex, val)
             if self._debug:
                 debugger.post_mortem(tb)
             raise TestSuiteAbort("Test initialization failed!") from val
@@ -184,11 +181,22 @@ class TestCase:
             self.finalize()
         except:  # noqa
             ex, val, tb = sys.exc_info()
-            self.diagnostic("{} ({})".format(ex.__name__, val))
             logging.exception_error("Error in TestCase.finalize", val)
+            self._exception_diagnostic(ex, val)
             if self._debug:
                 debugger.post_mortem(tb)
             raise TestSuiteAbort("Test finalize failed!") from val
+
+    def _exception_diagnostic(self, ex, val):
+        self.diagnostic("{} ({})".format(ex.__name__, val))
+        orig = val
+        while val.__context__ is not None:
+            val = val.__context__
+            self.diagnostic(" Within: {} ({})".format(type(val).__name__, val))
+        val = orig
+        while val.__cause__ is not None:
+            val = val.__cause__
+            self.diagnostic("   From: {} ({})".format(type(val).__name__, val))
 
     def manual(self):
         """Perform a purely manual test according to the instructions in the

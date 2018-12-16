@@ -33,9 +33,7 @@ class ConsoleIO:
         self.writelines = self.stdout.writelines
 
     def input(self, prompt=""):
-        self.write(prompt)
-        self.flush()
-        return self.readline().strip()
+        return input(prompt)
 
     def close(self):
         self.stdout = None

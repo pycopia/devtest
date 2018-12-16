@@ -148,12 +148,7 @@ class ShellInterface:
             if self.debug_framework:
                 debugger.post_mortem(tb)
             else:
-                print("Error loading: {}: {}".format(ex.__name__, val),
-                      file=sys.stderr)
-                while val.__cause__ is not None:
-                    val = val.__cause__
-                    print("Because: {}: {}".format(val.__class__.__name__, val),
-                          file=sys.stderr)
+                _print_exception(ex, val)
         if errlist:
             print("Warning: some modules could not be loaded:", file=sys.stderr)
             for errarg in errlist:
@@ -172,12 +167,7 @@ class ShellInterface:
                 if self.debug_framework:
                     debugger.post_mortem(tb)
                 else:
-                    print("Error: {}: {}".format(ex.__name__, val), file=sys.stderr)
-                    while val.__cause__ is not None:
-                        val = val.__cause__
-                        print("Because: {}: {}".format(val.__class__.__name__,
-                                                       val),
-                              file=sys.stderr)
+                    _print_exception(ex, val)
         else:
             print("Warning: nothing to run.", file=sys.stderr)
 
@@ -254,6 +244,18 @@ def pick_tests(argumentlist):
             break
         optset = options.OptionSet(sel)
         argumentlist.append(optset)
+
+
+def _print_exception(ex, val):
+    print("Error: {}: {}".format(ex.__name__, val), file=sys.stderr)
+    orig = val
+    while val.__context__ is not None:
+        val = val.__context__
+        print(" Within: {}: {}".format(val.__class__.__name__, val), file=sys.stderr)
+    val = orig
+    while val.__cause__ is not None:
+        val = val.__cause__
+        print("   From: {}: {}".format(val.__class__.__name__, val), file=sys.stderr)
 
 
 def _usage(err=None):

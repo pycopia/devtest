@@ -5,13 +5,8 @@ Custom REPL copied from code module and modified.
 import sys
 import readline
 import traceback
+import rlcompleter  # noqa
 from codeop import CommandCompiler
-
-try:
-    from jedi.utils import setup_readline
-    setup_readline()
-except ImportError:
-    import rlcompleter  # noqa
 
 from devtest.ui.simpleui import ConsoleIO
 from devtest.textutils import colors
@@ -19,12 +14,16 @@ from devtest.textutils import colors
 
 class InteractiveConsole:
 
-    def __init__(self, namespace=None, io=None, ps1="Python> ", ps2="more> ",
+    def __init__(self, namespace=None, io=None, ps1="Python> ", ps2="..more> ",
                  history=None):
         self._ns = namespace or globals()
         self._io = io or ConsoleIO()
         self.history = history
-        readline.parse_and_bind("tab: complete")
+        readline.set_history_length(1000)
+        if sys.platform == "darwin":
+            readline.parse_and_bind("^I rl_complete")
+        else:
+            readline.parse_and_bind("tab: complete")
         try:
             self.saveps1, self.saveps2 = sys.ps1, sys.ps2
         except AttributeError:
@@ -84,14 +83,20 @@ class InteractiveConsole:
         lines = traceback.format_exception_only(type, value)
         self._io.write(''.join(lines))
 
-    def print_exc(self, name, val):
-        self._io.write("{}: {}\n".format(colors.red(name), val))
-        if val.__cause__ is not None:
-            self.print_exc("Because: {}".format(val.__cause__.__class__.__name__), val.__cause__)
+    def print_exc(self, prefix, val):
+        self._io.write("{}{}: {}\n".format(prefix, colors.red(type(val).__name__), val))
+        orig = val
+        while val.__context__ is not None:
+            val = val.__context__
+            self.print_exc(" Within: ", val)
+        val = orig
+        while val.__cause__ is not None:
+            val = val.__cause__
+            self.print_exc(" From: ", val)
 
     def showtraceback(self):
         ex, val, tb = sys.exc_info()
-        self.print_exc(ex.__name__, val)
+        self.print_exc("", val)
         try:
             ss = traceback.extract_tb(tb)
             self._io.write("".join(ss.format()[2:]))
@@ -130,12 +135,8 @@ class InteractiveConsole:
         return more
 
 
-def _test(argv):
-    cons = InteractiveConsole()
-    cons.interact("A banner.")
-
-
 if __name__ == "__main__":
-    _test(sys.argv)
+    cons = InteractiveConsole()
+    cons.interact("Test REPL banner.")
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

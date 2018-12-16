@@ -172,9 +172,14 @@ def exception_warning(prefix, ex):
 
 def _format_exception(ex):
     s = ["{} ({})".format(ex.__class__.__name__, ex)]
+    orig = ex
+    while ex.__context__ is not None:
+        ex = ex.__context__
+        s.append(" Within: {} ({})".format(ex.__class__.__name__, ex))
+    ex = orig
     while ex.__cause__ is not None:
         ex = ex.__cause__
-        s.append("Because: {} ({})".format(ex.__class__.__name__, ex))
+        s.append(" From: {} ({})".format(ex.__class__.__name__, ex))
     return " | ".join(s)
 
 
