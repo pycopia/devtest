@@ -53,10 +53,13 @@ def autodebug(on=True):
 
 
 def DEBUG(*args, **kwargs):
-    """Can use this instead of 'print' when debugging. Prints to stderr.
+    """You can use this instead of 'print' when debugging. Prints to stderr.
+
+    Emits nothing if run in "optimized" mode.
     """
-    kwargs["file"] = sys.stderr
-    print("DEBUG", *args, **kwargs)
+    if __debug__:
+        kwargs["file"] = sys.stderr
+        print("DEBUG", *args, **kwargs)
 
 
 # Self test
