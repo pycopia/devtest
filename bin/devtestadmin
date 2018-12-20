@@ -1,7 +1,20 @@
 #!/usr/bin/env python3.6
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""CLI tool for managing the Devtest database.
 """
-CLI tool for managing the Devtest database.
-"""
+
 import sys
 import os
 import textwrap
@@ -443,9 +456,9 @@ def main(argv):
             layer = arguments["--layer"]
             type = arguments["--type"]
             notes = arguments["--notes"]
-            nw, created = controllers.NetworksController.create(name,
-                    ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
-                    type=type, notes=notes)
+            nw, created = controllers.NetworksController.create(
+                name, ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
+                type=type, notes=notes)
             if created:
                 print("Created.")
             else:
@@ -458,9 +471,9 @@ def main(argv):
             layer = arguments["--layer"]
             type = arguments["--type"]
             notes = arguments["--notes"]
-            nw = controllers.NetworksController.update(name,
-                    ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
-                    type=type, notes=notes)
+            nw = controllers.NetworksController.update(
+                name, ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
+                type=type, notes=notes)
         elif arguments["delete"]:
             name = arguments["<name>"]
             controllers.NetworksController.delete(name)
@@ -481,7 +494,7 @@ def main(argv):
                                                  name, arguments["<attrname>"])))
             elif arguments["del"]:
                 controllers.NetworksController.attribute_del(arguments["<name>"],
-                                                            arguments["<attrname>"])
+                                                             arguments["<attrname>"])
             elif arguments["export"]:
                 fname = arguments["<file>"]
                 attribs = controllers.NetworksController.attributes_export(name)
@@ -765,11 +778,15 @@ def list_networks(like, verbose):
 
 def show_network(nw, verbose):
     if nw.layer == 2 and nw.vlanid is not None:
-        print("{:>20.20s} vlan: {} type: {!s}".format(colors.white(nw.name, bold=True), nw.vlanid, nw.type))
+        print("{:>20.20s} vlan: {} type: {!s}".format(colors.white(nw.name, bold=True),
+                                                      nw.vlanid, nw.type))
     elif nw.layer == 3:
-        print("{:>20.20s} ip4: {}, ip6: {}, type: {!s}".format(colors.white(nw.name, bold=True), nw.ipnetwork, nw.ip6network, nw.type))
+        print("{:>20.20s} ip4: {}, ip6: {}, type: {!s}".format(colors.white(nw.name, bold=True),
+                                                               nw.ipnetwork, nw.ip6network,
+                                                               nw.type))
     else:
-        print("{:>20.20s} layer: {}, type: {!s}".format(colors.white(nw.name, bold=True), nw.layer, nw.type))
+        print("{:>20.20s} layer: {}, type: {!s}".format(colors.white(nw.name, bold=True),
+                                                        nw.layer, nw.type))
     if verbose:
         if nw.notes:
             print(colors.cyan("  Notes:"))
@@ -783,6 +800,7 @@ def show_network(nw, verbose):
         if nw.upper:
             print(colors.cyan("  Upper Layer:"))
             show_network(nw.upper, verbose)
+
 
 def show_scenario(scenario):
     print(colors.box(scenario.name))
