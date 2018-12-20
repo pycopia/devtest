@@ -1,5 +1,4 @@
-#!/usr/bin/env python3.5
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
+#!/usr/bin/env python3
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -102,3 +101,4 @@ class TestRingBuffer:
         r = rb.read(32)
         assert r == DATA
 
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
