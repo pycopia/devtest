@@ -13,6 +13,8 @@ abstractly and function properly in many testbed environments without change.
 This is a multi-device, multi-interface, multi-role framework. It man manage
 small scale testing, or large and complex test scenarios.
 
+NOTE: This is not an officially supported Google product
+
 
 ## Basic Installation
 
