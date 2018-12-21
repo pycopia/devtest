@@ -57,15 +57,15 @@ def delay_after(seconds):
     return _wrapper
 
 
-def iotimeout(function, timeout):
+def iotimeout(function, *args, timeout=5.0):
     def _timeout(sig, st):
-        raise TimeoutError("IO operation timed out for {!r}.".format(function))
+        raise TimeoutError("IO operation timed out for {!r}.".format(function.__name__))
 
     signal.siginterrupt(signal.SIGALRM, True)
     oldhandler = signal.signal(signal.SIGALRM, _timeout)
     signal.setitimer(signal.ITIMER_REAL, timeout, 0)
     try:
-        return function()
+        return function(*args)
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0, 0)
         signal.signal(signal.SIGALRM, oldhandler)
