@@ -69,7 +69,7 @@ class TestCase:
     Subclass this to define a new test. Define the ``procedure`` method in the
     subclass.  The test should test one specific thing. Optionally define the
     ``initialize`` and ``finalize`` methods.  Those are run before, and after
-    the ``procedure`` method.
+    the ``procedure`` method, respectively.
     """
     OPTIONS = None  # Class, or TestCase, options
     options = None  # loader may set instance options
@@ -91,6 +91,7 @@ class TestCase:
         if cls.OPTIONS is not None:
             return
         implementation = "{}.{}".format(cls.__module__, cls.__name__)
+        # Chop off "testcases." base package name for brevity.
         test_name = implementation.replace("testcases.", "")
         insert_options(cls, implementation=implementation, test_name=test_name)
         opts = cls.OPTIONS
@@ -521,6 +522,10 @@ class _TestEntry:
     """Helper class to run a TestCase with arguments at some later time.
 
     Also helps manage prerequisite matching and track test results.
+
+    Raises:
+        raises TestImplementationError if a disposition is attempted a second
+        time.
     """
     def __init__(self, inst, args=None, kwargs=None, autoadded=False):
         self.inst = inst
@@ -632,7 +637,7 @@ def repr_test(name, args, kwargs):
 
     Returns a TestCase instantiation plus arguments as text (repr).
     """
-    return "{}()({})".format(name, repr_args(args, kwargs))
+    return "{}(...)({})".format(name, repr_args(args, kwargs))
 
 
 def repr_args(args, kwargs):
@@ -795,8 +800,8 @@ class TestSuite:
     def add(self, klass, args=None, kwargs=None, name=None):
         """Add a Suite or a TestCase to this TestSuite.
 
-    Most general method to add test case classes or other test suites.
-    """
+        Most general method to add test case classes or other test suites.
+        """
         if type(klass) is type:
             if issubclass(klass, TestCase):
                 self.add_test(klass, args=args, kwargs=kwargs, name=name)
@@ -961,6 +966,13 @@ class TestSuite:
         pass
 
 
+class _ScenarioWarningTest(TestCase):
+
+    def procedure(self):
+        return self.incomplete('You should override the "get_suite" static method of '
+                               'your Scenario subclass.')
+
+
 class Scenario:
     """A Scenario is a runable object that dynamically creates a test suite.
     """
@@ -968,7 +980,14 @@ class Scenario:
 
     @staticmethod
     def get_suite(config, testbed, ui, suiteclass=TestSuite):
-        return suiteclass(config, testbed, name=suiteclass.__name__)
+        """A TestSuite factory function.
+
+        Override this in a subclass (as a staticmethod) and have it return some
+        populated TestSuite instance.
+        """
+        suite =  suiteclass(config, testbed=testbed, ui=ui, nested=0, name=None, doc=None)
+        suite.add_test(_ScenarioWarningTest)
+        return suite
 
     @classmethod
     def run(cls, config, testbed, ui):
