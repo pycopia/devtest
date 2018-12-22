@@ -20,10 +20,10 @@ NOTE: New protocol is not implemented yet.
 """
 
 import struct
-import json
 
 import portpicker
 
+from devtest import json
 from devtest.io import reactor
 from devtest.io import socket
 
@@ -40,29 +40,6 @@ class Error(Exception):
 
 class SL4AProtocolError(Error):
     pass
-
-
-class Encoder(json.JSONEncoder):
-    def __init__(self):
-        super(Encoder, self).__init__(ensure_ascii=False)
-
-
-class Decoder(json.JSONDecoder):
-    pass
-
-
-_json_decoder = Decoder()
-_json_encoder = Encoder()
-
-
-def loadb(data):
-    """Decode a bytes object into Python objects."""
-    return _json_decoder.decode(data.decode("utf-8"))
-
-
-def dumpb(obj):
-    """Encode a Python object into bytes."""
-    return _json_encoder.encode(obj).encode("utf-8")
 
 
 def counter():
@@ -128,11 +105,11 @@ class _OldSL4AProtocol:
         return resp
 
     async def _send(self, data):
-        return await self._stream.write(dumpb(data) + b'\n')
+        return await self._stream.write(json.dumpb(data) + b'\n')
 
     async def _receive(self):
         resp = await self._stream.readline()
-        return loadb(resp)
+        return json.loadb(resp)
 
     async def _rpc(self, methodname, args, kwargs):
         rpcid = next(self._counter)

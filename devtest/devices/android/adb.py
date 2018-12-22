@@ -24,7 +24,7 @@ from devtest.io import socket
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
-from devtest.io.reactor import get_kernel
+from devtest.io.reactor import get_kernel, spawn
 
 
 ADB = procutils.which("adb")
@@ -292,6 +292,17 @@ class AsyncAndroidDeviceClient:
                     name="{}@{}".format(name, self.serial.decode("ascii")),
                     returncode=rc)
                 )
+
+    async def start(self, cmdline, stdoutstream, stderrstream):
+        if isinstance(cmdline, list):
+            name = cmdline[0]
+            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
+        else:
+            name = cmdline.split()[0]
+        cmdline = cmdline.encode("utf8")
+        await _start_shell(self.serial, self._conn, False, cmdline)
+        sp = ShellProtocol(self._conn.socket)
+        return await spawn(sp.run(None, stdoutstream, stderrstream))
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like

@@ -22,6 +22,7 @@ from devtest import devices
 from devtest.core import exceptions
 from devtest.devices.android import adb
 from devtest.devices.android import sl4a
+from devtest.devices.android import snippets
 
 import uiautomator
 
@@ -39,6 +40,7 @@ class AndroidController(devices.Controller):
         adb: An adb.AndroidDeviceClient instance.
         uia: An uiautomator.Device instance.
         api: An sl4a.SL4AInterface instance.
+        snippets: An snippets.SnippetsInterface instance.
         properties: A dictionary of all Android property values (from getprop).
     """
 
@@ -49,6 +51,7 @@ class AndroidController(devices.Controller):
         self._adb = None
         self._uia = None
         self._api = None
+        self._snippets = None
 
 
     @property
@@ -76,6 +79,13 @@ class AndroidController(devices.Controller):
             self._api.connect()
         return self._api
 
+    @property
+    def snippets(self):
+        if self._snippets is None:
+            aadb = adb.AsyncAndroidDeviceClient(self._equipment["serno"])
+            self._snippets = snippets.SnippetsInterface(aadb, self._equipment["serno"])
+        return self._snippets
+
     def close(self):
         if self._api is not None:
             self._api.close()
@@ -85,6 +95,9 @@ class AndroidController(devices.Controller):
         if self._adb is not None:
             self._adb.close()
             self._adb = None
+        if self._snippets is not None:
+            self._snippets.close()
+            self._snippets = None
 
     @property
     def properties(self):
