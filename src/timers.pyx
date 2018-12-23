@@ -15,9 +15,7 @@
 
 
 from posix.unistd cimport close, read
-
-cdef extern from "Python.h":
-    int PyErr_CheckSignals()
+from cpython.exc cimport PyErr_CheckSignals
 
 
 cdef extern from "signal.h" nogil:
@@ -100,7 +98,9 @@ cdef inline void _set_timespec(timespec *ts, double n):
 
 def nanosleep(double delay):
     """Sleep for <delay> seconds, with nanosecond precision. Unlike
-    time.sleep(), signal handlers are run during this sleep."""
+    time.sleep(), signal handlers are run during this sleep.
+    If a signal handler raises an exception this will re-raise that exception.
+    """
     cdef timespec ts_delay
 
     _set_timespec(&ts_delay, delay)
