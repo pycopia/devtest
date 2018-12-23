@@ -422,7 +422,13 @@ class ProcessManager:
         # need a real list for loop since dict will be mutated.
         for pid in list(self._procs):
             proc = self._procs[pid]
-            if proc.status() == psutil.STATUS_ZOMBIE:
+            try:
+                sts = proc.status()
+            except psutil.NoSuchProcess:
+                del self._procs[pid]
+                logging.notice("SIGCHLD no such process: {}({})".format(proc.progname, proc.pid))
+                return
+            if sts == psutil.STATUS_ZOMBIE:
                 del self._procs[pid]
                 self._zombies[pid] = proc
                 es = proc.poll()

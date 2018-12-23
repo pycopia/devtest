@@ -86,6 +86,7 @@ cdef extern from "string.h":
 cdef extern from "errno.h":
     int errno
     enum:EINTR
+    enum:EAGAIN
 
 cdef extern double floor(double)
 cdef extern double fmod(double, double)
@@ -152,8 +153,8 @@ IF UNAME_SYSNAME == "Linux":
 
     def alarm(double delay):
         """Arrange for SIGALRM to arrive after the given number of seconds.
-    The argument may be floating point number for subsecond precision. Returns
-    the original value of the timer, as a float.
+        The argument may be floating point number for subsecond precision.
+        Returns the original value of the timer, as a float.
         """
         cdef itimerval new
         cdef itimerval old
@@ -163,7 +164,6 @@ IF UNAME_SYSNAME == "Linux":
         if setitimer(ITIMER_REAL, &new, &old) == -1:
             raise ItimerError("Could not set itimer for alarm")
         return _timeval2float(&old.it_value)
-
 
 
     cdef extern from "stdint.h":
@@ -180,12 +180,14 @@ IF UNAME_SYSNAME == "Linux":
         read returns the number of times timer has expired since last read. See
         timerfd_create(2) for more information.
         If nonblocking flag is true, the fd is made non-blocking.
+
+        Evaluates to True if timer is active.
         """
         cdef int _fd
 
         def __init__(self, int clockid=CLOCK_MONOTONIC, int nonblocking=0):
             cdef int fd = -1
-            fd = timerfd_create(clockid, TFD_CLOEXEC | TFD_NONBLOCK if nonblocking else 0)
+            fd = timerfd_create(clockid, TFD_CLOEXEC | (TFD_NONBLOCK if nonblocking else 0))
             if fd == -1:
                 raise OSError((errno, strerror(errno)))
             self._fd = fd
@@ -215,11 +217,12 @@ IF UNAME_SYSNAME == "Linux":
                 return self._fd == -1
 
         def settime(self, double expire, double interval=0.0, int absolute=0):
-            """settime(expire, interface, absolute=0)
-        Set time for initial timeout, and subsequent intervals. Set interval to
-        zero for one-shot timer. Set expire time to zero to disarm. The time is
-        absolute (unix time) if the absolute flag is true.
-        Returns current time value and interval at time of the call.
+            """settime(expire, interval, absolute=False)
+            
+            Set time for initial timeout, and subsequent intervals. Set interval
+            to zero for one-shot timer. Set expire time to zero to disarm. The
+            time is absolute (unix time) if the absolute flag is True.  Returns
+            current time value and interval at time of the call.
             """
             cdef itimerspec ts
             cdef itimerspec old
@@ -235,7 +238,7 @@ IF UNAME_SYSNAME == "Linux":
 
         def gettime(self):
             """gettime()
-        Returns tuple of (time until next expiration, interval).
+            Returns tuple of (time until next expiration, interval).
             """
             cdef itimerspec ts
             if timerfd_gettime(self._fd, &ts) == -1:
@@ -244,8 +247,11 @@ IF UNAME_SYSNAME == "Linux":
 
         def read(self, int amt=-1):
             """read(amt=-1)
-        Returns number of times timer has expired since last read.
-        The amt parameter is for file-like type compatibility, and is ignored."""
+            Returns number of times timer has expired since last read.
+            The amt parameter is for file-like type compatibility,
+            and is ignored.
+            Returns an integer.
+            """
             cdef uint64_t buf
             cdef int rv
             while 1:
@@ -254,9 +260,24 @@ IF UNAME_SYSNAME == "Linux":
                     return <unsigned long long> buf
                 elif rv == -1 and errno == EINTR:
                     PyErr_CheckSignals()
+                elif rv == -1 and errno == EAGAIN:
+                    raise BlockingIOError(strerror(errno))
                 else:
                     raise OSError((errno, strerror(errno)))
 
+        def stop(self):
+            """stop()
+            
+            Stop the timer. Same is setting timer to zero.
+            """
+            cdef itimerspec ts
+            cdef timespec ts_zero
+            ts_zero.tv_sec = 0L
+            ts_zero.tv_nsec = 0L
+            ts.it_value = ts_zero
+            ts.it_interval = ts_zero
+            if timerfd_settime(self._fd, 0, &ts, NULL) == -1:
+                raise OSError((errno, strerror(errno)))
 
 
     cdef class IntervalTimer:
@@ -342,5 +363,4 @@ IF UNAME_SYSNAME == "Linux":
 
         def getoverrun(self):
             return timer_getoverrun(self._timerid)
-
 

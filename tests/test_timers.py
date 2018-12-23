@@ -16,8 +16,10 @@
 """
 
 
+import sys
 import time
 import signal
+import selectors
 
 import pytest
 
@@ -68,6 +70,59 @@ def test_nanosleep_with_alarm():
     signal.signal(signal.SIGALRM, old)
     assert (stop - start) < 2.01 and (stop-start) > 1.999
     assert _signaled is True
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Only available on Linux")
+class TestFDTimer:
+
+    def test_create(self):
+        t = timers.FDTimer()
+        assert type(t) is timers.FDTimer
+        t.close()
+
+    def test_create_nonblocking(self):
+        t = timers.FDTimer(nonblocking=True)
+        assert type(t) is timers.FDTimer
+        t.close()
+
+    def test_create_realtime(self):
+        t = timers.FDTimer(clockid=timers.CLOCK_REALTIME)
+        assert type(t) is timers.FDTimer
+        t.close()
+
+    def test_oneshot(self):
+        t = timers.FDTimer(nonblocking=True)
+        start = time.time()
+        with selectors.DefaultSelector() as s:
+            rkey = s.register(t, selectors.EVENT_READ)
+            t.settime(2.0)
+            for key, ev in s.select():
+                assert key.fileobj.read() == 1
+        stop = time.time()
+        t.close()
+        assert rkey is key
+        assert (stop - start) < 2.01 and (stop-start) > 1.999
+
+    def test_stop(self):
+        t = timers.FDTimer(nonblocking=True)
+        start = time.time()
+        t.settime(2.0)
+        timers.nanosleep(1)
+        t.stop()
+        timers.nanosleep(2)
+        with pytest.raises(BlockingIOError):
+            t.read()
+        t.close()
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Only available on Linux")
+class TestIntervalTimer:
+
+    def test_create(self):
+        t = timers.IntervalTimer(signal.SIGALRM)
+        assert type(t) is timers.IntervalTimer
+        assert t.signo == signal.SIGALRM
+        assert t.clockid == timers.CLOCK_MONOTONIC
 
 
 
