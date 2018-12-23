@@ -130,10 +130,6 @@ class ControllerError(Exception):
     """Base class for controller related errors."""
 
 
-class TimeoutError(OSError):
-    """Unified timeout error."""
-
-
 # Errors in report objects
 class ReportError(Exception):
     pass
@@ -141,22 +137,6 @@ class ReportError(Exception):
 
 class ReportFindError(ReportError):
     """Can't find requested report."""
-
-
-if __name__ == '__main__':
-    try:
-        raise TestIncomplete("just testing incomplete")
-    except TestDisposition as tr:
-        print(tr)
-
-    try:
-        raise TestRunAbort("Testing TestRunAbort")
-    except TestDisposition as tr:
-        raise AssertionError("wrong exception caught.") from None
-    except AbortError as aberr:
-        print(aberr)
-    else:
-        raise AssertionError("Didn't get our exception")
 
 
 # Errors related to interfacing the shells
@@ -167,6 +147,22 @@ class ShellError(Exception):
 
 class ShellConnectionError(ShellError):
     """Could not make initial connection to a shell."""
+
+
+if __name__ == '__main__':
+    try:
+        raise TestIncomplete("just testing incomplete")
+    except TestDisposition as tr:
+        print(tr)
+
+    try:
+        raise TestRunAbort("Testing TestRunAbort")
+    except TestDisposition:
+        raise AssertionError("wrong exception caught.") from None
+    except AbortError as aberr:
+        print(aberr)
+    else:
+        raise AssertionError("Didn't get our exception")
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

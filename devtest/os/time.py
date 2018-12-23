@@ -23,7 +23,7 @@ from functools import wraps
 from devtest.io.reactor import get_kernel, sleep
 
 
-__all__ = ['delay', 'delay_before', 'delay_after']
+__all__ = ['delay', 'delay_before', 'delay_after', 'now', 'iotimeout']
 
 now = time.time
 
