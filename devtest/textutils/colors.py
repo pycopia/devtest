@@ -92,6 +92,8 @@ _BOXCHARS = {0: ['┏', '━', '┃', '┓', '┗', '┛'],
 
 
 def color(text, fg, bg=None, bold=False):
+    """Return a new text string with color codes added.
+    """
     try:
         c = _LT_FG_MAP[fg] if bold else _FG_MAP[fg]
         return c + _BG_MAP[bg] + text + RESET
@@ -118,6 +120,8 @@ def inverse(text):
 
 
 def box(text, level=0, color=GREY):
+    """Draw a unicide box-drawing character box with text in it.
+    """
     UL, hor, vert, UR, LL, LR = _BOXCHARS[level]
     tt = "{}{}{}".format(UL, hor * (len(text) + 2), UR)
     bt = "{}{}{}".format(LL, hor * (len(text) + 2), LR)

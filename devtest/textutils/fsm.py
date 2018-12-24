@@ -11,6 +11,8 @@
 # limitations under the License.
 """
 This module implements a generic finite state machine (FSM).
+
+Useful for parsers and protocols.
 """
 
 import re
@@ -153,5 +155,6 @@ class FiniteStateMachine:
             self.current_state = next_state
 
     def process_string(self, s):
+        """Feed a string of characters to be parsed."""
         for c in s:
             self.process(c)

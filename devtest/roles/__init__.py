@@ -11,7 +11,9 @@
 # limitations under the License.
 """
 Implementations of abstract role interfaces. Test cases can get objects from
-here via the testbed attribute.
+here via the testbed attribute. The `get_role` method queries the implementation
+field of an equipment, that should point to something in here. But it could be
+in another package.
 """
 
 from __future__ import generator_stop
@@ -21,6 +23,7 @@ from .. import importlib
 
 
 class BaseRole(metaclass=abc.ABCMeta):
+    """Base, abstract, role for equipment role controllers."""
     def __init__(self, equipment):
         self._equipment = equipment
         self.initialize()
@@ -36,6 +39,9 @@ class BaseRole(metaclass=abc.ABCMeta):
 
 
 class SoftwareRole(metaclass=abc.ABCMeta):
+    """Base, abstract, role for software objects.
+
+    Usually, this is an emulator of some kind."""
     def __init__(self, software):
         self._software = software
         self.initialize()
@@ -44,6 +50,9 @@ class SoftwareRole(metaclass=abc.ABCMeta):
         pass
 
     def finalize(self):
+        pass
+
+    def close(self):
         pass
 
 

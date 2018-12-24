@@ -11,6 +11,24 @@
 # limitations under the License.
 
 """Shell UI (command) for test framework.
+
+Collects options and arguments from the command line, then invokes the
+TestRunner with the selected runnable objects.
+
+Runnable objects are TestCase, Scenario, or module objects that have a `run`
+function or method.
+
+A simple, interactive picker can also be used to choose runnable objects and
+testbeds.
+
+The run callable should have the following signature.
+
+    run(config, testbed, UI)
+
+Where:
+    `config` is a nested config.ConfigDict object.
+    `testbed` is a db.testbeds.TestBedRuntime object.
+    `UI` is a devtest.ui.simpleui.SimpleUserInterface object.
 """
 
 import sys
@@ -28,7 +46,7 @@ from . import bases
 ModuleType = type(sys)
 
 
-USAGE = """devtester [options] [-c <configfile>]
+USAGE = r"""devtester [options] [-c <configfile>]
     [<globalconfig>...] [<testname> [<testconfig>]] ...
 
 Select and run tests or test suites from the command line.
@@ -58,7 +76,16 @@ Options:
 
 Example:
 
-  devtester -d --reportname=default --testbed=mytestbed --global1=globalarg testcases.mytest --mytestopt=arg
+  devtester -d --reportname=default --testbed=mytestbed --global1=globalarg \
+          testcases.mytest --mytestopt=arg
+
+That will run a test in debug mode (-d), select the report named "default",
+select the (pre-defined) test bed named "mytestbed", set global option "global1"
+to "globalarg, and select the testcase "testcases.mytest. That test will get its
+own option in the `options` attribute with key "mytestopt", and argument "arg".
+
+Use the `-l` option to print a list of runnable objects there are found when
+scanned.
 """  # noqa
 
 

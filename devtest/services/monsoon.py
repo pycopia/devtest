@@ -13,6 +13,11 @@
 # limitations under the License.
 
 """A service for using Monsoon current and voltage measuring device.
+
+Provides background capture during span of time the service is wanted.
+
+When no longer wanted the service_dontwant signal will return a finalized
+`measure.AveragePowerHandler` instance.
 """
 
 from devtest import logging

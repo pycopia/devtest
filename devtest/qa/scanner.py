@@ -10,8 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Objects for finding and managing test cases from the testcases base package
-namespace.
+"""Objects for finding test cases from a base package
+namespace. The default namespace package is called "testcases".
 """
 
 from __future__ import generator_stop
@@ -97,13 +97,15 @@ def _iter_module(mod, baseclass):
 
 
 def _test(argv):
+    spec = None
     for spec in iter_module_specs():
         print(spec)
-    print("name:", spec.name)
-    print("parent:", spec.parent)
-    print("origin:", spec.origin)
-    print("cached:", spec.cached)
-    print("has_location:", spec.has_location)
+    if spec is not None:
+        print("name:", spec.name)
+        print("parent:", spec.parent)
+        print("origin:", spec.origin)
+        print("cached:", spec.cached)
+        print("has_location:", spec.has_location)
 
     tc = None
     for tc in iter_all_runnables("testcases"):

@@ -67,6 +67,10 @@ def get_input(prompt="", default=None, input=input):
 
 
 def choose(somelist, defidx=0, prompt="choose", lines=LINES, columns=COLUMNS):
+    """Simple interactive chooser.
+
+    Choose an item from a list.
+    """
     return curses.wrapper(_choose, somelist, defidx, prompt, lines, columns)
 
 

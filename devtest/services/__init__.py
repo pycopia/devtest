@@ -12,6 +12,11 @@
 
 """Services that test cases may need are implemented here.
 
+Services are generall background activities that a test case, or the framework,
+my request via the "service_want" signal.
+
+The service gets the equipment runtime object to inspect.
+
 Scans for potential services in this subpackage and initializes
 them.
 """
@@ -43,13 +48,20 @@ def log_service_dontwant(equipment, service=None):
 
 
 class Service(abc.ABC):
-    """Base class for all services."""
+    """Base class for all services.
+
+    Service class in submodules inherit from this class.
+    """
 
     def provide_for(self, needer):
-        pass
+        """Provide the service for the needer (equipment).
+        """
+        raise NotImplementedError("provide_for must be implemented")
 
     def release_for(self, needer):
-        pass
+        """Release the service (service_dontwant signal) when no longer needed.
+        """
+        raise NotImplementedError("release_for must be implemented")
 
     def finalize(self):
         pass
@@ -61,6 +73,9 @@ class Service(abc.ABC):
 class ServiceManager:
     """Singleton service manager.
     Provides central dispatcher for service modules provided in this package.
+
+    Responsible for registering, unregistering, and handling the want, and
+    dontwant signals.
     """
     def __init__(self):
         self._servicemap = {}

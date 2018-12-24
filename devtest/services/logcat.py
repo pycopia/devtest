@@ -14,6 +14,8 @@
 
 """
 A logcat service for Android devices.
+
+Will write a logcat capture file to the logdir_location.
 """
 
 from devtest import logging

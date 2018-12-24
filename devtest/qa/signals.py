@@ -11,6 +11,9 @@
 # limitations under the License.
 
 """Collection of framework synchronous signals.
+
+Based on the blinker package. Most testing framework activity is handled by a
+simple publish-subscribe designed using these signals.
 """
 
 from blinker import Namespace
@@ -46,7 +49,6 @@ suite_summary = _signals.signal('suite-summary')
 
 # informational
 target_model = _signals.signal('target-model')
-target_train = _signals.signal('target-train')
 target_build = _signals.signal('target-build')
 logdir_location = _signals.signal('logdir-location')
 

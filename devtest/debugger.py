@@ -25,6 +25,11 @@ The debugger module should support the "post_mortem" interface.
 import sys
 import os
 
+# Reset excepthook to default. Some Linux distros put something there
+# that can interfere with this. They think they're being helpful, but
+# they are not.
+sys.excepthook = sys.__excepthook__
+
 
 class _MakeDebugger:
     def __getattr__(self, name):

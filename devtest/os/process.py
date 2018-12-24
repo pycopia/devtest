@@ -13,6 +13,10 @@
 """Asynchronous process spawner and manager.
 
 Manages all subprocesses and coprocesses.
+
+Also provides the primary object that represents a process, the Process object.
+It works with the asynchronous kernel. It also has additional process
+informational methods provided by psutil.
 """
 
 from __future__ import generator_stop
@@ -105,6 +109,11 @@ class PipeProcess(Process):
 
     @property
     def exitstatus(self):
+        """Return the "universal" ExitStatus object if this process has
+        terminated.
+
+        Returns None if process is still running.
+        """
         rc = self._popen._popen.returncode
         if rc is None:
             return None
@@ -185,15 +194,17 @@ CMD_PING = 3
 
 
 class CoProcess(Process):
-    """Main thread representation of coprocess server.
+    """Main thread representation of a coprocess server.
 
-    Contains both synchrnous and asychronous methods.
+    Contains both synchronous and asychronous methods.
     """
     def __init__(self, pid, conn):
         self._init(pid, _ignore_nsp=True)
         self._conn = conn
 
     def start(self, func, *args):
+        """Start a method or function in the coprocess.
+        """
         return get_kernel().run(self.astart, func, args)
 
     async def astart(self, func, args):
@@ -205,6 +216,8 @@ class CoProcess(Process):
             raise
 
     def poll(self):
+        """Wait on, and return the status of the coprocess.
+        """
         pid, sts = os.waitpid(self.pid, os.WNOHANG)
         if pid == self.pid:
             return sts
@@ -231,6 +244,7 @@ class CoProcess(Process):
         await self._conn.close()
 
     def ping(self):
+        """Verify server is running."""
         return get_kernel().run(self.aping)
 
     async def aping(self):
@@ -265,10 +279,13 @@ def _fork_coprocess(cwd):
 async def _coprocess_server_coro(conn):
     """This bit runs the coprocess server, waiting for commands.
 
-    The usual command will the CMD_CALL, sent by the CoProcess start method.
+    The usual command will be the CMD_CALL, sent by the CoProcess start method.
 
-    You can pass an function or method object. But since coroutines are not
+    You can pass any function or method object. But since coroutines are not
     pickle-able, you need a coroutine factory function to invoke one.
+
+    You can also pass code as a string. It will be compiled and executed in the
+    coprocess.
     """
     while True:
         msg = await conn.recv()
@@ -279,7 +296,7 @@ async def _coprocess_server_coro(conn):
                 local_ns = {"args": args}
                 global_ns = globals()
                 try:
-                    code = compile(func, "coprocess", "exec")
+                    code = compile(func, "<coprocess>", "exec")
                     exec(code, global_ns, local_ns)
                 except Exception as ex:  # noqa
                     await conn.send((False, ex))
@@ -343,6 +360,11 @@ def _restore_stderr(oldfd):
 
 class ProcessManager:
     """Starts and keeps track of subprocesses.
+
+    Every other part of the framework should use this, rather than creating a
+    subprocess object directly.
+
+    Use the get_manager() factory function to return the singleton.
     """
 
     def __init__(self):
@@ -389,6 +411,11 @@ class ProcessManager:
         return proc
 
     def coprocess(self, directory=None):
+        """Start a coprocess server.
+
+        Return a CoProcess object that is the manager for the coprocess.
+        Use the `start` method on that to actually run coprocess method.
+        """
         pid, conn = _fork_coprocess(directory)
         if pid == 0:  # child
             sys.excepthook = sys.__excepthook__
@@ -402,8 +429,8 @@ class ProcessManager:
             sys.stdout.flush()
             sys.stderr.flush()
             _close_stdin()
-            _redirect(1, "/tmp/devtest.stdout")
-            _redirect(2, "/tmp/devtest.stderr")
+            _redirect(1, "/tmp/devtest-coprocess-{}.stdout".format(os.getpid()))
+            _redirect(2, "/tmp/devtest-coprocess-{}.stderr".format(os.getpid()))
             try:
                 get_kernel().run(_coprocess_server_coro, conn)
             except KeyboardInterrupt:
@@ -418,7 +445,7 @@ class ProcessManager:
         logging.notice("ProcessManager: coprocess server with PID: {}".format(pid))
         return proc
 
-    def _sigchild(self, sig, stack):
+    def _sigchild(self, sig, frame):
         # need a real list for loop since dict will be mutated.
         for pid in list(self._procs):
             proc = self._procs[pid]
@@ -426,6 +453,7 @@ class ProcessManager:
                 sts = proc.status()
             except psutil.NoSuchProcess:
                 del self._procs[pid]
+                # Already waited on somewhere else...
                 logging.notice("SIGCHLD no such process: {}({})".format(proc.progname, proc.pid))
                 return
             if sts == psutil.STATUS_ZOMBIE:
@@ -437,21 +465,43 @@ class ProcessManager:
                 logging.notice("Exited: {}({}): {}".format(proc.progname, proc.pid, es))
 
     def run_exit_handlers(self):
+        """Run any exit handler.
+
+        If the start method was supplied an exit_handler, run it if the process
+        has exited. Run all available.
+        """
         while self._zombies:
             pid, proc = self._zombies.popitem()
-            if proc.exit_handler is not None:
+            if proc.exit_handler is not None and callable(proc.exit_handler):
                 proc.exit_handler(proc)
 
     def killall(self):
+        """Interrupt all managed subprocesses.
+
+        The SIGCHLD handler will handle reaping the exit status.
+        """
         while self._procs:
             pid, proc = self._procs.popitem()
             proc.interrupt()
 
     def run_command(self, cmd, timeout=None, input=None, directory=None):
+        """Take a command line argument and communicate with it.
+
+        Return the output, or raise an exception.
+
+        Arguments:
+            cmd : str or list
+            timeout : optional timeout. Command will be interrupted after this
+                      timeout.
+            input : str of input to send to command.
+            directory : optional directory to change to in subprocess.
+        """
         proc = self.start(cmd, directory=directory)
         return self.run_process(proc, timeout=timeout, input=input)
 
     def run_process(self, proc, timeout=None, input=None):
+        """Take a Process instance and communicate with it.
+        """
         coro = _run_proc(proc, input)
         if timeout:
             coro = timeout_after(float(timeout), coro)
@@ -461,6 +511,12 @@ class ProcessManager:
         return rv
 
     def call_command(self, cmd, directory=None):
+        """Run command, does not collect output.
+
+        Inherits main thread stdio.
+
+        Returns the command exit status.
+        """
         proc = self.start(cmd, stdin=None, stdout=None, stderr=None,
                           directory=directory)
         coro = _call_proc(proc)
@@ -502,6 +558,8 @@ _manager = None
 
 
 def get_manager():
+    """Get the process manager singleton.
+    """
     global _manager
     if _manager is None:
         _manager = ProcessManager()
@@ -510,6 +568,8 @@ def get_manager():
 
 
 def close_manager():
+    """Close the process manager.
+    """
     global _manager
     if _manager is not None:
         _manager.close()
@@ -518,6 +578,10 @@ def close_manager():
 
 
 async def start_and_delay(cmd, waittime, **kwargs):
+    """Start a command, then wait <waittime> seconds before returning.
+
+    Allows command some time to initialize before caller tries to use it.
+    """
     proc = get_manager().start(cmd, **kwargs)
     await sleep(waittime)
     return proc
@@ -528,9 +592,9 @@ def start_process(cmd, delaytime=1.0, **kwargs):
 
     Gives spawned process a chance to initialize.
     """
-    rv = get_kernel().run(start_and_delay(cmd, delaytime, **kwargs))
+    proc = get_kernel().run(start_and_delay(cmd, delaytime, **kwargs))
     get_manager().run_exit_handlers()
-    return rv
+    return proc
 
 
 def run_command(cmd, timeout=None, input=None, directory=None):
@@ -561,6 +625,9 @@ def run_coroutine(coro):
 
 
 async def kill_later(proc, waittime):
+    """Asynchronous method to unconditionally interrupt a process at a later
+    time.
+    """
     await sleep(waittime)
     proc.interrupt()
 

@@ -28,10 +28,10 @@ ModuleType = type(bases)
 
 
 class TestReporter:
-    """Runs test objects.
+    """Reports on test objects.
 
-    Handled running objects, initializing reports, testbeds, services, etc.
-    then runs tests and cleans up afterwards.
+    Similar to the test runner, except that it prints information about the test
+    case rather than running it.
     """
     def __init__(self, cfg):
         self.config = cfg
