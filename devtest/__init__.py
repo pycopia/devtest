@@ -9,7 +9,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Reset the except hook to something sane on some Linux distros.
-import sys
-sys.excepthook = sys.__excepthook__
