@@ -13,6 +13,7 @@
 """Helpers for creating and maintaining the database.
 """
 
+import sys
 import os
 import urllib.parse
 
@@ -29,15 +30,24 @@ _DBSCHEMES = {
 
 
 def create_db(url):
+    if sys.platform == 'linux':
+        prefix = 'sudo su -c "'
+        #         sudo su -c "createuser --help" postgres
+        postfix = '" postgres'
+    elif sys.platform == 'darwin':
+        prefix = ''  # assumes brew install
+        postfix = ''
+    else:
+        raise NotImplementedError("Platform not supported.")
     url = urllib.parse.urlparse(url)
     scheme = url.scheme
     if scheme.startswith("postgres"):
-        cmd = ('createuser --host {} --port {} '
-               '--createdb --no-superuser --no-createrole {}'.format(
-                   url.hostname, url.port or 5432, url.username))
+        cmd = ('{}createuser --host {} --port {} '
+               '--createdb --no-superuser --no-createrole {}{}'.format(
+                prefix, url.hostname, url.port or 5432, url.username, postfix))
         os.system(cmd)
-        cmd = ('createdb --host {} --port {} --owner {} --encoding utf-8 {}'.format(
-               url.hostname, url.port or 5432, url.username, url.path[1:]))
+        cmd = ('{}createdb --host {} --port {} --owner {} --encoding utf-8 {}{}'.format(
+               prefix, url.hostname, url.port or 5432, url.username, url.path[1:], postfix))
         os.system(cmd)
     elif scheme.startswith("sqlite"):
         import sqlite3
