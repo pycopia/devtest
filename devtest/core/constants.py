@@ -51,7 +51,7 @@ class TestResultType(Enum):
     Unknown = 0
     Test = 1
     TestSuite = 2
-    UseCase = 3
+    Scenario = 3
     TestRunSummary = 4
 
 

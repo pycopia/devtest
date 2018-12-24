@@ -756,6 +756,10 @@ def _show_equipment(eq):
         print(colors.cyan("  Network interfaces:"))
         for iface in eq.interfaces:
             print("    ", iface)
+    if eq.connections:
+        print(colors.cyan("  Connections:"))
+        for connection in eq.connections:
+            print("    ", connection)
 
 
 def list_equipment(like, verbose):

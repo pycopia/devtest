@@ -215,9 +215,10 @@ class Equipment(BaseModel):
 
     def remove_connection(self, other, connection_type=None):
         with database.atomic():
-            q = self.connections.where(_Connection.source == self & _Connection.destination == other)
+            q = self.connections.where(_Connection.source == self &
+                                       _Connection.destination == other)
             if connection_type is not None:
-                q =q.where(_Connection.type == connection_type)
+                q = q.where(_Connection.type == connection_type)
             conn = q.get()
             conn.delete_instance()
 
@@ -498,6 +499,10 @@ class _Connection(BaseModel):
 
     class Meta:
         table_name = 'connections'
+
+    def __str__(self):
+        return "{} <-<{}>-> {}".format(self.source.name, self.type.name,
+                                       self.destination.name)
 
 
 class Networks(BaseModel):

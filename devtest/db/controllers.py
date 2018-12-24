@@ -309,7 +309,7 @@ class EquipmentController(Controller):
     @staticmethod
     def add_connection(name, othername, conntype, modelname=None,
                        othermodelname=None):
-        conntype = EquipmentController.CONNECTION_TYPES.get(conntype, conntype)
+        conntype = EquipmentController.CONNECTION_TYPES.get(conntype.lower(), conntype)
         eq = EquipmentController.get(name, modelname)
         if eq:
             other = EquipmentController.get(othername, othermodelname)

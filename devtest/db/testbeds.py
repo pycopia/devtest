@@ -27,6 +27,12 @@ from devtest.core.exceptions import ConfigError
 
 
 class TestBedRuntime:
+    """Runtime container of a Testbed.
+
+    Contains factory functions for roles.
+
+    Provides a mapping interface to the attributes defined in the database.
+    """
     def __init__(self, testbedrow, debug=False):
         self._testbed = testbedrow
         self._debug = debug
@@ -68,6 +74,8 @@ class TestBedRuntime:
 
     @property
     def DUT(self):
+        """Convenience property for accessing the Equipment defined as the DUT.
+        """
         try:
             return self._eqcache["DUT"]
         except KeyError:
@@ -87,6 +95,9 @@ class TestBedRuntime:
         return sut
 
     def get_role(self, rolename):
+        """Feth the first equipment in the testbed that provides the role with
+        the supplied name.
+        """
         try:
             return self._eqcache[rolename]
         except KeyError:
@@ -98,6 +109,8 @@ class TestBedRuntime:
 
     @property
     def supported_roles(self):
+        """Roles supported by this testbed.
+        """
         return self._testbed.get_supported_roles()
 
     def finalize(self):
@@ -108,6 +121,7 @@ class TestBedRuntime:
     # Allow persistent storage of  state in the state attribute.
     @property
     def state(self):
+        """User-defined state attribute."""
         return self._testbed.attributes["state"]
 
     @state.setter
@@ -120,6 +134,8 @@ class TestBedRuntime:
 
 
 class EquipmentModelRuntime:
+    """Runtime wrapper for equipment models.
+    """
     def __init__(self, equipmentmodel):
         d = {}
         d["name"] = equipmentmodel.name
@@ -148,7 +164,12 @@ class EquipmentModelRuntime:
 
 
 class EquipmentRuntime:
-    """Runtime container of data about a device in a testbed."""
+    """Runtime container of information about a device in a testbed.
+
+    Contains the constructor methods for device controller, and others.
+    
+    Provides a mapping interface to the attributes defined in the database.
+    """
 
     def __init__(self, equipmentrow, rolename, debug=False):
         self.name = equipmentrow.name
@@ -259,6 +280,8 @@ class EquipmentRuntime:
     @property
     def parent(self):
         """The device that this device is contained in.
+
+        Returns None if this is not part of another equipment.
         """
         if self._parent is None:
             eq = self._equipment.partof
@@ -298,7 +321,11 @@ class EquipmentRuntime:
 
     @property
     def initializer(self):
-        """The initializing controller defined for this equipment."""
+        """The initializing controller defined for this equipment.
+        
+        Usually a special controller to "bootstrap" a device so that the main
+        controller can function.
+        """
         if self._initializer is None:
             iobjname = self._attributes.get(
                 "initializer", self.model._attributes.get("initializer"))
@@ -329,6 +356,11 @@ class EquipmentRuntime:
                 logging.exception_warning("initializer close", ex)
 
     def get_console(self):
+        """Fetch any console controller.
+        
+        A console is another kind of controller that provides console access to
+        a device, if it defines one. Usually a serial port.
+        """
         if self._console is None:
             console_config = self._attributes.get("console")
             if console_config is None:
@@ -341,6 +373,10 @@ class EquipmentRuntime:
 
     @property
     def console(self):
+        """Console access to device.
+
+        Often a serial port or port concentrator.
+        """
         try:
             return self.get_console()
         except:  # noqa
@@ -379,13 +415,17 @@ class EquipmentRuntime:
 
     @property
     def components(self):
+        """Other equipment defined as components of this one.
+        """
         role = self._attributes["role"]
         return [EquipmentRuntime(eq, role) for eq in self._equipment.subcomponents]
 
     def service_want(self, name):
+        """Request a service from the services modules."""
         return signals.service_want.send(self, service=name)
 
     def service_dontwant(self, name):
+        """Relinquish a service from the services modules."""
         responses = signals.service_dontwant.send(self, service=name)
         for handler, rv in responses:
             if rv is not None:
@@ -393,7 +433,7 @@ class EquipmentRuntime:
 
 
 class SoftwareRuntime:
-    """Runtime container of data about software defined in the testbed."""
+    """Runtime container of information about software defined in the testbed."""
     def __init__(self, softwarerow, rolename):
         self._software = softwarerow
         self._controller = None
@@ -454,6 +494,11 @@ def _get_software_instance(softwarert):
 
 
 def get_testbed(name, storageurl=None, debug=False):
+    """Entry point for Testbed, container of the device tree.
+
+    Returns:
+        TestBedRuntime initialized from the testbed in the database.
+    """
     models.connect(storageurl)
     try:
         testbed = models.TestBed.select().where(
