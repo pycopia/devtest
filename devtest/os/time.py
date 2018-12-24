@@ -111,5 +111,13 @@ if __name__ == "__main__":
     se = now()
     assert math.isclose(se - st, 4.0, rel_tol=0.01)
 
+    def ioop():
+        with open("/dev/random", "rb") as fo:
+            fo.read(65536)
+
+    try:
+        iotimeout(ioop, timeout=5.0)
+    except TimeoutError as to:
+        print("got expected timeout:", to)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8
