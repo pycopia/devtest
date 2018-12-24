@@ -150,7 +150,7 @@ class Terminal:
             self._read()
 
     def _read(self):
-        inp = time.iotimeout(partial(self._fo.read, 4096), self._timeout)
+        inp = time.iotimeout(partial(self._fo.read, 4096), timeout=self._timeout)
         self._fsm.process_string(inp)
 
     def read_until(self, substr):
