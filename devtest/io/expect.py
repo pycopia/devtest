@@ -38,7 +38,7 @@ class Expect:
     """A wrapper for a file-like object that provides Expect functionality on
     top of it.
 
-    The send and expect methods work with text (latin1 encoded). The read/write
+    The send and expect methods work with text (utf-8 encoded). The read/write
     methods work with bytes. The underlaying file-like object should have a
     bytes interface.
 
@@ -95,7 +95,7 @@ class Expect:
             searchlist = []
         ptype = type(patt)
         if ptype is str:
-            searchlist.append(self._get_re(patt.encode("latin1"), mtype, callback))
+            searchlist.append(self._get_re(patt.encode("utf-8"), mtype, callback))
         elif ptype is bytes:
             searchlist.append(self._get_re(patt, mtype, callback))
         elif ptype is tuple:
@@ -107,14 +107,14 @@ class Expect:
                 self._get_search_list(p, mtype, callback, searchlist)
         return searchlist
 
-    def send(self, text, timeout=None):
+    def send(self, text, timeout=None, encoding="utf-8"):
         timeout = timeout or self.default_timeout
-        return time.iotimeout(partial(self._fo.write, text.encode("latin1")),
-                              timeout)
+        return time.iotimeout(partial(self._fo.write, text.encode(encoding)),
+                                      timeout=timeout)
 
-    def send_slow(self, data):
+    def send_slow(self, data, encoding="utf-8"):
         if isinstance(data, str):
-            data = data.encode("latin1")
+            data = data.encode(encoding)
         for c in data:
             self._fo.write(bytes([c]))
             time.delay(0.1)
@@ -131,18 +131,18 @@ class Expect:
         searchlist = self._get_search_list(patt, mtype, callback)
         if not searchlist:
             raise ExpectError("Empty expect search.")
-        time.iotimeout(self._fill_buf, timeout)
+        time.iotimeout(self._fill_buf, timeout=timeout)
         matchbuf = bytes()
         while 1:
             c = self._inbuf.read(1)
             if not c:
-                time.iotimeout(self._fill_buf, timeout)
+                time.iotimeout(self._fill_buf, timeout=timeout)
                 continue
             matchbuf += c
             for index, (so, cb) in enumerate(searchlist):
                 mo = so.search(matchbuf)
                 if mo:
-                    mo.string = mo.string.decode("latin1")
+                    mo.string = mo.string.decode("utf-8")
                     if cb is not None:
                         cb(mo)
                     return mo, index
@@ -169,7 +169,7 @@ class Expect:
         timeout = timeout or self.default_timeout
         if len(self._inbuf) > 0:
             return self._inbuf.read(amt)
-        return time.iotimeout(partial(self._fo.read, amt), timeout)
+        return time.iotimeout(partial(self._fo.read, amt), timeout=timeout)
 
     def write(self, data):
         return self._fo.write(data)
@@ -186,7 +186,7 @@ class Expect:
             else:
                 return bd + self._fo.readline()
         else:
-            return time.iotimeout(self._fo.readline, timeout)
+            return time.iotimeout(self._fo.readline, timeout=timeout)
 
     def readlines(self):
         for line in self._fo.readlines():
@@ -237,12 +237,39 @@ class TimeoutMatchObject:
         return True
 
 
+class UnifiedIO:
+    """Combine stdin and stdout into one object.
+    """
+    def __init__(self, stdin, stdout):
+        self._fd = stdout.fileno()
+        self.write = stdout.write
+        self.writelines = stdout.writelines
+        self.read = stdin.read
+        self.readline = stdin.readline
+        self.readlines = stdin.readlines
+        self.flush = stdout.flush
+
+    def fileno(self):
+        return self._fd
+
+    def close(self):
+        self._fd = -1
+        self.write = None
+        self.writelines = None
+        self.read = None
+        self.readline = None
+        self.readlines = None
+        self.flush = None
+
+
 def _test(argv):
-    from devtest.os import process
+    import subprocess
     from devtest.textutils.stringmatch import StringMatchObject
     # With process
-    proc = process.start_process(["/bin/cat", "-u", "-"])
-    exp = Expect(proc)
+    proc = subprocess.Popen(["/bin/cat", "-u", "-"], bufsize=0,
+                            stdout=subprocess.PIPE,
+                            stdin=subprocess.PIPE)
+    exp = Expect(UnifiedIO(proc.stdout, proc.stdin))
     exp.send("echo me\n")
     mo, index = exp.expect("echo")
     if mo:
@@ -262,17 +289,24 @@ def _test(argv):
         raise AssertionError("Did not see expected response.")
 
     exp.close()
-
-    proc = process.start_process(["/bin/sleep", "30"])
-    exp = Expect(proc)
+    proc.terminate()
+    proc.wait()
+    
+    # Test timeouts
+    proc = subprocess.Popen(["/bin/sleep", "30"],
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE)
+    exp = Expect(UnifiedIO(proc.stdout, proc.stdin))
     try:
-        exp.expect(["zzz", TimeoutMatch(3.0)], timeout=5.0)
-    except TimeoutError:
-        pass
+        exp.expect(["zzz", TimeoutMatch(3.0)], timeout=2.0)
+    except TimeoutError as to:
+        print("Got expected timeout:", to)
     else:
         exp.close()
         raise AssertionError("Did not see expected TimeoutError.")
     exp.close()
+    proc.terminate()
+    proc.wait()
 
 
 if __name__ == "__main__":
