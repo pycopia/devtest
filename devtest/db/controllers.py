@@ -130,18 +130,24 @@ class TestBedController(Controller):
         inst = TestBedController.get(name)
         if inst:
             return inst.attribute_get(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_set(name, attrname, attrvalue):
         inst = TestBedController.get(name)
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_del(name, attrname):
         inst = TestBedController.get(name)
         if inst:
             return inst.attribute_del(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attributes_export(testbedname):
@@ -262,18 +268,24 @@ class EquipmentController(Controller):
         inst = EquipmentController.get(name)
         if inst:
             return inst.attribute_get(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_set(name, attrname, attrvalue):
         inst = EquipmentController.get(name)
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_del(name, attrname):
         inst = EquipmentController.get(name)
         if inst:
             return inst.attribute_del(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attributes_export(name, modelname=None):
@@ -384,7 +396,10 @@ class EquipmentModelController(Controller):
     @staticmethod
     def attribute_get(modelname, attrname, manufacturer="Acme Inc."):
         inst = EquipmentModelController.get(modelname, manufacturer)
-        return inst.attribute_get(attrname)
+        if inst:
+            return inst.attribute_get(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_list(modelname, manufacturer="Acme Inc."):
@@ -397,12 +412,16 @@ class EquipmentModelController(Controller):
         inst = EquipmentModelController.get(modelname, manufacturer)
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_del(modelname, attrname, manufacturer="Acme Inc."):
         inst = EquipmentModelController.get(modelname, manufacturer)
         if inst:
             return inst.attribute_del(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attributes_export(modelname, manufacturer="Acme Inc."):
@@ -494,7 +513,10 @@ class NetworksController(Controller):
     @staticmethod
     def attribute_get(netname, attrname):
         inst = NetworksController.get(netname)
-        return inst.attribute_get(attrname)
+        if inst:
+            return inst.attribute_get(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_list(netname):
@@ -507,12 +529,16 @@ class NetworksController(Controller):
         inst = NetworksController.get(netname)
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
+        else:
+            print(inst)
 
     @staticmethod
     def attribute_del(netname, attrname):
         inst = NetworksController.get(netname)
         if inst:
             return inst.attribute_del(attrname)
+        else:
+            print(inst)
 
     @staticmethod
     def attributes_export(netname):
