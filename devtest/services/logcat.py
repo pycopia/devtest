@@ -66,7 +66,7 @@ def make_logcat_coroutine(serialno, logdir):
         try:
             signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
             try:
-                with open(logfilename, "wb", 0) as logfile:
+                with open(logfilename, "ab", 0) as logfile:
                     task = await spawn(aadc.logcat(logfile, logfile))
                     await signalset.wait()
                     await task.cancel()
