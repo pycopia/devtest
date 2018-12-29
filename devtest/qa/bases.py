@@ -734,8 +734,6 @@ class TestSuite:
             args = ()
         if kwargs is None:
             kwargs = {}
-        if _testclass.options:
-            kwargs.update(_testclass.options)
         for i in range(_testclass.OPTIONS.repeat):
             testinstance = _testclass(self.config, self.testbed, self.UI, name=name)
             entry = _TestEntry(testinstance, args, kwargs, False)
