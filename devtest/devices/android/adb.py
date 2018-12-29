@@ -322,6 +322,8 @@ class _AsyncAndroidDeviceClient:
             DeviceProcess with active connection.
         """
         cmdline, name = _fix_command_line(cmdline)
+        sock = await _start_exec(self.serial, self._conn, cmdline)
+        return DeviceProcess(sock)
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
@@ -407,8 +409,27 @@ class AndroidDeviceClient:
 
 
 class DeviceProcess:
-    def __init__(self, socket):
-        pass
+    def __init__(self, asocket):
+        self.socket = asocket
+
+    async def copy_to(self, otherfile):
+        while True:
+            data = await self.socket.recv(4096)
+            if not data:
+                break
+            await otherfile.write(data)
+
+    async def copy_from(self, otherfile):
+        while True:
+            data = await otherfile.read(65536)
+            if not data:
+                break
+            await self.socket.sendall(data)
+
+    async def close(self):
+        if self.socket is not None:
+            await self.socket.close()
+            self.socket = None
 
 
 def _fix_command_line(cmdline):
@@ -435,6 +456,17 @@ async def _start_shell(serial, conn, usepty, cmdline):
     await conn.open()
     await conn.message(tpmsg, expect_response=False)
     await conn.message(msg, expect_response=False)
+
+
+async def _start_exec(serial, conn, cmdline):
+    tpmsg = b"host:transport:%b" % serial
+    msg = b"exec:%b" % (cmdline,)
+    await conn.open()
+    await conn.message(tpmsg, expect_response=False)
+    await conn.message(msg, expect_response=False)
+    sock = conn.socket.dup()
+    await conn.close()
+    return sock
 
 
 # Send command to specific device with orderly shutdown
