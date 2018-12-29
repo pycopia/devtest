@@ -21,6 +21,7 @@ import struct
 
 from devtest import ringbuffer
 from devtest.io import socket
+from devtest.io import streams
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
@@ -323,7 +324,42 @@ class _AsyncAndroidDeviceClient:
         """
         cmdline, name = _fix_command_line(cmdline)
         sock = await _start_exec(self.serial, self._conn, cmdline)
-        return DeviceProcess(sock)
+        return DeviceProcess(sock, name)
+
+    async def install(self, apkfile, allow_test=True, installer=None,
+                      onsdcard=False, onflash=False, allow_downgrade=True,
+                      grant_all=True):
+        """Install an APK.
+
+        Performs a streaming installation.  Returns True if Success.
+        """
+        # TODO(dart) other options
+        st = os.stat(apkfile)  # TODO(dart) fix potential long blocker
+
+        cmdline = ["cmd", "package", "install"]
+        if allow_test:
+            cmdline.append("-t")
+        if installer is not None:
+            cmdline.extend(["-i", str(installer)])
+        if onsdcard:
+            cmdline.append("-s")
+        if onflash:
+            cmdline.append("-f")
+        if allow_downgrade:
+            cmdline.append("-d")
+        if grant_all:
+            cmdline.append("-g")
+        cmdline.extend(["-S", str(st.st_size)])
+        cmdline, name = _fix_command_line(cmdline)
+        sock = await _start_exec(self.serial, self._conn, cmdline)
+        p = DeviceProcess(sock, name)
+        del sock
+        async with streams.aopen(apkfile, "rb") as afo:
+            await p.copy_from(afo)
+        status_response = await p.read(4096)
+        await p.close()
+        return b'Success' in status_response
+    # TODO(dart) install sessions
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
@@ -333,7 +369,7 @@ class _AsyncAndroidDeviceClient:
         logtags = logtags.replace('"', '\\"')
         longopt = "-v long" if longform else ""
         cmdline = 'export ANDROID_LOG_TAGS="{}"; exec logcat {}'.format(logtags,
-                                                                    longopt)
+                                                                        longopt)
         cmdline = cmdline.encode("utf8")
         await _start_shell(self.serial, self._conn, False, cmdline)
         sp = ShellProtocol(self._conn.socket)
@@ -401,6 +437,15 @@ class AndroidDeviceClient:
         """
         return get_kernel().run(self._aadb.command(cmdline, usepty))
 
+    def install(self, apkfile, **kwargs):
+        """Install an APK.
+
+        Default flags are best for testing, but you can override. See asyn
+        method.
+        """
+        coro = self._aadb.install(apkfile, **kwargs)
+        return get_kernel().run(coro)
+
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
@@ -409,22 +454,36 @@ class AndroidDeviceClient:
 
 
 class DeviceProcess:
-    def __init__(self, asocket):
+    """Represents an attached process on the device.
+    """
+    def __init__(self, asocket, name):
         self.socket = asocket
+        self.name = name
+
+    def __str__(self):
+        return "DeviceProcess running {!r}".format(self.name)
 
     async def copy_to(self, otherfile):
+        """Copy output from this process to another file stream."""
         while True:
-            data = await self.socket.recv(4096)
+            data = await self.socket.recv(MAX_PAYLOAD)
             if not data:
                 break
             await otherfile.write(data)
 
     async def copy_from(self, otherfile):
+        """Copy output from another file stream to this process."""
         while True:
-            data = await otherfile.read(65536)
+            data = await otherfile.read(MAX_PAYLOAD)
             if not data:
                 break
             await self.socket.sendall(data)
+
+    async def read(self, amt):
+        return await self.socket.recv(amt)
+
+    async def write(self, data):
+        return await self.socket.sendall(data)
 
     async def close(self):
         if self.socket is not None:
@@ -477,6 +536,7 @@ async def _connect_command(serial, conn, msg):
     await conn.message(msg, expect_response=False)
     await conn.close()
 
+
 # Root command transaction is special since device adbd restarts.
 async def _special_command(serial, conn, cmd):
     tpmsg = b"host:transport:%b" % serial
@@ -486,7 +546,6 @@ async def _special_command(serial, conn, cmd):
     resp = await conn.socket.recv(4096)
     await conn.close()
     return resp
-
 
 
 class ShellProtocol:
@@ -558,7 +617,7 @@ def _device_factory(line):
 if __name__ == "__main__":
     import sys
     import signal
-    from devtest.io.reactor import SignalEvent, spawn
+    from devtest.io.reactor import SignalEvent
     from devtest import debugger
     debugger.autodebug()
     start_server()

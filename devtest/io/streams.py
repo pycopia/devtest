@@ -20,6 +20,7 @@ from __future__ import generator_stop
 
 from curio.io import _Fd, StreamBase, FileStream, SocketStream, Socket  # noqa
 from curio.channel import Connection, Channel
+from curio.file import aopen, AsyncFile
 
 
 def _test(argv):
