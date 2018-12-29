@@ -52,6 +52,13 @@ def post_mortem(tb=None):
     debugger.post_mortem(tb)
 
 
+def from_exception(exc):
+    if hasattr(debugger, "from_exception"):
+        debugger.from_exception(exc)
+    else:
+        debugger.post_mortem(exc.__traceback__)
+
+
 def debugger_hook(exc, value, tb):
     if (not hasattr(sys.stderr, "isatty") or
         not sys.stderr.isatty() or exc in (SyntaxError,
@@ -60,7 +67,7 @@ def debugger_hook(exc, value, tb):
         sys.__excepthook__(exc, value, tb)
     else:
         DEBUG("Uncaught exception:", exc.__name__, ":", value)
-        post_mortem(tb)
+        from_exception(value)
 
 
 def autodebug(on=True):
