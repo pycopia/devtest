@@ -189,7 +189,20 @@ class AdbClient:
         return int(resp, 16)
 
 
-class AsyncAndroidDeviceClient:
+def getAsyncAndroidDeviceClient(serial, host="localhost", port=ADB_PORT):
+    """Get initialized _AsyncAndroidDeviceClient object from sync code.
+    """
+    return get_kernel().run(AsyncAndroidDeviceClient(serial, host, port))
+
+
+async def AsyncAndroidDeviceClient(serial, host="localhost", port=ADB_PORT):
+    """Get initialized _AsyncAndroidDeviceClient instance from async code."""
+    ac = _AsyncAndroidDeviceClient(serial, host, port)
+    await ac._init()
+    return ac
+
+
+class _AsyncAndroidDeviceClient:
     """An active adb client per device.
 
     For device specific operations.
@@ -198,10 +211,13 @@ class AsyncAndroidDeviceClient:
     def __init__(self, serial, host="localhost", port=ADB_PORT):
         self.serial = serial.encode("ascii")
         self._conn = AdbConnection(host=host, port=port)
-        self.features = None
+
+    async def _init(self):
+        await self._conn.open()
+        await self.get_features()
 
     async def _message(self, msg):
-        if self._conn is None:
+        if not self._conn.isopen():
             raise Error("Operation on a closed device client.")
         return await _transact(self._conn, msg)
 
@@ -212,9 +228,10 @@ class AsyncAndroidDeviceClient:
         return self.features
 
     async def close(self):
-        if self._conn is not None:
-            await self._conn.close()
-            self._conn = None
+        await self._conn.close()
+
+    async def open(self):
+        await self._conn.open()
 
     async def get_state(self):
         msg = b"host-serial:%b:get-state" % (self.serial,)
@@ -270,12 +287,7 @@ class AsyncAndroidDeviceClient:
             await self.get_features()
         if "shell_v2" not in self.features:
             raise AdbCommandFail("Only shell v2 protocol currently supported.")
-        if isinstance(cmdline, list):
-            name = cmdline[0]
-            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
-        else:
-            name = cmdline.split()[0]
-        cmdline = cmdline.encode("utf8")
+        cmdline, name = _fix_command_line(cmdline)
         await _start_shell(self.serial, self._conn, usepty, cmdline)
         sp = ShellProtocol(self._conn.socket)
         stdout = ringbuffer.RingBuffer(MAX_PAYLOAD)
@@ -294,15 +306,22 @@ class AsyncAndroidDeviceClient:
                 )
 
     async def start(self, cmdline, stdoutstream, stderrstream):
-        if isinstance(cmdline, list):
-            name = cmdline[0]
-            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
-        else:
-            name = cmdline.split()[0]
-        cmdline = cmdline.encode("utf8")
+        """Start a process on device with the shell protocol.
+
+        Returns a curio Task object wrapping the ShellProtocol run.
+        """
+        cmdline, name = _fix_command_line(cmdline)
         await _start_shell(self.serial, self._conn, False, cmdline)
         sp = ShellProtocol(self._conn.socket)
         return await spawn(sp.run(None, stdoutstream, stderrstream))
+
+    async def spawn(self, cmdline):
+        """Start a process on device in raw mode.
+
+        Return:
+            DeviceProcess with active connection.
+        """
+        cmdline, name = _fix_command_line(cmdline)
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
@@ -322,68 +341,50 @@ class AsyncAndroidDeviceClient:
 class AndroidDeviceClient:
     """An active adb client per device.
 
-    For device specific operations.
+    For synchronous (blocking) style code.
     """
     def __init__(self, serial, host="localhost", port=ADB_PORT):
-        self.serial = serial.encode("ascii")
-        self._conn = AdbConnection(host=host, port=port)
+        self._aadb = _AsyncAndroidDeviceClient(serial, host, port)
+        self.open()
         self.features = self.get_features()
 
     def close(self):
-        if self._conn is not None:
-            get_kernel().run(self._conn.close())
-            self._conn = None
+        get_kernel().run(self._aadb.close())
 
-    def _message(self, msg):
-        if self._conn is None:
-            raise Error("Operation on a closed device client.")
-        return get_kernel().run(_transact(self._conn, msg))
-
-    def get_state(self):
-        msg = b"host-serial:%b:get-state" % (self.serial,)
-        resp = self._message(msg)
-        return resp.decode("ascii")
-
-    def reboot(self):
-        get_kernel().run(_connect_command(self.serial, self._conn, b"reboot:"))
-
-    def remount(self):
-        resp = get_kernel().run(_special_command(self.serial, self._conn,
-                                                 b"remount:"))
-        return resp.decode("ascii")
-
-    def root(self):
-        resp = get_kernel().run(_special_command(self.serial, self._conn,
-                                                 b"root:"))
-        return resp.decode("ascii")
+    def open(self):
+        get_kernel().run(self._aadb.open())
 
     def get_features(self):
-        msg = b"host-serial:%b:features" % (self.serial,)
-        resp = self._message(msg)
-        return resp.decode("ascii")
+        return get_kernel().run(self._aadb.get_features())
+
+    def get_state(self):
+        return get_kernel().run(self._aadb.get_state())
+
+    def reboot(self):
+        return get_kernel().run(self._aadb.reboot())
+
+    def remount(self):
+        return get_kernel().run(self._aadb.remount())
+
+    def root(self):
+        return get_kernel().run(self._aadb.root())
 
     def forward(self, hostport, devport):
         """Tell server to start forwarding TCP ports.
         """
-        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (self.serial,
-                                                         hostport, devport)
-        get_kernel().run(_command_transact(self._conn, msg))
+        return get_kernel().run(self._aadb.forward(hostport, devport))
 
     def kill_forward(self, hostport):
         """Tell server to remove forwarding TCP ports.
         """
-        msg = b"host-serial:%b:killforward:tcp:%d" % (self.serial, hostport)
-        get_kernel().run(_command_transact(self._conn, msg))
+        return get_kernel().run(self._aadb.kill_forward(hostport))
 
     def wait_for(self, state: str):
         """Wait for device to be in a particular state.
 
         State must be one of {"any", "bootloader", "device", "recovery", "sideload"}
         """
-        if state not in {"any", "bootloader", "device", "recovery", "sideload"}:
-            raise ValueError("Invalid state to wait for.")
-        msg = b"host-serial:%b:wait-for-usb-%b" % (self.serial, state.encode("ascii"))
-        get_kernel().run(_command_transact(self._conn, msg))
+        return get_kernel().run(self._aadb.wait_for(state))
 
     def command(self, cmdline, usepty=False):
         """Run a non-interactive shell command.
@@ -396,45 +397,32 @@ class AndroidDeviceClient:
             stderr (string): error output of command
             exitstatus (ExitStatus): the exit status of the command.
         """
-        if "shell_v2" not in self.features:
-            raise AdbCommandFail("Only shell v2 protocol currently supported.")
-        if isinstance(cmdline, list):
-            name = cmdline[0]
-            cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
-        else:
-            name = cmdline.split()[0]
-        cmdline = cmdline.encode("utf8")
-        kern = get_kernel()
-        kern.run(_start_shell(self.serial, self._conn, usepty, cmdline))
-        sp = ShellProtocol(self._conn.socket)
-        stdout = ringbuffer.RingBuffer(MAX_PAYLOAD)
-        stderr = ringbuffer.RingBuffer(MAX_PAYLOAD)
-        resp = kern.run(sp.run(None, stdout, stderr))
-        kern.run(self._conn.close())
-        rc = resp[0]
-        if rc & 0x80:
-            rc = -(rc & 0x7F)
-        return (stdout.read().decode("utf8"),
-                stderr.read().decode("utf8"),
-                exitstatus.ExitStatus(
-                    None,
-                    name="{}@{}".format(name, self.serial.decode("ascii")),
-                    returncode=rc)
-                )
+        return get_kernel().run(self._aadb.command(cmdline, usepty))
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
         """
-        logtags = os.environ.get("ANDROID_LOG_TAGS", logtags)
-        logtags = logtags.replace('"', '\\"')
-        longopt = "-v long" if longform else ""
-        cmdline = 'export ANDROID_LOG_TAGS="{}"; exec logcat {}'.format(logtags,
-                                                                    longopt)
-        cmdline = cmdline.encode("utf8")
-        await _start_shell(self.serial, self._conn, False, cmdline)
-        sp = ShellProtocol(self._conn.socket)
-        await sp.run(None, stdoutstream, stderrstream)
+        await self._aadb.logcat(stdoutstream, stderrstream, longform=longform, logtags=logtags)
+
+
+class DeviceProcess:
+    def __init__(self, socket):
+        pass
+
+
+def _fix_command_line(cmdline):
+    """Fix the command.
+
+    If a list, quote the components if required.
+    Return encoded command line as bytes and the command base name.
+    """
+    if isinstance(cmdline, list):
+        name = cmdline[0]
+        cmdline = " ".join('"{}"'.format(s) if " " in s else str(s) for s in cmdline)
+    else:
+        name = cmdline.split()[0]
+    return cmdline.encode("utf8"), name
 
 
 # Perform shell request, connection stays open
@@ -565,7 +553,7 @@ if __name__ == "__main__":
 
     # Test async with logcat. ^C to stop it.
     async def dostuff():
-        ac = AsyncAndroidDeviceClient(devinfo.serial)
+        ac = await AsyncAndroidDeviceClient(devinfo.serial)
 
         stdout, stderr, es = await ac.command(["ls", "/sdcard"])
         print("    ", es)

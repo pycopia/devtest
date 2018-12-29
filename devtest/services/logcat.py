@@ -59,9 +59,9 @@ def make_logcat_coroutine(serialno, logdir):
     from devtest.devices.android import adb
 
     logfilename = os.path.join(logdir, "logcat_{}.txt".format(serialno))
-    aadc = adb.AsyncAndroidDeviceClient(serialno)
 
-    async def dologcat(aadc, logfilename):
+    async def dologcat(logfilename):
+        aadc = await adb.AsyncAndroidDeviceClient(serialno)
         await aadc.wait_for("device")
         try:
             signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
@@ -75,7 +75,7 @@ def make_logcat_coroutine(serialno, logdir):
         except KeyboardInterrupt:
             pass
 
-    return dologcat(aadc, logfilename)
+    return dologcat(logfilename)
 
 
 def initialize(manager):
