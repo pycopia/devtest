@@ -1,19 +1,21 @@
 # General Purpose Device and System Test Framework
 
-A generalized framework for testing systems of interconnected devices.
+A generalized framework for testing systems of interconnected devices. It's
+called *devtest*, short for device testing.
 
-Provides a developer friendly API, reporting, and advanced debugging.
+It provides a developer friendly API, reporting, and advanced debugging.
 
 The framework models device types, equipment models, interfaces, connections,
-and roles.  Group the devices models into a Testbed objects for use by
+and roles.  Group the device models into a Testbed objects for use by
 generalized tests.  Test cases have easy access to this model to know about the
 testbed and device attributes. Test cases may therefore be written more
 abstractly and function properly in many testbed environments without change.
 
-This is a multi-device, multi-interface, multi-role framework. It man manage
-small scale testing, or large and complex test scenarios.
+This is a multi-device, multi-interface, multi-role framework. It can manage
+small scale testing of one device, up to large and complex test scenarios with
+many heterogeneous devices and servers.
 
-NOTE: This is not an officially supported Google product
+NOTE: This is not an officially supported Google product.
 
 
 ## Basic Installation
@@ -25,109 +27,194 @@ More documentation is coming.
 
 This framework requires Python 3.6 or greater.
 
-The current default configuration expects a postgresql database to be running.
+The current default configuration expects a PostgreSQL database to be running
+locally. It's also possible to configure a central, shared database server.
+For this basic installation a local server can be used.
+
 Other databases may be used in the future, once appropriate extensions are
 written for the *peewee* ORM.
 
 It is developed on and for Posix type systems, and tested on Linux and
 MacOS/Darwin. It does not require a graphical environment, therefore runs just
-fine on "headless" lab servers.
+fine on "headless" lab servers. Some test cases may have additional
+dependencies, but the base framework has relatively few.
 
-### OSX/MacOS
+#### Linux
+
+##### Debian or Ubuntu
+
+You'll need the PostgreSQL server.
+
+```console
+$ sudo apt-get install postgresql
+```
+
+Configure it to listen on _localhost_ with _trust_ authorization.
+
+###### libusb
+
+You'll need the libusb dev package to compile the usb extension module.
+
+```console
+$ sudo apt-get install libusb-1.0-0-dev
+```
+
+#### OSX/MacOS
 
 I use [homebrew](https://brew.sh/) to install dependencies. Please make sure
 that is installed first.
 
 After installing, make sure to install, as follows:
 
-```shell
+```console
 $ brew install git
-$ brew install python      # default is latestPython 3 now, which is good.
+$ brew install libusb
 $ brew install postgresql
 $ brew services start postgresql
 ```
 
-### Linux
+### Python
 
-#### Debian or Ubuntu
+This framework needs Python 3.6 or later.  Use whatever host package manager you
+use to install it.
 
-You'll need the postgres server.
+#### Linux
 
-```shell
-$ sudo apt-get install postgresql
+On many Linux distros you can do this:
+
+```console
+$ sudo apt-get install python3.6-dev
 ```
 
-##### libusb
+#### MacOS
 
-You'll need the libusb dev package to compile extension module.
+On MacOS with homebrew:
 
-```shell
-$ sudo apt-get install libusb-1.0-0-dev
+```console
+$ brew install python      # default is latest Python 3 now (3.7), which is good.
 ```
 
-### Python Dependencies
+That will get you everything you need to start.
 
-Now install some necessary Python packages.
-
-```shell
-$ python3 -m pip install cython
-$ python3 -m pip install flake8
-```
-
-### Devtest
-
-Here we'll clone from the source so you can more easily stay up to date. Right
-now, there is no installable package. You can run from the source tree, after
-cloning it with git.
-
-```shell
-$ git clone https://github.com/kdart/devtest.git
-$ cd devtest
-```
+### Python Packages
 
 To make sure we use the Python version we want, we can set PYTHONBIN to point to
 it.
 
-```shell
-$ export PYTHONBIN=/usr/local/bin/python3.6  # or whereever your brew home is.
+```console
+$ export PYTHONBIN=/usr/bin/python3.6  # or wherever your installation is.
+```
+
+That will probably be python3.7 on MacOS, as of this writing. That's fine.
+
+Now install some necessary Python packages.
+
+```console
+# With brew on MacOS, everything is installed as regular user.
+$ [[ $(uname) = Darwin ]] && SUDO="" || SUDO=sudo
+$ $SUDO $PYTHONBIN -m pip install -U setuptools
+$ $SUDO $PYTHONBIN -m pip install cython
+$ $SUDO $PYTHONBIN -m pip install flake8
+```
+
+### Devtest
+
+Here we'll clone from the source so you can stay up to date easily. Right
+now, there is no installable package. You can run from the source tree, after
+cloning it with git.
+
+```console
+# If you have access to private github repo:
+$ git clone https://github.com/kdart/devtest.git
+
+# If you are inside Google:
+$ git clone sso://user/dart/devtest
+```
+
+Now change into the new directory.
+
+```console
+$ cd devtest
 ```
 
 Then verify we have the right Python, and set up *developer mode* for the framework source.
 
-```shell
+```console
 $ make info
 ```
 
 Verify that it will use the Python you want (3.6 or greater) If it looks good:
 
-```shell
+```console
 $ make develop
 ```
 
 Initialize the database.
 
-```shell
-$ python3 -m devtest.db.models_init
+```console
+$ $PYTHONBIN -m devtest.db.models_init
 ```
 
-This should create a postgres user *devtest* and a database named *devtest*.
+This should create a PostgreSQL user named *devtest* and a database named
+*devtest*. It will ask for your password, if you are on Linux, since it runs
+*sudo* to do this.
 
 Test that the installation and initialization worked. If it doesn't, check your
-postgres installation and verify that it is listening on *localhost* and has
-*trust* acess in the _pghba.conf_ file.
+PostgreSQL installation and verify that it is listening on *localhost* and has
+*trust* access in the _pghba.conf_ file.
 
 
-```shell
+```console
 $ devtestadmin testbed list
 default
 ```
 
-If that works, it should be good to go.
+If that works, it should be good to go. If not, well PostgreSQL can be difficult
+to set up if you haven't done it before. Ask the author for help if you need to.
+
+### Test Cases
 
 Now you'll need a *testcases* package. The actual test cases are not included in
-devtest. It expects to find a set of packages rooted at *testcases* package
+devtest. It expects to find a set of packages rooted at a *testcases* package
 name. A basic template to get started can be installed from
 [devtest-testcases](https://github.com/kdart/devtest-testcases).
+
+Install it as follows.
+
+```console
+$ cd ~/src
+$ git clone https://github.com/kdart/devtest-testcases
+$ cd devtest-testcases
+$ $PYTHONBIN setup.py develop --user
+```
+
+Now, try running a demo test case.
+
+```console
+$ devtester testcases.examples.demo.PassCheck
+```
+
+List available test cases with the `-l` option.
+
+```console
+$ devtester -l
+
+Runnable objects:
+      test testcases.examples.demo.BasicReadinessCheck
+  scenario testcases.examples.demo.DemoScenario
+      test testcases.examples.demo.ErrorCheck
+      test testcases.examples.demo.FailCheck
+      test testcases.examples.demo.PassCheck
+      test testcases.examples.eat.EatTheApple
+  scenario testcases.examples.eat.EatingScenario
+      test testcases.examples.interactive.InteractiveTest
+```
+
+#### Namespace Package
+
+The *testcases* package is a namespace package. The *devtest-testcases* setup
+can be used as a template for your own packages of test cases. It will also be
+rooted in the *testcases* base package, but distributed separately. 
 
 
 ### Data Model
@@ -136,11 +223,12 @@ Eventually, you'll have to populate the database with your equipment model,
 which includes testbeds, networks, interfaces, and connections.  Right now, the
 *devtestadmin* tool is the only way to do that. Crude, but effective.
 
-```shell
+```console
 $ devtestadmin
 ```
 
-Will show the usage. A better, possibly web based, UI is in the dreaming stages.
+Will show the rather large usage. A better, possibly web based, UI is in the
+dreaming stage.
 
 #### Example session
 
@@ -175,7 +263,7 @@ Now, in a test case implementation, you should be able to refer to it like this.
 ```
 
 That is a "model object". It has information about the device, and you can add
-more. To interact with it requires getting the device attribute.
+more. To interact with it requires getting the *device* attribute.
 
 ```python3
     def procedure(self):
@@ -186,6 +274,9 @@ more. To interact with it requires getting the device attribute.
         self.passed("Run ls command")
 ```
 
+The Android device also has access to *adb*, *uiautomator*, the SL4A *api*, and
+*snippets* by attribute accessors.
+
 ### Running Test Cases
 
 Running test cases uses the *devtester* tool to inspect and run any test case.
@@ -195,7 +286,7 @@ modules in a subpackage of *testcases* base package.
 You can select a *Scenario* object that you define, or a single test cases. You
 may also construct on the command-line a series of tests as an *ac hoc* test suite.
 
-```shell
+```console
 $ devtester -h
 ```
 
@@ -237,6 +328,18 @@ Example:
 
 The *devtest-testcases* package contains a `_template.py` file to start from.
 Copy that to another name, possibly in another subpackage, and edit it.
+
+### Debugger
+
+The framework allows choosing which debugger you want to use. It's configured
+through the environment variable *PYTHON\_DEBUGGER*. It defaults to the built-in
+*pdb* module. For a better debugging experience set it to "elicit.debugger".
+
+```console
+$ export PYTHON_DEBUGGER=elicit.debugger
+```
+
+Better put that in your *.bashrc* or *.zshrc* file.
 
 
 ## Continuing on...
