@@ -546,12 +546,12 @@ async def _call_proc(proc):
     return await proc._popen.wait()
 
 
-def call(cmd, timeout=None, directory=None):
+def call(cmd, directory=None):
     """Run a managed command with stdio inherited from parent.
 
     Return exit code of subprocess.
     """
-    return get_manager().call_command(cmd, timeout=timeout, directory=directory)
+    return get_manager().call_command(cmd, directory=directory)
 
 
 _manager = None
