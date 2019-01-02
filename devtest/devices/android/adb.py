@@ -306,6 +306,12 @@ class _AsyncAndroidDeviceClient:
                     returncode=rc)
                 )
 
+    async def list(self, name, coro_cb):
+        sp = SyncProtocol(self.serial)
+        await sp.connect_with(self._conn)
+        await sp.list(name, coro_cb)
+        await self._conn.close()
+
     async def start(self, cmdline, stdoutstream, stderrstream):
         """Start a process on device with the shell protocol.
 
@@ -587,6 +593,61 @@ class ShellProtocol:
                 self._winsize = data
             else:
                 raise AdbProtocolError("Unhandled shell protocol message type.")
+
+
+class SyncProtocol:
+
+    mkid = lambda code: int.from_bytes(code, byteorder='little')
+    ID_LSTAT_V1 = mkid(b'STAT')
+    ID_STAT_V2 = mkid(b'STA2')
+    ID_LSTAT_V2 = mkid(b'LST2')
+    ID_LIST = mkid(b'LIST')
+    ID_SEND = mkid(b'SEND')
+    ID_RECV = mkid(b'RECV')
+    ID_DENT = mkid(b'DENT')
+    ID_DONE = mkid(b'DONE')
+    ID_DATA = mkid(b'DATA')
+    ID_OKAY = mkid(b'OKAY')
+    ID_FAIL = mkid(b'FAIL')
+    ID_QUIT = mkid(b'QUIT')
+    del mkid
+
+    SYNC_MSG = struct.Struct("<II")
+    DIRENT = struct.Struct("<IIIII")  # id; mode; size; time; namelen;
+
+
+    def __init__(self, serial):
+        self.serial = serial
+        self.socket = None
+
+    async def connect_with(self, adbconnection):
+        tpmsg = b"host:transport:%b" % self.serial
+        msg = b"sync:"
+        await adbconnection.open()
+        await adbconnection.message(tpmsg, expect_response=False)
+        await adbconnection.message(msg, expect_response=False)
+        self.socket = adbconnection.socket
+
+    async def send_request(self, protoid: int, path_and_mode: str):
+        path_and_mode = path_and_mode.encode("utf-8")
+        length = len(path_and_mode)
+        if length > 1024:
+            raise ValueError("Can't send message > 1024")
+        hdr = SyncProtocol.SYNC_MSG.pack(protoid, length)
+        await self.socket.sendall(hdr + path_and_mode)
+
+    async def list(self, path, cb_coro):
+        await self.send_request(SyncProtocol.ID_LIST, path)
+        while True:
+            resp = await self.socket.recv(SyncProtocol.DIRENT.size)
+            msgid, mode, size, time, namelen = SyncProtocol.DIRENT.unpack(resp)
+            if msgid == SyncProtocol.ID_DONE:
+                return True
+            if msgid != SyncProtocol.ID_DENT:
+                return False
+            name = await self.socket.recv(namelen)
+            stat = os.stat_result((mode, None, None, None, 0, 0, size, None, time, None))
+            await spawn(cb_coro(stat, name.decode("utf-8")))
 
 
 class AndroidDevice:
