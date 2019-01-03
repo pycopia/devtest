@@ -505,25 +505,22 @@ class ProcessManager:
         coro = _run_proc(proc, input)
         if timeout:
             coro = timeout_after(float(timeout), coro)
-        rv = get_kernel().run(coro)
-        if isinstance(rv, Exception):
-            raise rv
-        return rv
+        output = get_kernel().run(coro)
+        if isinstance(output, Exception):
+            raise output
+        return output
 
     def call_command(self, cmd, directory=None):
         """Run command, does not collect output.
 
         Inherits main thread stdio.
 
-        Returns the command exit status.
+        Returns an ExitStatus instance from command.
         """
         proc = self.start(cmd, stdin=None, stdout=None, stderr=None,
                           directory=directory)
-        coro = _call_proc(proc)
-        rv = get_kernel().run(coro)
-        if isinstance(rv, Exception):
-            raise rv
-        return rv
+        retcode = get_kernel().run(_call_proc(proc))
+        return exitstatus.ExitStatus(0, name=proc.progname, returncode=retcode)
 
 
 async def _run_proc(proc, input):
@@ -549,7 +546,7 @@ async def _call_proc(proc):
 def call(cmd, directory=None):
     """Run a managed command with stdio inherited from parent.
 
-    Return exit code of subprocess.
+    Return ExitStatus instance of subprocess.
     """
     return get_manager().call_command(cmd, directory=directory)
 
