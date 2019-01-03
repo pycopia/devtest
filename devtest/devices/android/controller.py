@@ -156,4 +156,19 @@ class AndroidController(devices.Controller):
         """
         return self.shell(["setprop", name, value]).strip()
 
+    def get_state(self):
+        """Return device state using a method that does not require it to be
+        authorized.
+        """
+        client = adb.AdbClient()
+        return client.get_state(self._equipment["serno"])
+
+    def reconnect(self):
+        """Cause device to reconnect to adb.
+
+        Wait for it to become known to adb again.
+        """
+        return adb.AdbClient().reconnect(self._equipment["serno"])
+
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

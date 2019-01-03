@@ -23,7 +23,7 @@ from devtest import logging  # This must be first
 from devtest.os import eventloop
 
 from curio import (Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout, # noqa
-                   Event, SignalEvent, timeout_after, TaskGroup)
+                   Event, SignalEvent, timeout_after, TaskGroup, run_in_thread)
 
 
 _default_kernel = None

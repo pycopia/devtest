@@ -19,13 +19,14 @@ This is an async implementation, suitable for including in an event loop.
 import os
 import struct
 
+from devtest import timers
 from devtest import ringbuffer
 from devtest.io import socket
 from devtest.io import streams
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
-from devtest.io.reactor import get_kernel, spawn
+from devtest.io.reactor import get_kernel, spawn, run_in_thread
 
 
 ADB = procutils.which("adb")
@@ -167,10 +168,31 @@ class AdbClient:
             self._conn = None
 
     def get_device(self, serial):
+        """Get a AndroidDeviceClient instance.
+        """
         return AndroidDeviceClient(
             serial, host=self._conn.host, port=self._conn.port)
 
+    def get_state(self, serial):
+        """Get the current state of a device.
+
+        Arguments:
+            serial: str of the device serial number.
+
+        Returns:
+            one of {"device", "unauthorized", "bootloader"}
+            or None if serial not found.
+        """
+        for dev in self.get_device_list():
+            if dev.serial == serial:
+                return dev.state
+
     def get_device_list(self):
+        """Get list of attached devices.
+
+        Returns:
+            list of AndroidDevice instances.
+        """
         dl = []
         resp = self._message(b"host:devices-l")
         for line in resp.splitlines():
@@ -184,8 +206,17 @@ class AdbClient:
                                                          hostport, devport)
         get_kernel().run(_command_transact(self._conn, msg))
 
+    def reconnect_offline(self):
+        self._message(b"host:reconnect-offline")
+
+    def reconnect(self, serial):
+        self._message(b"host-serial:%b:reconnect" % (serial.encode("ascii"),))
+        while self.get_state(serial) is None:
+            timers.nanosleep(1.1)
+
     @property
     def server_version(self):
+        """The server's version number."""
         resp = self._message(b"host:version")
         return int(resp, 16)
 
@@ -367,6 +398,12 @@ class _AsyncAndroidDeviceClient:
         return b'Success' in status_response
     # TODO(dart) install sessions
 
+    async def reconnect(self):
+        msg = b"host-serial:%b:reconnect" % (self.serial,)
+        await _command_transact(self._conn, msg)
+        await self._conn.close()
+        await self._init()
+
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
@@ -451,6 +488,22 @@ class AndroidDeviceClient:
         """
         coro = self._aadb.install(apkfile, **kwargs)
         return get_kernel().run(coro)
+
+    def list(self, name, cb):
+        """Perform a directory listing.
+
+        Arguments:
+            name: str, name of directory
+            cb: callable with signature cb(os.stat_result, filename)
+        """
+        async def acb(stat, path):
+            await run_in_thread(cb, stat, path)
+        coro = self._aadb.list(name, acb)
+        return get_kernel().run(coro)
+
+    def reconnect(self):
+        """Reconnect from device side."""
+        return get_kernel().run(self._aadb.reconnect())
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
@@ -597,7 +650,7 @@ class ShellProtocol:
 
 class SyncProtocol:
 
-    mkid = lambda code: int.from_bytes(code, byteorder='little')
+    mkid = lambda code: int.from_bytes(code, byteorder='little')  # noqa
     ID_LSTAT_V1 = mkid(b'STAT')
     ID_STAT_V2 = mkid(b'STA2')
     ID_LSTAT_V2 = mkid(b'LST2')
@@ -614,7 +667,6 @@ class SyncProtocol:
 
     SYNC_MSG = struct.Struct("<II")
     DIRENT = struct.Struct("<IIIII")  # id; mode; size; time; namelen;
-
 
     def __init__(self, serial):
         self.serial = serial
@@ -651,28 +703,37 @@ class SyncProtocol:
 
 
 class AndroidDevice:
+    """Information about attached Android device.
 
-    def __init__(self, serial, product, model, device):
+    No connection necessary.
+    """
+
+    def __init__(self, serial, product, model, device, state):
         self.type = "phone"
         self.serial = serial
         self.product = product
         self.model = model
         self.device = device
+        self.state = state
 
     def __repr__(self):
         return ("AndroidDevice("
-                "serial={!r}, product={!r}, model={!r}, device={!r})".format(
-                    self.serial, self.product, self.model, self.device))
+                "serial={!r}, product={!r}, model={!r}, device={!r}, state={!r})".format(
+                    self.serial, self.product, self.model, self.device, self.state))
 
 
 # b'HTxxxserial device usb:1-1.1 product:marlin model:Pixel_XL device:marlin\n'
 def _device_factory(line):
     parts = line.decode("ascii").split()
     serial = parts[0]
-    product = parts[3].partition(":")[2]
-    model = parts[4].partition(":")[2]
-    device = parts[5].partition(":")[2]
-    return AndroidDevice(serial, product, model, device)
+    state = parts[1]
+    if state == "device":
+        product = parts[3].partition(":")[2]
+        model = parts[4].partition(":")[2]
+        device = parts[5].partition(":")[2]
+        return AndroidDevice(serial, product, model, device, state)
+    else:
+        return AndroidDevice(serial, None, None, None, state)
 
 
 if __name__ == "__main__":
