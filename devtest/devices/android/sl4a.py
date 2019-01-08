@@ -105,11 +105,11 @@ class _OldSL4AProtocol:
         return resp
 
     async def _send(self, data):
-        return await self._stream.write(json.dumpb(data) + b'\n')
+        return await self._stream.write(json.encode_bytes(data) + b'\n')
 
     async def _receive(self):
         resp = await self._stream.readline()
-        return json.loadb(resp)
+        return json.decode_bytes(resp)
 
     async def _rpc(self, methodname, args, kwargs):
         rpcid = next(self._counter)
