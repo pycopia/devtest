@@ -196,17 +196,28 @@ class AndroidController(devices.Controller):
         return original_mode
 
     def svc_wifi(self, onoff):
+        """WiFi enable/disable."""
         return self.shell(['svc', 'wifi', 'enable' if onoff else 'disable'])
 
     def svc_data(self, onoff):
+        """Data enable/disable."""
         return self.shell(['svc', 'data', 'enable' if onoff else 'disable'])
 
     def svc_nfc(self, onoff):
+        """NFC enable/disable."""
         return self.shell(['svc', 'nfc', 'enable' if onoff else 'disable'])
 
     def svc_bluetooth(self, onoff):
+        """Bluetooth enable/disable."""
         return self.shell(['svc', 'bluetooth', 'enable' if onoff else 'disable'])
-    # TODO(dart) usb          Control Usb state
+
+    def stay_awake(self, onoff):
+        """Screen will never sleep while charging."""
+        # TODO(dart) handle: svc power stayon [true|false|usb|ac|wireless]
+        if onoff:
+            return self.shell(['svc', 'power', 'stayon', 'usb'])
+        else:
+            return self.shell(['svc', 'power', 'stayon', 'false'])
 
     def reboot(self):
         """Reboot the device."""
@@ -318,5 +329,26 @@ class _Settings:
         if namespace not in {"global", "secure"}:
             raise ValueError('namespace must be one of: "global", "secure"')
         return self._cont.shell(['settings', 'reset', namespace, mode])
+
+    # Methods for settings that require special handling follow
+    def location(self, onoff):
+        """Set location service on or off."""
+        # The location_providers_allowed setting is a list, you add and
+        # remove providers using "+" and "-" prefix, respectively. When all
+        # are removed, the location service is disabled.
+        if onoff:
+            # TODO(dart) fix hard-coded defaults
+            self._cont.shell(['settings', 'put', "secure", "location_providers_allowed", "+gps"])
+            self._cont.shell(['settings', 'put', "secure", "location_providers_allowed", "+network"])
+        else:
+            locations =  self._cont.shell(
+                ['settings', 'get', "secure", "location_providers_allowed"])
+            locations = locations.strip()
+            if locations:
+                for provider in locations.split(","):
+                    self._cont.shell(
+                        ['settings', 'put',
+                         'secure', 'location_providers_allowed', '-' + provider])
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

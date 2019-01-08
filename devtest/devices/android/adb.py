@@ -281,6 +281,10 @@ class _AsyncAndroidDeviceClient:
         resp = await _special_command(self.serial, self._conn, b"root:")
         return resp.decode("ascii")
 
+    async def unroot(self):
+        resp = await _special_command(self.serial, self._conn, b"unroot:")
+        return resp.decode("ascii")
+
     async def forward(self, hostport, devport):
         """Tell server to start forwarding TCP ports.
         """
