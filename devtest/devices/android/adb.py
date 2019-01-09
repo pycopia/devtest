@@ -26,7 +26,7 @@ from devtest.io import streams
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
-from devtest.io.reactor import get_kernel, spawn, run_in_thread
+from devtest.io.reactor import get_kernel, spawn, run_in_thread, sleep
 
 
 ADB = procutils.which("adb")
@@ -279,10 +279,12 @@ class _AsyncAndroidDeviceClient:
 
     async def root(self):
         resp = await _special_command(self.serial, self._conn, b"root:")
+        await sleep(3)  # adbd needs some time to initialize
         return resp.decode("ascii")
 
     async def unroot(self):
         resp = await _special_command(self.serial, self._conn, b"unroot:")
+        await sleep(3)  # adbd needs some time to initialize
         return resp.decode("ascii")
 
     async def forward(self, hostport, devport):
@@ -446,13 +448,20 @@ class AndroidDeviceClient:
         return get_kernel().run(self._aadb.get_state())
 
     def reboot(self):
+        """Reboot the device."""
         return get_kernel().run(self._aadb.reboot())
 
     def remount(self):
+        """Remount filesystem read-write."""
         return get_kernel().run(self._aadb.remount())
 
     def root(self):
+        """Become root on the device."""
         return get_kernel().run(self._aadb.root())
+
+    def unroot(self):
+        """Become non-root on the device."""
+        return get_kernel().run(self._aadb.unroot())
 
     def forward(self, hostport, devport):
         """Tell server to start forwarding TCP ports.
