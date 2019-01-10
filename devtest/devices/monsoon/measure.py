@@ -206,6 +206,8 @@ class MeasurementHandler:
             return None, None, None, None, None
         else:
             return None, None, None, None, None
+        # some bogus type, default to all None
+        return None, None, None, None, None
 
 
 class StdoutHandler(MeasurementHandler):
