@@ -293,53 +293,13 @@ class Protocol2(Protocol):
 class Dynamixel:
     """Establishes base type for all Dynamixel."""
 
-
-class DynamixelAX18A(Dynamixel):
-    """A Dynamixel model AX-18A."""
-
-    EEPROM = struct.Struct("<HBBBBHHBBBBHBBB")
-    RAM = struct.Struct("<6B6H6BH")  # offset 24
-    # EEPROM:
-    # 0    2    Model Number    Model Number    R    18
-    # 2    1    Firmware Version    Firmware Version    R    -
-    # 3    1    ID    DYNAMIXEL ID    RW    1
-    # 4    1    Baud Rate    Communication Speed    RW    1
-    # 5    1    Return Delay Time    Response Delay Time    RW    250
-    # 6    2    CW Angle Limit    Clockwise Angle Limit    RW    0
-    # 8    2    CCW Angle Limit    Counter-Clockwise Angle Limit    RW    1023
-    # 10   1    unused
-    # 11    1    Temperature Limit    Maximum Internal Temperature Limit    RW    75
-    # 12    1    Min Voltage Limit    Minimum Input Voltage Limit    RW    60
-    # 13    1    Max Voltage Limit    Maximum Input Voltage Limit    RW    140
-    # 14    2    Max Torque    Maximun Torque    RW    983
-    # 16    1    Status Return Level    Select Types of Status Return    RW    2
-    # 17    1    Alarm LED    LED for Alarm    RW    36
-    # 18    1    Shutdown    Shutdown Error Information    RW    36
-    # RAM:
-    # 24    1    Torque Enable    Motor Torque On/Off    RW    0
-    # 25    1    LED    Status LED On/Off    RW    0
-    # 26    1    CW Compliance Margin    CW Compliance Margin    RW    1
-    # 27    1    CCW Compliance Margin    CCW Compliance Margin    RW    1
-    # 28    1    CW Compliance Slope    CW Compliance Slope    RW    32
-    # 29    1    CCW Compliance Slope    CCW Compliance Slope    RW    32
-    # 30    2    Goal Position    Target Position    RW    -
-    # 32    2    Moving Speed    Moving Speed    RW    -
-    # 34    2    Torque Limit    Torque Limit(Goal Torque)    RW    ADD 14&15
-    # 36    2    Present Position    Present Position    R    -
-    # 38    2    Present Speed    Present Speed    R    -
-    # 40    2    Present Load    Present Load    R    -
-    # 42    1    Present Voltage    Present Voltage    R    -
-    # 43    1    Present Temperature    Present Temperature    R    -
-    # 44    1    Registered    If Instruction is registered    R    0
-    # 45    1    unused
-    # 46    1    Moving    Movement Status    R    0
-    # 47    1    Lock    Locking EEPROM    RW    0
-    # 48    2    Punch    Minimum Current Threshold    RW    32
-
     def __init__(self, serialdevice, motorid):
         self._protocol = Protocol1(serialdevice)
         self.motorid = motorid
         self._wheel_mode = None
+        self._multiturn_mode = None
+        self._model = None
+        self._version = None
         self.read_eeprom()
 
     def __del__(self):
@@ -396,34 +356,17 @@ class DynamixelAX18A(Dynamixel):
         """Perform registered command."""
         self._protocol.send_message(0xFE, Instruction.Action, b"")
 
-    def read_eeprom(self):
-        raw = self.read_value(0, DynamixelAX18A.EEPROM.size)
-        if len(raw) != DynamixelAX18A.EEPROM.size:
+    def _read_ram(self, structure, offset):
+        raw = self.read_value(offset, structure.size)
+        if len(raw) != structure.size:
+            raise DynamixelError("bad read of RAM")
+        return structure.unpack(raw)
+
+    def _read_eeprom(self, structure):
+        raw = self.read_value(0, structure.size)
+        if len(raw) != structure.size:
             raise DynamixelError("bad read of EEPROM")
-        resp = DynamixelAX18A.EEPROM.unpack(raw)
-        (self._model, self._version, self.motorid, baud, rtd, angle_limit_cw,
-         angle_limit_ccw, _, temp_limit, min_v_limit, max_v_limit, max_torque,
-         status_return, alarm_led, shutdown_info) = resp
-        self._baudcode = baud
-        self._return_delay_time = 2 * rtd  # usec
-        self._wheel_mode = angle_limit_cw == 0 and angle_limit_ccw == 0
-        self._angle_limit_cw = round(angle_limit_cw * 0.2932551319648094, 2)
-        self._angle_limit_ccw = round(angle_limit_ccw * 0.2932551319648094, 2)
-        self._min_voltage_limit = min_v_limit / 10.
-        self._max_voltage_limit = max_v_limit / 10.
-        self._max_torque = round(max_torque / 10.23, 2)
-        self._status_return_level = StatusReturnLevel(status_return)
-        self._alarm_led = DynamixelErrorSet(alarm_led)
-        self._shutdown_info = DynamixelErrorSet(shutdown_info)
-
-    def read_ram(self):
-        raw = self.read_value(24, DynamixelAX18A.RAM.size)
-        resp = DynamixelAX18A.RAM.unpack(raw)
-        return resp
-
-#    def factory_reset(self):
-#        self._protocol.send_message(self.motorid, Instruction.FactoryReset, b"")
-#        print("factory reset:", self._protocol.read_response())
+        return structure.unpack(raw)
 
     @property
     def baud(self):
@@ -442,34 +385,10 @@ class DynamixelAX18A(Dynamixel):
 
     @return_delay_time.setter
     def return_delay_time(self, rtd):
-        if rtd < 0 or rtd > 254:
-            raise ValueError("return_delay_time must be in range 0-254")
+        if rtd < 0 or rtd > 508:
+            raise ValueError("return_delay_time must be in range 0-508 uS")
         self.write_value(5, rtd // 2, 1)
         self._return_delay_time = rtd
-
-    @property
-    def angle_limit_cw(self):
-        """Angle limit in degrees, CW side. 0 - 300."""
-        return self._angle_limit_cw
-
-    @angle_limit_cw.setter
-    def angle_limit_cw(self, angle):
-        rawval = round(angle / 0.2932551319648094)
-        self.write_value(6, rawval, 2)
-        self._angle_limit_cw = angle
-        self._wheel_mode = None
-
-    @property
-    def angle_limit_ccw(self):
-        """Angle limit in degrees, CCW side. 0 - 300."""
-        return self._angle_limit_ccw
-
-    @angle_limit_ccw.setter
-    def angle_limit_ccw(self, angle):
-        rawval = round(angle / 0.2932551319648094)
-        self.write_value(8, rawval, 2)
-        self._angle_limit_ccw = angle
-        self._wheel_mode = None
 
     @property
     def wheel_mode(self):
@@ -483,6 +402,19 @@ class DynamixelAX18A(Dynamixel):
             angle_limit_ccw = int.from_bytes(self.read_value(8, 2), byteorder="little")
             self._wheel_mode = angle_limit_cw == 0 and angle_limit_ccw == 0
         return self._wheel_mode
+
+    @property
+    def multiturn_mode(self):
+        """Check for multi-turn mode.
+
+        Multiturn mode is indicated by both Angle Limit CW and Angle Limit CCW are
+        both 4095.
+        """
+        if self._multiturn_mode is None:
+            angle_limit_cw = int.from_bytes(self.read_value(6, 2), byteorder="little")
+            angle_limit_ccw = int.from_bytes(self.read_value(8, 2), byteorder="little")
+            self._multiturn_mode = angle_limit_cw == 4095 and angle_limit_ccw == 4095
+        return self._multiturn_mode
 
     @property
     def min_voltage_limit(self):
@@ -579,6 +511,209 @@ class DynamixelAX18A(Dynamixel):
         self.write_value(25, 1, 1) if onoff else self.write_value(25, 0, 1)
 
     @property
+    def moving_speed(self):
+        """Moving speed to goal postion. Depends on operating mode.
+
+        Set both angle_limit_cw and angle_limit_ccw to zero to enable wheel
+        mode.
+
+        See: http://emanual.robotis.com/docs/en/dxl/ax/ax-18a/#moving-speed
+
+        Wheel mode:
+            Unit is percent of max speed.
+
+        Joint mode:
+            Unit is RPM, from 0 to 114.
+            Value of 0 is special, it means maximum RPM.
+        """
+        if self.wheel_mode:
+            rawval = int.from_bytes(self.read_value(32, 2), byteorder="little")
+            return rawval  # TODO(dart)
+        else:
+            rawval = int.from_bytes(self.read_value(32, 2), byteorder="little")
+            if rawval == 0:
+                return 115.  # Maximum RPM
+            else:
+                return round(rawval / 8.973684210526315, 2)
+
+    @moving_speed.setter
+    def moving_speed(self, rpm_or_percent):
+        if self.wheel_mode:
+            pass  # TODO(dart)
+        else:  # Joint mode, RPM unit
+            if rpm_or_percent < 0:
+                raise ValueError("moving speed must be 1 - 115 RPM")
+            if rpm_or_percent >= 114:
+                self.write_value(32, 0, 2)
+            else:
+                rawval = round(rpm_or_percent * 8.973684210526315)  # as RPM
+                if rawval > 1023:
+                    rawval = 1023
+                self.write_value(32, rawval, 2)
+
+    @property
+    def torque_limit(self):
+        """Maximum torque applied, as percent of max.
+
+        If it is zero the motor is disabled.
+        """
+        rawval = int.from_bytes(self.read_value(34, 2), byteorder="little")
+        return round(rawval / 10.23, 2)
+
+    @torque_limit.setter
+    def torque_limit(self, percent):
+        self.write_value(34, round(percent * 10.23), 2)
+
+    @property
+    def present_speed(self):
+        """Present speed, in RPM for Joint Mode, in percent of max for Wheel
+        mode."""
+        rawval = int.from_bytes(self.read_value(38, 2), byteorder="little")
+        direction = rawval & 0x800
+        if self.wheel_mode:
+            return Direction(direction), round((rawval & 0x3FF) / 10.23, 2)
+        else:
+            return Direction(direction), round((rawval & 0x3FF) * 0.111111, 2)
+
+    @property
+    def present_load(self):
+        """Present load, in percent of max torque."""
+        rawval = int.from_bytes(self.read_value(40, 2), byteorder="little")
+        direction = rawval & 0x800
+        return Direction(direction), round((rawval & 0x3FF) / 10.23, 2)
+
+    @property
+    def present_voltage(self):
+        """Present voltage applied."""
+        rawval = int.from_bytes(self.read_value(42, 1), byteorder="little")
+        return rawval / 10.
+
+    @property
+    def present_temperature(self):
+        """Present temperature in degrees C."""
+        return int.from_bytes(self.read_value(43, 1), byteorder="little")
+
+    @property
+    def has_registered(self):
+        """Indicates if a registered instruction has been received."""
+        return bool(int.from_bytes(self.read_value(44, 1), byteorder="little"))
+
+    @property
+    def is_moving(self):
+        """Indicates if motor is currently moving."""
+        return bool(int.from_bytes(self.read_value(46, 1), byteorder="little"))
+
+    @property
+    def is_locked(self):
+        """Indicates EEPROM area can be modified."""
+        return bool(int.from_bytes(self.read_value(47, 1), byteorder="little"))
+
+    def lock(self):
+        """Lock EEPROM area. Power must be cycled to change it back."""
+        self.write_value(47, 1, 1)
+
+    @property
+    def punch(self):
+        """Minimum current to drive motor.
+
+        NOTE: manual is not clear on the units.
+        """
+        rawval = int.from_bytes(self.read_value(48, 2), byteorder="little")
+        return rawval
+
+    @punch.setter
+    def punch(self, current):
+        current = int(current)
+        if current >= 0x20 or current <= 0x3FF:
+            self.write_value(48, current, 2)
+
+
+class DynamixelAX18A(Dynamixel):
+    """A Dynamixel model AX-18A."""
+
+    EEPROM = struct.Struct("<H4BHH4BH3B")
+    RAM = struct.Struct("<6B6H6BH")  # offset 24
+    RAM_OFFSET = 24
+    # EEPROM:
+    # 0    2    Model Number    Model Number    R    18
+    # 2    1    Firmware Version    Firmware Version    R    -
+    # 3    1    ID    DYNAMIXEL ID    RW    1
+    # 4    1    Baud Rate    Communication Speed    RW    1
+    # 5    1    Return Delay Time    Response Delay Time    RW    250
+    # 6    2    CW Angle Limit    Clockwise Angle Limit    RW    0
+    # 8    2    CCW Angle Limit    Counter-Clockwise Angle Limit    RW    1023
+    # 10   1    unused
+    # 11    1    Temperature Limit    Maximum Internal Temperature Limit    RW    75
+    # 12    1    Min Voltage Limit    Minimum Input Voltage Limit    RW    60
+    # 13    1    Max Voltage Limit    Maximum Input Voltage Limit    RW    140
+    # 14    2    Max Torque    Maximun Torque    RW    983
+    # 16    1    Status Return Level    Select Types of Status Return    RW    2
+    # 17    1    Alarm LED    LED for Alarm    RW    36
+    # 18    1    Shutdown    Shutdown Error Information    RW    36
+    # RAM:
+    # 24    1    Torque Enable    Motor Torque On/Off    RW    0
+    # 25    1    LED    Status LED On/Off    RW    0
+    # 26    1    CW Compliance Margin    CW Compliance Margin    RW    1
+    # 27    1    CCW Compliance Margin    CCW Compliance Margin    RW    1
+    # 28    1    CW Compliance Slope    CW Compliance Slope    RW    32
+    # 29    1    CCW Compliance Slope    CCW Compliance Slope    RW    32
+    # 30    2    Goal Position    Target Position    RW    -
+    # 32    2    Moving Speed    Moving Speed    RW    -
+    # 34    2    Torque Limit    Torque Limit(Goal Torque)    RW    ADD 14&15
+    # 36    2    Present Position    Present Position    R    -
+    # 38    2    Present Speed    Present Speed    R    -
+    # 40    2    Present Load    Present Load    R    -
+    # 42    1    Present Voltage    Present Voltage    R    -
+    # 43    1    Present Temperature    Present Temperature    R    -
+    # 44    1    Registered    If Instruction is registered    R    0
+    # 45    1    unused
+    # 46    1    Moving    Movement Status    R    0
+    # 47    1    Lock    Locking EEPROM    RW    0
+    # 48    2    Punch    Minimum Current Threshold    RW    32
+
+    def read_eeprom(self):
+        resp = self._read_eeprom(DynamixelAX18A.EEPROM)
+        (self._model, self._version, self.motorid, baud, rtd, angle_limit_cw,
+         angle_limit_ccw, _, temp_limit, min_v_limit, max_v_limit, max_torque,
+         status_return, alarm_led, shutdown_info) = resp
+        self._baudcode = baud
+        self._return_delay_time = 2 * rtd  # usec
+        self._wheel_mode = angle_limit_cw == 0 and angle_limit_ccw == 0
+        self._angle_limit_cw = round(angle_limit_cw * 0.2932551319648094, 2)
+        self._angle_limit_ccw = round(angle_limit_ccw * 0.2932551319648094, 2)
+        self._min_voltage_limit = min_v_limit / 10.
+        self._max_voltage_limit = max_v_limit / 10.
+        self._max_torque = round(max_torque / 10.23, 2)
+        self._status_return_level = StatusReturnLevel(status_return)
+        self._alarm_led = DynamixelErrorSet(alarm_led)
+        self._shutdown_info = DynamixelErrorSet(shutdown_info)
+
+    @property
+    def angle_limit_cw(self):
+        """Angle limit in degrees, CW side. 0 - 300."""
+        return self._angle_limit_cw
+
+    @angle_limit_cw.setter
+    def angle_limit_cw(self, angle):
+        rawval = round(angle / 0.2932551319648094)
+        self.write_value(6, rawval, 2)
+        self._angle_limit_cw = angle
+        self._wheel_mode = None
+
+    @property
+    def angle_limit_ccw(self):
+        """Angle limit in degrees, CCW side. 0 - 300."""
+        return self._angle_limit_ccw
+
+    @angle_limit_ccw.setter
+    def angle_limit_ccw(self, angle):
+        rawval = round(angle / 0.2932551319648094)
+        self.write_value(8, rawval, 2)
+        self._angle_limit_ccw = angle
+        self._wheel_mode = None
+
+    # RAM control table follows
+    @property
     def compliance_margin_cw(self):
         """Compliance margin CW, from 1 to 75 degrees."""
         rawval = int.from_bytes(self.read_value(26, 1), byteorder="little")
@@ -648,127 +783,10 @@ class DynamixelAX18A(Dynamixel):
         self.write_value(30, rawval, 2)
 
     @property
-    def moving_speed(self):
-        """Moving speed to goal postion. Depends on operating mode.
-
-        Set both angle_limit_cw and angle_limit_ccw to zero to enable wheel
-        mode.
-
-        See: http://emanual.robotis.com/docs/en/dxl/ax/ax-18a/#moving-speed
-
-        Wheel mode:
-            Unit is percent of max speed.
-
-        Joint mode:
-            Unit is RPM, from 0 to 114.
-            Value of 0 is special, it means maximum RPM.
-        """
-        if self.wheel_mode:
-            rawval = int.from_bytes(self.read_value(32, 2), byteorder="little")
-            return rawval  # TODO(dart)
-        else:
-            rawval = int.from_bytes(self.read_value(32, 2), byteorder="little")
-            if rawval == 0:
-                return 115.  # Maximum RPM
-            else:
-                return round(rawval / 8.973684210526315, 2)
-
-    @moving_speed.setter
-    def moving_speed(self, rpm_or_percent):
-        if self.wheel_mode:
-            pass  # TODO(dart)
-        else:  # Joint mode, RPM unit
-            if rpm_or_percent < 0:
-                raise ValueError("moving speed must be 1 - 115 RPM")
-            if rpm_or_percent >= 114:
-                self.write_value(32, 0, 2)
-            else:
-                rawval = round(rpm_or_percent * 8.973684210526315)  # as RPM
-                if rawval > 1023:
-                    rawval = 1023
-                self.write_value(32, rawval, 2)
-
-    @property
-    def torque_limit(self):
-        """Maximum torque applied, as percent of max.
-
-        If it is zero the motor is disabled.
-        """
-        rawval = int.from_bytes(self.read_value(34, 2), byteorder="little")
-        return round(rawval / 10.23, 2)
-
-    @torque_limit.setter
-    def torque_limit(self, percent):
-        self.write_value(34, round(percent * 10.23), 2)
-
-    @property
     def present_position(self):
         """Present position, in degrees."""
         rawval = int.from_bytes(self.read_value(36, 2), byteorder="little")
         return round(rawval * 0.2932551319648094, 2)
-
-    @property
-    def present_speed(self):
-        """Present speed, in RPM for Joint Mode, in percent of max for Wheel
-        mode."""
-        rawval = int.from_bytes(self.read_value(38, 2), byteorder="little")
-        direction = rawval & 0x800
-        if self.wheel_mode:
-            return Direction(direction), round((rawval & 0x3FF) / 10.23, 2)
-        else:
-            return Direction(direction), round((rawval & 0x3FF) * 0.111111, 2)
-
-    @property
-    def present_load(self):
-        """Present load, in percent of max torque."""
-        rawval = int.from_bytes(self.read_value(40, 2), byteorder="little")
-        direction = rawval & 0x800
-        return Direction(direction), round((rawval & 0x3FF) / 10.23, 2)
-
-    @property
-    def present_voltage(self):
-        """Present voltage applied."""
-        rawval = int.from_bytes(self.read_value(42, 1), byteorder="little")
-        return rawval / 10.
-
-    @property
-    def present_temperature(self):
-        """Present temperature in degrees C."""
-        return int.from_bytes(self.read_value(43, 1), byteorder="little")
-
-    @property
-    def has_registered(self):
-        """Indicates if a registered instruction has been received."""
-        return bool(int.from_bytes(self.read_value(44, 1), byteorder="little"))
-
-    @property
-    def is_moving(self):
-        """Indicates if motor is currently moving."""
-        return bool(int.from_bytes(self.read_value(46, 1), byteorder="little"))
-
-    @property
-    def is_locked(self):
-        """Indicates EEPROM area can be modified."""
-        return bool(int.from_bytes(self.read_value(47, 1), byteorder="little"))
-
-    def lock(self):
-        """Lock EEPROM area. Power must be cycled to change it back."""
-        self.write_value(47, 1, 1)
-
-    @property
-    def punch(self):
-        """Minimum current to drive motor.
-
-        NOTE: manual is not clear on the units.
-        """
-        rawval = int.from_bytes(self.read_value(48, 2), byteorder="little")
-        return rawval
-
-    @punch.setter
-    def punch(self, current):
-        current = int(current)
-        if current >= 0x20 or current <= 0x3FF:
-            self.write_value(48, current, 2)
 
     def move_to(self, goal):
         """Move to <goal> angle. Blocks until complete."""
@@ -785,6 +803,168 @@ class DynamixelAX18A(Dynamixel):
                 present_position = int.from_bytes(self.read_value(36, 2), byteorder="little")
 
 
+class DynamixelMX64A(Dynamixel):
+    """A Dynamixel model MX-64A."""
+
+    EEPROM = struct.Struct("<H4BHH4BH4BhB")
+    RAM = struct.Struct("<6B6H6B2H16BHBHB")  # offset 24
+    RAM_OFFSET = 24
+    # Control Table of EEPROM Area
+    # Address | Size | Data Name | Description | Access | Initial Value |
+    # 0 | 2 | Model Number | Model Number | R | 310 |
+    # 2 | 1 | Firmware Version | Firmware Version | R | - |
+    # 3 | 1 | ID | DYNAMIXEL ID | RW | 1 |
+    # 4 | 1 | Baud Rate | Communication Speed | RW | 34 |
+    # 5 | 1 | Return Delay Time | Response Delay Time | RW | 250 |
+    # 6 | 2 | CW Angle Limit | Clockwise Angle Limit | RW | 0 |
+    # 8 | 2 | CCW Angle Limit | Counter-Clockwise Angle Limit | RW | 4,095 |
+    # 10 | 1 unused
+    # 11 | 1 | Temperature Limit | Maximum Internal Temperature Limit | RW | 80 |
+    # 12 | 1 | Min Voltage Limit | Minimum Input Voltage Limit | RW | 60 |
+    # 13 | 1 | Max Voltage Limit | Maximum Input Voltage Limit | RW | 240 |
+    # 14 | 2 | Max Torque | Maximun Torque | RW | 1023 |
+    # 16 | 1 | Status Return Level | Select Types of Status Return | RW | 2 |
+    # 17 | 1 | Alarm LED | LED for Alarm | RW | 36 |
+    # 18 | 1 | Shutdown | Shutdown Error Information | RW | 36 |
+    # 19 | 1 unused
+    # 20 | 2 | Multi Turn Offset | Adjust Position with Offset | RW | 0 |
+    # 22 | 1 | Resolution Divider | Divider for Position Resolution | RW | 1 |
+
+    # Control Table of RAM Area
+    # Address | Size | Data Name | Description | Access | Initial Value |
+    # 24 | 1 | Torque Enable | Motor Torque On/Off | RW | 0 |
+    # 25 | 1 | LED | Status LED On/Off | RW | 0 |
+    # 26 | 1 | D Gain | Derivative Gain | RW | 0 |
+    # 27 | 1 | I Gain | Integral Gain | RW | 0 |
+    # 28 | 1 | P Gain | Proportional Gain | RW | 32 |
+    # 29 | 1 unused
+    # 30 | 2 | Goal Position | Desired Position | RW | - |
+    # 32 | 2 | Moving Speed | RW | - |
+    # 34 | 2 | Torque Limit | RW | ADD 14&15 |
+    # 36 | 2 | Present Position | Present Position | R | - |
+    # 38 | 2 | Present Speed | Present Speed | R | - |
+    # 40 | 2 | Present Load | Present Load | R | - |
+    # 42 | 1 | Present Voltage | Present Voltage | R | - |
+    # 43 | 1 | Present Temperature | Present Temperature | R | - |
+    # 44 | 1 | Registered | If Instruction is registered | R | 0 |
+    # 45 | 1 unused
+    # 46 | 1 | Moving | Movement Status | R | 0 |
+    # 47 | 1 | Lock | Locking EEPROM | RW | 0 |
+    # 48 | 2 | Punch | Minimum Current Threshold | RW | 0 |
+    # 50 | 2 | Realtime Tick | Count Time in millisecond | R | 0 |
+    # 52 | 16 unused
+    # 68 | 2 | Current | Consuming Current | RW | 0 |
+    # 70 | 1 | Torque Ctrl Mode Enable | Torque Control Mode On/Off | RW | 0 |
+    # 71 | 2 | Goal Torque | Goal Torque | RW | 0 |
+    # 73 | 1 | Goal Acceleration | Goal Acceleration | RW | 0 |
+
+    def read_eeprom(self):
+        resp = self._read_eeprom(DynamixelMX64A.EEPROM)
+        (self._model, self._version, self.motorid, baud, rtd, angle_limit_cw,
+         angle_limit_ccw, _, temp_limit, min_v_limit, max_v_limit, max_torque,
+         status_return, alarm_led, shutdown_info, _, multiturn_offset, resolution_divider) = resp
+        self._baudcode = baud
+        self._return_delay_time = 2 * rtd  # usec
+        self._wheel_mode = angle_limit_cw == 0 and angle_limit_ccw == 0
+        self._multiturn_mode = angle_limit_cw == 4095 and angle_limit_ccw == 4095
+        self._angle_limit_cw = round(angle_limit_cw * 0.2932551319648094, 2)
+        self._angle_limit_ccw = round(angle_limit_ccw * 0.2932551319648094, 2)
+        self._min_voltage_limit = min_v_limit / 10.
+        self._max_voltage_limit = max_v_limit / 10.
+        self._max_torque = round(max_torque / 10.23, 2)
+        self._status_return_level = StatusReturnLevel(status_return)
+        self._alarm_led = DynamixelErrorSet(alarm_led)
+        self._shutdown_info = DynamixelErrorSet(shutdown_info)
+        self._multiturn_offset = multiturn_offset
+        self._resolution_divider = resolution_divider
+
+    @property
+    def angle_limit_cw(self):
+        """Angle limit in degrees, CW side. 0 - 360."""
+        return self._angle_limit_cw
+
+    @angle_limit_cw.setter
+    def angle_limit_cw(self, angle):
+        rawval = round(angle / 0.08791208791208792)
+        self.write_value(6, rawval, 2)
+        self._angle_limit_cw = angle
+        self._wheel_mode = None
+        self._multiturn_mode = None
+
+    @property
+    def angle_limit_ccw(self):
+        """Angle limit in degrees, CCW side. 0 - 360."""
+        return self._angle_limit_ccw
+
+    @angle_limit_ccw.setter
+    def angle_limit_ccw(self, angle):
+        rawval = round(angle / 0.08791208791208792)
+        self.write_value(8, rawval, 2)
+        self._angle_limit_ccw = angle
+        self._wheel_mode = None
+        self._multiturn_mode = None
+
+    @property
+    def multiturn_offset(self):
+        """Adjusts offset position.
+
+        Only meaningful in multi-turn mode.
+        """
+        return self._multiturn_offset
+
+    @multiturn_offset.setter
+    def multiturn_offset(self, offset):
+        self.write_value(20, offset, 2)
+        self._multiturn_offset = offset
+
+    @property
+    def resolution_divider(self):
+        """It allows the user to change Dynamixel’s resolution.
+
+        Only meaningful in multi-turn mode.
+        """
+        return self._resolution_divider
+
+    @resolution_divider.setter
+    def resolution_divider(self, value):
+        if value < 1 or value > 4:
+            raise ValueError("The resolution_divider must be between 1 and 4.")
+        self.write_value(22, value, 1)
+        self._resolution_divider = value
+
+    # RAM control table follows
+    @property
+    def goal_position(self):
+        """Goal position, from 0 to 360 degrees."""
+        rawval = int.from_bytes(self.read_value(30, 2), byteorder="little")
+        return round(rawval * 0.08791208791208792, 2)
+
+    @goal_position.setter
+    def goal_position(self, angle):
+        rawval = round(angle / 0.08791208791208792)
+        self.write_value(30, rawval, 2)
+
+    @property
+    def present_position(self):
+        """Present position, in degrees (0 to 360)."""
+        rawval = int.from_bytes(self.read_value(36, 2), byteorder="little")
+        return round(rawval * 0.08791208791208792, 2)
+
+    def move_to(self, goal):
+        """Move to <goal> angle. Blocks until complete."""
+        if not self.wheel_mode and not self.multiturn_mode:
+            self.goal_position = goal
+            # Use raw values inside methods for better performance
+            rawgoal = round(goal / 0.08791208791208792)
+            # Reported and requested values can differ slightly
+            bot = max(rawgoal - 2, 0)
+            top = min(rawgoal + 2, 4095)
+            present_position = int.from_bytes(self.read_value(36, 2), byteorder="little")
+            while present_position < bot or present_position > top:
+                timers.nanosleep(0.01)
+                present_position = int.from_bytes(self.read_value(36, 2), byteorder="little")
+
+
 _BAUD_CODES = {
     1: 1_000_000,
     3: 500_000,
@@ -794,15 +974,22 @@ _BAUD_CODES = {
     16: 115_200,
     34: 57_600,
     103: 19_200,
-    207: 9600,
+    207: 9_600,
+    250: 2_250_000,
+    251: 2_500_000,
+    252: 3_000_000,
 }
 
 _BAUD_CODES_REV = dict([(v, k) for k, v in _BAUD_CODES.items()])
 
 
+# Maps both human-friendly name for scripting use, and product ID number for
+# find method use.
 _MOTORS = {
     "AX-18A": DynamixelAX18A,
     18: DynamixelAX18A,
+    "MX-64A": DynamixelMX64A,
+    310: DynamixelMX64A,
 }
 
 
@@ -840,12 +1027,6 @@ class SerialInterface:
         return self.get_motor(model, motorid)
         # TODO protocol 2
 
-    def perform_action(self):
-        """Perform registered command on all devices."""
-        if self._ser is not None:
-            protocol = Protocol1(self._ser)
-            protocol.send_message(0xFE, Instruction.Action, b"")
-
     def get_motor(self, motortype, motorid, baud=57600):
         """Provide a known motor model and ID.
 
@@ -858,6 +1039,12 @@ class SerialInterface:
         if self._ser is None:
             self.open(baud=baud)
         return mclass(self._ser, motorid)
+
+    def perform_action(self):
+        """Perform registered command on all devices."""
+        if self._ser is not None:
+            protocol = Protocol1(self._ser)
+            protocol.send_message(0xFE, Instruction.Action, b"")
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
