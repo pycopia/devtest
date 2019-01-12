@@ -154,6 +154,29 @@ class AndroidController(devices.Controller):
         else:
             raise AndroidControllerError((es, stderr))
 
+    def start_activity(self, package, activity,
+                       action='android.intent.action.MAIN', **extra):
+        """Start an activity on device.
+
+        Args:
+            package: str with package name.
+            activity: str with activity name.
+            action: str of action, default is 'android.intent.action.MAIN'.
+        Extra options may be supplied as additional keyword arguments.
+
+        Returns:
+            output of activity start command.
+        """
+        cmd = ['cmd', 'activity', 'start', '-a', action,
+               "{}/{}".format(package, activity)]
+        for key, value in extra:
+            option, optionval = _activity_extra_type(value)
+            cmd.extend([option, key, optionval])
+        out = self.shell(cmd)
+        if "Error:" in out:
+            raise AndroidControllerError(out)
+        return out
+
     def get_property(self, name):
         """Get a single Android property.
         """
@@ -250,6 +273,32 @@ class AndroidController(devices.Controller):
             raise AndroidControllerError((es, stderr))
 
 
+def _activity_extra_type(value):
+    """Figure out the intent extra type option from the Python type.
+
+    Best effort, might not work for all cases.
+    """
+    if isinstance(value, str):
+        return "--es", value
+    elif isinstance(value, bool):
+        return "--ez", "true" if value else "false"
+    elif isinstance(value, int):
+        if value.bit_length() <= 32:
+            return "--ei", str(value)
+        else:
+            return "--el", str(value)
+    elif isinstance(value, float):
+        return "--ef", str(value)
+    elif isinstance(value, list):
+        if all(isinstance(v, int) for v in value):
+            return "--eia", ",".join(str(v) for v in value)
+        elif all(isinstance(v, float) for v in value):
+            return "--efa", ",".join(str(v) for v in value)
+        elif all(isinstance(v, str) for v in value):
+            return "--esa", ",".join(value)
+    raise ValueError("Don't have conversion for type: {}".format(type(value)))
+
+
 class _Settings:
     """Manage Android settings.
 
@@ -338,8 +387,10 @@ class _Settings:
         # are removed, the location service is disabled.
         if onoff:
             # TODO(dart) fix hard-coded defaults
-            self._cont.shell(['settings', 'put', "secure", "location_providers_allowed", "+gps"])
-            self._cont.shell(['settings', 'put', "secure", "location_providers_allowed", "+network"])
+            self._cont.shell(["settings", "put", "secure",
+                              "location_providers_allowed", "+gps"])
+            self._cont.shell(["settings", "put", "secure",
+                              "location_providers_allowed", "+network"])
         else:
             locations =  self._cont.shell(
                 ['settings', 'get', "secure", "location_providers_allowed"])
