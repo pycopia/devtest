@@ -26,7 +26,7 @@ from devtest.io import streams
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
-from devtest.io.reactor import get_kernel, spawn, run_in_thread, sleep
+from devtest.io.reactor import get_kernel, spawn, block_in_thread, sleep
 
 
 ADB = procutils.which("adb")
@@ -441,6 +441,10 @@ class AndroidDeviceClient:
     def open(self):
         get_kernel().run(self._aadb.open())
 
+    @property
+    def async_client(self):
+        return self._aadb
+
     def get_features(self):
         return get_kernel().run(self._aadb.get_features())
 
@@ -510,7 +514,7 @@ class AndroidDeviceClient:
             cb: callable with signature cb(os.stat_result, filename)
         """
         async def acb(stat, path):
-            await run_in_thread(cb, stat, path)
+            await block_in_thread(cb, stat, path)
         coro = self._aadb.list(name, acb)
         return get_kernel().run(coro)
 
@@ -712,7 +716,7 @@ class SyncProtocol:
                 return False
             name = await self.socket.recv(namelen)
             stat = os.stat_result((mode, None, None, None, 0, 0, size, None, time, None))
-            await spawn(cb_coro(stat, name.decode("utf-8")))
+            await cb_coro(stat, name.decode("utf-8"))
 
 
 class AndroidDevice:

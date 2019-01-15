@@ -16,10 +16,13 @@
 
 from __future__ import generator_stop
 
+import os
 import re
+import stat
 from ast import literal_eval
 
 from devtest import devices
+from devtest.io import reactor
 from devtest.core import exceptions
 from devtest.devices.android import adb
 from devtest.devices.android import sl4a
@@ -43,6 +46,9 @@ class AndroidController(devices.Controller):
         api: An sl4a.SL4AInterface instance.
         snippets: An snippets.SnippetsInterface instance.
         properties: A dictionary of all Android property values (from getprop).
+        settings: Access to settings.
+        buttons: Access to button press interaction.
+        thermal: Access to thermal information
     """
 
     _PROPERTY_RE = re.compile(r"\[(.*)\]: \[(.*)\]")
@@ -130,11 +136,6 @@ class AndroidController(devices.Controller):
                 name, value = m.group(1, 2)
                 pd[name] = value
         return pd
-
-    @property
-    def settings(self):
-        """Android settings."""
-        return _Settings(self)
 
     def shell(self, cmd):
         """Run a shell command and return stdout.
@@ -272,6 +273,128 @@ class AndroidController(devices.Controller):
         else:
             raise AndroidControllerError((es, stderr))
 
+    @property
+    def settings(self):
+        """Android settings."""
+        return _Settings(self)
+
+    @property
+    def buttons(self):
+        """Use some buttons using kernel event injection.
+        """
+        return _Buttons(self)
+
+    # thermal management
+    @property
+    def thermal(self):
+        """Access to thermal management.
+        """
+        return _Thermal(self)
+
+
+class _Buttons:
+    def __init__(self, controller):
+        self._cont = controller
+
+    def press(self, keycode):
+        """Insert a a keyevent for the given keycode.
+
+        See: https://developer.android.com/reference/android/view/KeyEvent
+        for possible codes.
+        """
+        return self._cont.shell(['input', 'keyevent', keycode])
+
+    def power(self):
+        """Wake up device by using wakeup key.
+        """
+        return self.press('KEYCODE_WAKEUP')
+
+    def back(self):
+        """Press Back button.
+        """
+        return self.press('KEYCODE_BACK')
+
+    def home(self):
+        """Press Home button.
+        """
+        return self.press('KEYCODE_HOME')
+
+    def volume_up(self):
+        """Press volume up.
+        """
+        return self.press('KEYCODE_VOLUME_UP')
+
+    def volume_down(self):
+        """Press volume down.
+        """
+        return self.press('KEYCODE_VOLUME_DOWN')
+
+
+class _Thermal:
+    """Access Android thermal subsystem.
+    """
+
+    THERMAL_ENGINE_CONFIG = "/vendor/etc/thermal-engine.conf"
+    THERMAL_BASE = "/sys/devices/virtual/thermal"
+
+    def __init__(self, controller):
+        self._cont = controller
+        self._config = self._parse_config(self.THERMAL_ENGINE_CONFIG)
+        self._board_temp_file = self._find_board_temp_file()
+
+    def _parse_config(self, cfpath):
+        """Parse the thermal-engine config file to a dictionary.
+        """
+        d = {}
+        text = self._cont.shell(["cat", cfpath])
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("["):
+                section_name = line[1:-1]
+                d[section_name] = section = {}
+            else:
+                option, value = line.split(None, 1)
+                section[option] = value.split() if "\t" in value else _evaluate_value(value)
+        return d
+
+    def _find_board_temp_file(self):
+        """Find the thermal subystem temperature file to use for the board temperature.
+
+        Use the THROTTLING-NOTIFY2 config.
+        """
+        config_section = self._config.get("THROTTLING-NOTIFY2")
+        if config_section is None:
+            raise AndroidControllerError("No THROTTLING-NOTIFY2 section in config")
+        # Find the right thermal_zone path for that sensor type.
+        sensor_type = config_section["sensor"]
+        sensor_path = None
+        ac = self._cont.adb.async_client
+
+        async def match_entry(st, name):
+            nonlocal sensor_path
+            if stat.S_ISDIR(st.st_mode):
+                if name.startswith("thermal_zone"):
+                    tpath = os.path.join(self.THERMAL_BASE, name, "type")
+                    out, err, es = await ac.command(["cat", tpath])
+                    if es:
+                        if out.strip() == sensor_type:
+                            sensor_path = os.path.join(self.THERMAL_BASE, name, "temp")
+
+        reactor.get_kernel().run(ac.list(self.THERMAL_BASE, match_entry))
+        return sensor_path
+
+    @property
+    def board_temperature(self):
+        """The current board temperature, in Deg C."""
+        out, err, es = self._cont.adb.command(["cat", self._board_temp_file])
+        if es:
+            return int(out.strip())
+        else:
+            raise AndroidControllerError(
+                "Couldn't read board temperature file: {}".format(self._board_temp_file))
+
 
 def _activity_extra_type(value):
     """Figure out the intent extra type option from the Python type.
@@ -297,6 +420,15 @@ def _activity_extra_type(value):
         elif all(isinstance(v, str) for v in value):
             return "--esa", ",".join(value)
     raise ValueError("Don't have conversion for type: {}".format(type(value)))
+
+
+def _evaluate_value(value):
+    if value == "null":
+        return None
+    try:
+        return literal_eval(value)
+    except:  # noqa
+        return value
 
 
 class _Settings:
@@ -336,17 +468,9 @@ class _Settings:
         else:
             return str(value)
 
-    def _decode(self, value):
-        if value == "null":
-            return None
-        try:
-            return literal_eval(value)
-        except:  # noqa
-            return value
-
     def get(self, namespace, key):
         val =  self._cont.shell(['settings', 'get', namespace, key])
-        return self._decode(val)
+        return _evaluate_value(val)
 
     def put(self, namespace, key, value, tag=None, default=None):
         value = self._encode(value)
@@ -367,7 +491,7 @@ class _Settings:
         out = self._cont.shell(['settings', 'list', namespace])
         for line in out.splitlines():
             key, val = line.split("=", 1)
-            rv[key] = self._decode(val)
+            rv[key] = _evaluate_value(val)
         return rv
 
     def reset(self, namespace, mode):
