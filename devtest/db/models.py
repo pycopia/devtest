@@ -215,8 +215,8 @@ class Equipment(BaseModel):
 
     def remove_connection(self, other, connection_type=None):
         with database.atomic():
-            q = self.connections.where(_Connection.source == self &
-                                       _Connection.destination == other)
+            q = _Connection.select().where((_Connection.source == self) &
+                                           (_Connection.destination == other))
             if connection_type is not None:
                 q = q.where(_Connection.type == connection_type)
             conn = q.get()

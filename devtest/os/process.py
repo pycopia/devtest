@@ -459,7 +459,11 @@ class ProcessManager:
             if sts == psutil.STATUS_ZOMBIE:
                 del self._procs[pid]
                 self._zombies[pid] = proc
-                es = proc.poll()
+                try:
+                    es = proc.poll()
+                except ChildProcessError:
+                    logging.notice("Already waited: {}({})".format(proc.progname, proc.pid))
+                    return
                 if es < 0:  # signaled
                     es = signal.Signals(-es)
                 logging.notice("Exited: {}({}): {}".format(proc.progname, proc.pid, es))
