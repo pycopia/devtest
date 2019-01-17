@@ -42,7 +42,10 @@ def main(argv):
                                       stdout: write data as it comes from device to stdout.
                                       average: Write only average of values from run.
                                       count: Simply count and report cumulative values.
+                                      file: raw, binary sample data.
                                       [default: stdout]
+        --filename=<filename>         Name of file to write to if output is to file.
+                                      [default: samples.dat]
     """
     arguments = docopt.docopt(main.__doc__, argv=argv[1:])
     measure_context = {
@@ -54,6 +57,7 @@ def main(argv):
             "calsamples": int(arguments["--calsamples"]),
             "duration": int(arguments["--duration"]) if arguments["--duration"] else None,
             "output": arguments["--output"],
+            "filename": arguments["--filename"],
     }
 
     measurer = measure.MonsoonCurrentMeasurer(measure_context)

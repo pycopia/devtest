@@ -16,6 +16,7 @@
 with different measurement handlers.
 """
 
+import struct
 import collections
 
 from devtest.devices.monsoon import simple as monsoon_simple
@@ -224,6 +225,43 @@ class StdoutHandler(MeasurementHandler):
             print(main_current, usb_current, aux_current, main_voltage, usb_voltage, sep="\t")
 
 
+class FileHandler(MeasurementHandler):
+    """Handler that emits sample data as binary packed double values.
+
+    Structure is (main_current, usb_current, aux_current, main_voltage, usb_voltage),
+    which is 5 items, or 40 bytes per sample.
+
+    This can be read by numpy as:
+
+        data = np.fromfile(file, dtype=np.double)
+        data.shape = (-1, 5)
+        data = data.transpose()
+
+    This will give you columns containing the above values. That is, data[0] is
+    main_current.
+    """
+
+    def initialize(self, context):
+        super().initialize(context)
+        fname = context.get("filename")
+        self._packer = struct.Struct("=5d")
+        if not fname:
+            raise ValueError("No filename in context for Monsoon measurer.")
+        self._output = open(fname, "wb")
+
+    def __call__(self, sample):
+        # values are (main_current, usb_current, aux_current, main_voltage, usb_voltage)
+        values = self._process_raw(sample)
+        if values[0] is not None:
+            data = self._packer.pack(*values)
+            self._output.write(data)
+
+    def finalize(self, captured, dropped):
+        super().finalize(captured, dropped)
+        self._packer = None
+        self._output.close()
+
+
 class AverageHandler(MeasurementHandler):
     """Compute only average of all measurements.
 
@@ -362,6 +400,7 @@ class MonsoonCurrentMeasurer(Measurer):
                 "stdout": StdoutHandler,
                 "count": CountingHandler,
                 "average": AverageHandler,
+                "file": FileHandler,
             }.get(ctx.get("output"))
         if handlerclass is None or not issubclass(handlerclass, MeasurementHandler):
             raise ValueError("Measure handler class must be standard name or "
