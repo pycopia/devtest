@@ -131,10 +131,11 @@ class JupyterReport(BaseReport):
         self._display_html("DUT version: {!s} ({})<br/>".format(build, variant))
 
     def on_logdir_location(self, runner, path=None):
-        self._display_html('Results location: <a href="file://{path}">{path}</a>'.format(path=path))
+        self._display_html(
+            'Results location: <a href="file://{path}/" target="_blank">{path}/</a>'.format(path=path))
 
     def on_test_data(self, testcase, data=None):
-        pass
+        self._display_html("Data: {!r}<br/>".format(data))
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

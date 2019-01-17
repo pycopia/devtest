@@ -21,6 +21,8 @@ import sys
 import os
 from datetime import timezone
 
+from devtest import json
+
 from . import BaseReport
 
 WIDTH, LINES = os.get_terminal_size()
@@ -115,7 +117,9 @@ class DefaultReport(BaseReport):
 
     def initialize(self, config=None):
         self._file = sys.stdout
+        self._logdir = "/tmp"
         if config is not None:
+            self._logdir = config.get("resultsdir", "/tmp")
             self.timezone = config.get("timezone", timezone.utc)
         else:
             self.timezone = timezone.utc
@@ -198,7 +202,15 @@ class DefaultReport(BaseReport):
         print(("DUT version: {!s} ({})").format(build, variant), file=self._file)
 
     def on_logdir_location(self, runner, path=None):
+        self._logdir = path
         print("Results location:", path, file=self._file)
+
+    def on_test_data(self, testcase, data=None):
+        fname = "{}_data.json".format(testcase.test_name)
+        fpath = os.path.join(self._logdir, fname)
+        with open(fpath, "a") as fo:
+            json.dump(data, fo)
+        print("Data written to", repr(fname), "in results location.", file=self._file)
 
 
 class DefaultReportUnicode(DefaultReport):
