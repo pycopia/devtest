@@ -170,9 +170,10 @@ class AndroidController(devices.Controller):
         """
         cmd = ['cmd', 'activity', 'start', '-a', action,
                "{}/{}".format(package, activity)]
-        for key, value in extra:
-            option, optionval = _activity_extra_type(value)
-            cmd.extend([option, key, optionval])
+        for key, value in extra.items():
+            if value is not None:
+                option, optionval = _activity_extra_type(value)
+                cmd.extend([option, key, optionval])
         out = self.shell(cmd)
         if "Error:" in out:
             raise AndroidControllerError(out)

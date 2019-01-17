@@ -31,9 +31,11 @@ from .signals import *  # noqa
 
 # Type annotations
 Str = str
+Int = int
+Float = float
 OptionalStr = Optional[str]
 OptionalInt = Optional[int]
-Float = float
+OptionalFloat = Optional[float]
 
 
 __all__ = ['TestCase', 'TestSuite', 'Scenario']
