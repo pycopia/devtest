@@ -210,7 +210,7 @@ class DefaultReport(BaseReport):
         fpath = os.path.join(self._logdir, fname)
         with open(fpath, "a") as fo:
             json.dump(data, fo)
-        print("Data written to", repr(fname), "in results location.", file=self._file)
+        print(" Data available:", repr(fname), file=self._file)
 
 
 class DefaultReportUnicode(DefaultReport):

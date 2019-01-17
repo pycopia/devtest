@@ -28,6 +28,8 @@ class PowerMeterRole(BaseRole):
 
     def measure_average_power(self, duration=10, samples=None, voltage=4.2,
                               passthrough="auto"):
+        """Measure and report average power over the span of time.
+        """
         measure_context = {
             "serialno": self._equipment["serno"],
             "passthrough": passthrough,
@@ -38,6 +40,22 @@ class PowerMeterRole(BaseRole):
         measurer = measure.MonsoonCurrentMeasurer(measure_context)
         result = measurer.measure(handlerclass=measure.AveragePowerHandler)
         return result.main_power, result.usb_power
+
+    def record(self, filename, duration=10, samples=None, voltage=4.2,
+               passthrough="auto"):
+        """Record all samples to a file.
+        """
+        measure_context = {
+            "serialno": self._equipment["serno"],
+            "passthrough": passthrough,
+            "voltage": float(voltage),
+            "numsamples": samples,
+            "duration": duration,
+            "filename": filename,
+        }
+        measurer = measure.MonsoonCurrentMeasurer(measure_context)
+        result = measurer.measure(handlerclass=measure.FileHandler)
+        return result
 
 
 if __name__ == "__main__":

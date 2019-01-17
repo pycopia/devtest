@@ -490,8 +490,16 @@ class TestCase:
                                                      self.starttime, ext)
         return os.path.join(self.config.logdir, filename)
 
-    def open_log_file(self, basename: OptionalStr=None, ext="log", mode="wb") -> BinaryIO:
-        """Return a file object that you can write to in the results location.
+    def open_file(self, basename: OptionalStr=None, ext="log", mode="wb") -> BinaryIO:
+        """Return a file object that you can write to.
+
+        the file will be in the results location for this run.
+
+        Args:
+            basename: name of the file, without path. See get_filename for the
+                      resulting name format.
+            ext: file extension [default: log]
+            mode: File mode. [default: wb]
         """
         fname = self.get_filename(basename, ext)
         return open(fname, mode)
