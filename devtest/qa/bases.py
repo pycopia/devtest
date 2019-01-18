@@ -74,7 +74,7 @@ class TestCase:
     the ``procedure`` method, respectively.
     """
     OPTIONS = None  # Class, or TestCase, options
-    options = None  # loader may set instance options
+    optionslist = None  # loader may set instance options
     PREREQUISITES = None
     # TODO Annotate post-run state changes? Pre-conditions?
 
@@ -87,6 +87,7 @@ class TestCase:
         self._debug = config.flags.debug
         self._verbose = config.flags.verbose
         self._test_name = name
+        self.options = self.optionslist.pop(0) if self.optionslist else {}
 
     @classmethod
     def set_test_options(cls):
@@ -95,8 +96,8 @@ class TestCase:
         implementation = "{}.{}".format(cls.__module__, cls.__name__)
         # Chop off "testcases." base package name for brevity.
         test_name = implementation.replace("testcases.", "")
-        insert_options(cls, implementation=implementation, test_name=test_name)
-        opts = cls.OPTIONS
+        insert_options(cls, implementation=implementation, test_name=test_name,
+                       repeat=1)
         pl = []
         if cls.PREREQUISITES:
             for prereq in cls.PREREQUISITES:
@@ -106,16 +107,7 @@ class TestCase:
                     pl.append(_PreReq(*prereq))
                 else:
                     raise ValueError("Bad prerequisite value.")
-        opts.prerequisites = pl
-        # Additional class-level options and overrides
-        opts.repeat = 1
-        if cls.options is not None:
-            for extraopt in ("repeat", "bugid"):  # Special class options
-                optval = cls.options.pop(extraopt, None)
-                if optval is not None:
-                    setattr(opts, extraopt, optval)
-        else:
-            cls.options = {}
+        cls.OPTIONS.prerequisites = pl
 
     @property
     def prerequisites(self):
@@ -610,7 +602,7 @@ class _TestEntry:
         try:
             return self._signature
         except AttributeError:
-            arg_sig = repr((self.args, self.kwargs))
+            arg_sig = repr((self.args, self.kwargs, self.inst.options))
             self._signature = (id(self.inst.__class__), arg_sig)
             return self._signature
 

@@ -127,7 +127,7 @@ def _eval(val):
 # Run as top-level script to unit test.
 if __name__ == "__main__":
     argv = ["/usr/bin/prog", "-dv", "-v", "-s", "string", "name1",
-            "--arg11=val11", "--arg12=val12", "name2", "name3", "--arg31",
+            "--arg11=val11", "--arg12=val12", "--same=0", "name2", "--same=5", "name3", "--arg31",
             "--arg32=val32"]
 
     d = False
@@ -151,12 +151,15 @@ if __name__ == "__main__":
     assert s == "string"
     assert len(arguments) == 4
     assert len(arguments[0].options) == 0
-    assert len(arguments[1].options) == 2
-    assert len(arguments[2].options) == 0
+    assert len(arguments[1].options) == 3
+    assert len(arguments[2].options) == 1
     assert len(arguments[3].options) == 2
     assert arguments[1].argument == "name1"
     assert arguments[2].argument == "name2"
     assert arguments[3].argument == "name3"
+
+    assert arguments[1].options["same"] == 0
+    assert arguments[2].options["same"] == 5
 
     try:
         opts, arguments = getopt(["prog", "-x"], "dvs:")

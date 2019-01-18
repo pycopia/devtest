@@ -70,7 +70,9 @@ def load_selections(selections):
                             selection.argument, ierr))
             errlist.append(selection)
         else:
-            obj.options = selection.options
+            if getattr(obj, "optionslist", None) is None:
+                obj.optionslist = []
+            obj.optionslist.append(selection.options)
             if type(obj) is type:
                 obj.version = get_package_version_from_module(sys.modules[obj.__module__])
             else:
