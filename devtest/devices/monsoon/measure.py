@@ -410,7 +410,8 @@ class MonsoonCurrentMeasurer(Measurer):
         captured, dropped = dev.capture(samples=ctx["numsamples"],
                                         duration=ctx["duration"],
                                         handler=handler,
-                                        calsamples=ctx.get("calsamples", 1250))
+                                        calsamples=ctx.get("calsamples", 1250),
+                                        startdelay=ctx.get("delay", 0))
         dev.close()
         handler.finalize(captured, dropped)
         return handler

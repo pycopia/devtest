@@ -212,7 +212,8 @@ class HVPM(Monsoon):
     def read_sample(self):
         return self._dev.bulk_transfer(1, usb.EndpointDirection.In, 64, timeout=1000)
 
-    def capture(self, samples=None, duration=None, handler=None, calsamples=1250):
+    def capture(self, samples=None, duration=None, handler=None, calsamples=1250,
+                startdelay=0):
         """Perform a measurement series.
 
         Arguments:
@@ -227,17 +228,23 @@ class HVPM(Monsoon):
                     This is, a single tuple of those items.
             calsamples: Time in milliseconds between calibration samples.
                         Default is 1250.
+            startdelay: Time in seconds to wait before sending samples to
+                        handler. Allows for settle time of DUT. Default is zero.
+                        This does not effect duration time.
         """
         if samples is None and duration is None:
             raise ValueError("You must supply either number of samples or sampling duration.")
         if duration:
-            samples = 5000 * int(duration)
+            samples = 5000 * int(duration)  # use samples as ticks
         else:
             samples = int(samples)
+        startsample = 5000 * int(startdelay)
+        samples += startsample
 
         if handler is None:
             def handler(sample):  # Used for self test
                 print(repr(sample))
+
 
         headreader = struct.Struct("<HBB")
         datareader = struct.Struct(">HHHHHHHHBB")
@@ -251,6 +258,8 @@ class HVPM(Monsoon):
                     dropped, flags, number = headreader.unpack(data[:headreader.size])
                     dropped_count = dropped  # device accumulates dropped sample count.
                     sample_count += number
+                    if sample_count < startsample:
+                        continue
                     for start, end in zip(
                             range(headreader.size,
                                   datareader.size * (number + 1),

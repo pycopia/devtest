@@ -32,6 +32,8 @@ def main(argv):
         --voltage=<voltage>           Voltage to set output to. [default: 4.2]
         --samples=<number>            Number of samples to take. [default: 25000]
         --duration=<seconds>          Alternatively, specify run time in seconds.
+        --delay=<seconds>             Wait <delay> seconds after start of sample
+                                      to begin actual sample handling. [default: 0]
         --calsamples=<milliseconds>   Interval for calibration samples.  [default: 1250]
         --serial=<serialno>           Serial number of device to use. Defaults to
                                       first found if not given.
@@ -56,6 +58,7 @@ def main(argv):
             "numsamples": int(arguments["--samples"]),
             "calsamples": int(arguments["--calsamples"]),
             "duration": int(arguments["--duration"]) if arguments["--duration"] else None,
+            "delay": int(arguments["--delay"]),
             "output": arguments["--output"],
             "filename": arguments["--filename"],
     }
