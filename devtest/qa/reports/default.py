@@ -206,11 +206,23 @@ class DefaultReport(BaseReport):
         print("Results location:", path, file=self._file)
 
     def on_test_data(self, testcase, data=None):
+        # If the same test is run multiple times, add new data to top-level
+        # list. Make a new top-level list if required.
         fname = "{}_data.json".format(testcase.test_name)
         fpath = os.path.join(self._logdir, fname)
-        with open(fpath, "a") as fo:
+        olddata = None
+        if os.path.exists(fpath):
+            with open(fpath) as fo:
+                olddata = json.load(fo)
+            if isinstance(olddata, list):
+                olddata.append(data)
+                data = olddata
+            else:
+                data = [olddata, data]
+        with open(fpath, "w") as fo:
             json.dump(data, fo)
-        print(" Data available:", repr(fname), file=self._file)
+        print(" Data {}:".format("added to" if olddata else "available in"),
+                                 repr(fname), file=self._file)
 
 
 class DefaultReportUnicode(DefaultReport):
@@ -249,9 +261,5 @@ class DefaultReportUnicode(DefaultReport):
         ml = "{0} Start TestSuite: {1:{width}s} {B}{2}{R}{3}".format(
             vert, testsuite.test_name, ts, vert, width=nw, B=BLUE, R=RESET)
         print(tt, ml, bt, sep="\n", file=self._file)
-
-
-def _get_timestring(dt, zone):
-    return dt.astimezone(zone).timetz().isoformat()
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8
