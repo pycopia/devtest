@@ -41,6 +41,7 @@
 
 import enum
 
+
 class HardwareModel(enum.IntEnum):
     UNKNOWN = 0
     LVPM = 1
@@ -198,7 +199,7 @@ class MonsoonInfo:
         s = []
         s.append("SerialNumber: {}".format(self.SerialNumber))
         s.append("Voltage: {}".format(self.Voltage))
-        s.append("MainVoltageScale: {}".format( self.MainVoltageScale))
+        s.append("MainVoltageScale: {}".format(self.MainVoltageScale))
         s.append("USBVoltageScale: {}".format(self.USBVoltageScale))
         s.append("ADCRatio: {}".format(self.ADCRatio))
         s.append("AuxCoarseResistorOffset: {}".format(self.AuxCoarseResistorOffset))
@@ -272,7 +273,48 @@ class SampleType(enum.IntEnum):
     RefCal = 0x30
 
 
-if __name__ == "__main__":
-    pass
+class MeasurementResult:
+    """Data resulting from any measurement run.
+
+    Returned by measure methods.
+    """
+    # This object should be kept in core module since it may be pickled, and
+    # unpickled in a place without a Monsoon.
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    @classmethod
+    def from_context_and_handler(cls, ctx, handler):
+        return cls(handler=handler.__class__.__name__,
+                   captured=handler.captured,
+                   dropped=handler.dropped,
+                   sample_count=handler.sample_count,
+                   main_current=getattr(handler, "main_current", None),
+                   main_power=getattr(handler, "main_power", None),
+                   main_voltage=getattr(handler, "main_voltage", None),
+                   usb_current=getattr(handler, "usb_current", None),
+                   usb_power=getattr(handler, "usb_power", None),
+                   usb_voltage=getattr(handler, "usb_voltage", None),
+                   aux_current=getattr(handler, "aux_current", None),
+                   samplefile=ctx.get("filename"),
+                   duration=ctx.get("duration"),
+                   delay=ctx.get("delay", 0),
+                   passthrough=ctx.get("passthrough", "auto"),
+                   voltage=ctx["voltage"],
+                   columns=handler.COLUMNS,
+                   units=handler.UNITS,
+                   )
+
+    def __str__(self):
+        s = ["{} for {}:".format(self.__class__.__name__, self.handler)]
+        for name in ("duration", "captured", "dropped", "sample_count",
+                     "main_current", "main_power", "main_voltage",
+                     "usb_current", "usb_power", "usb_voltage",
+                     "aux_current"):
+            val = getattr(self, name, None)
+            if val is not None:
+                s.append("{:>15.15s}: {!s}".format(name, val))
+        return "\n".join(s)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

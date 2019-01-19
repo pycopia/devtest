@@ -29,6 +29,9 @@ class PowerMeterRole(BaseRole):
     def measure_average_power(self, duration=10, samples=None, voltage=4.2,
                               passthrough="auto", delay=0):
         """Measure and report average power over the span of time.
+
+        Returns:
+            devtest.devices.monsoon.core.MeasurementResult object.
         """
         measure_context = {
             "serialno": self._equipment["serno"],
@@ -40,11 +43,14 @@ class PowerMeterRole(BaseRole):
         }
         measurer = measure.MonsoonCurrentMeasurer(measure_context)
         result = measurer.measure(handlerclass=measure.AveragePowerHandler)
-        return result.main_power, result.usb_power
+        return result
 
     def record(self, filename, duration=10, samples=None, voltage=4.2,
                passthrough="auto", delay=0):
         """Record all samples to a file.
+
+        Returns:
+            devtest.devices.monsoon.core.MeasurementResult object.
         """
         measure_context = {
             "serialno": self._equipment["serno"],
@@ -65,7 +71,7 @@ if __name__ == "__main__":
             "serno": "20418",
     }
     dev = PowerMeterRole(device)
-    main_power, usb_power = dev.measure_average_power(passthrough="on")
-    print("Main power: {:10.4f} W, USB power: {:10.4f} W".format(main_power, usb_power))
+    result = dev.measure_average_power(passthrough="on")
+    print("Main power: {:10.4f} W, USB power: {:10.4f} W".format(result.main_power, result.usb_power))
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

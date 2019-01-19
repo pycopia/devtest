@@ -33,6 +33,8 @@ def read_data(filename, metadata=None):
     return data.transpose()
 
 
+def load(metadatafile):
+    pass
 
 if __name__ == "__main__":
     pass

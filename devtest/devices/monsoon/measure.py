@@ -71,6 +71,12 @@ class CalibrationData:
 
 
 class MeasurementHandler:
+    """Handlers are callable instances that do something with capture samples.
+    """
+    # All use these column names and units.
+    COLUMNS = ("main_current", "usb_current", "aux_current", "main_voltage", "usb_voltage")
+    UNITS = ("mA", "mA", "unknown", "V", "V")
+
     def __init__(self, context, metadata, calsize=5):
         self.metadata = metadata
         self.sample_count = 0
@@ -276,11 +282,11 @@ class AverageHandler(MeasurementHandler):
     def __call__(self, sample):
         main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
         if main_current is not None:
-            self.main_current = (main_current + ((self.measure_count - 1) * self.main_current) ) / self.measure_count
-            self.main_voltage = (main_voltage + ((self.measure_count - 1) * self.main_voltage) ) / self.measure_count
-            self.usb_current = (usb_current + ((self.measure_count - 1) * self.usb_current) ) / self.measure_count
-            self.usb_voltage = (usb_voltage + ((self.measure_count - 1) * self.usb_voltage) ) / self.measure_count
-            self.aux_current = (aux_current + ((self.measure_count - 1) * self.aux_current) ) / self.measure_count
+            self.main_current = (main_current + ((self.measure_count - 1) * self.main_current)) / self.measure_count
+            self.main_voltage = (main_voltage + ((self.measure_count - 1) * self.main_voltage)) / self.measure_count
+            self.usb_current = (usb_current + ((self.measure_count - 1) * self.usb_current)) / self.measure_count
+            self.usb_voltage = (usb_voltage + ((self.measure_count - 1) * self.usb_voltage)) / self.measure_count
+            self.aux_current = (aux_current + ((self.measure_count - 1) * self.aux_current)) / self.measure_count
 
     def finalize(self, counted, dropped):
         super().finalize(counted, dropped)
@@ -323,10 +329,10 @@ class AveragePowerHandler(MeasurementHandler):
     def __call__(self, sample):
         main_current, usb_current, aux_current, main_voltage, usb_voltage = self._process_raw(sample)  # noqa
         if main_current is not None:  # actual sample
-            self.main_current = (main_current + ((self.measure_count - 1) * self.main_current) ) / self.measure_count
-            self.main_voltage = (main_voltage + ((self.measure_count - 1) * self.main_voltage) ) / self.measure_count
-            self.usb_current = (usb_current + ((self.measure_count - 1) * self.usb_current) ) / self.measure_count
-            self.usb_voltage = (usb_voltage + ((self.measure_count - 1) * self.usb_voltage) ) / self.measure_count
+            self.main_current = (main_current + ((self.measure_count - 1) * self.main_current)) / self.measure_count
+            self.main_voltage = (main_voltage + ((self.measure_count - 1) * self.main_voltage)) / self.measure_count
+            self.usb_current = (usb_current + ((self.measure_count - 1) * self.usb_current)) / self.measure_count
+            self.usb_voltage = (usb_voltage + ((self.measure_count - 1) * self.usb_voltage)) / self.measure_count
 
     def finalize(self, counted, dropped):
         super().finalize(counted, dropped)
@@ -400,6 +406,7 @@ class MonsoonCurrentMeasurer(Measurer):
                 "stdout": StdoutHandler,
                 "count": CountingHandler,
                 "average": AverageHandler,
+                "power": AveragePowerHandler,
                 "file": FileHandler,
             }.get(ctx.get("output"))
         if handlerclass is None or not issubclass(handlerclass, MeasurementHandler):
@@ -414,6 +421,6 @@ class MonsoonCurrentMeasurer(Measurer):
                                         startdelay=ctx.get("delay", 0))
         dev.close()
         handler.finalize(captured, dropped)
-        return handler
+        return core.MeasurementResult.from_context_and_handler(ctx, handler)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

@@ -43,6 +43,7 @@ def main(argv):
         --output=<reportname>         Output format.
                                       stdout: write data as it comes from device to stdout.
                                       average: Write only average of values from run.
+                                      power: Average power over the run.
                                       count: Simply count and report cumulative values.
                                       file: raw, binary sample data.
                                       [default: stdout]
