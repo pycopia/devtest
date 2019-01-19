@@ -18,12 +18,16 @@ Basically, just pre-instantiates an encoder and decoder with options that is
 common for all of the framework.
 
 Also provides both text and bytes object codecs.
+
+It can encode most Python objects as an embedded pickle string. Any other JSON
+reader can read it, but it won't be able to decode the pickle.
 """
 
 __all__ = ['JSONSettingsError', 'Encoder', 'Decoder', 'decode_bytes', 'decode',
            'encode_bytes', 'encode', 'dump', 'dumps', 'load', 'loads']
 
 import json
+import pickle
 
 
 class JSONSettingsError(TypeError):
@@ -37,13 +41,24 @@ class Encoder(json.JSONEncoder):
     def __init__(self):
         super(Encoder, self).__init__(ensure_ascii=False)
 
+    def default(self, o):
+        try:
+            return {"_pickle_": pickle.dumps(o, protocol=pickle.HIGHEST_PROTOCOL).hex()}
+        except Exception:  # noqa
+            return super().default(o)
+
 
 class Decoder(json.JSONDecoder):
     """Decodes JSON into Python objects, and reconstitutes additional Python
     objects that were encoded by the encoder in this module.
     """
     def __init__(self):
-        super(Decoder, self).__init__()
+        super(Decoder, self).__init__(object_hook=self._object_hook)
+
+    def _object_hook(self, o):
+        if "_pickle_" in o:
+            return pickle.loads(bytes.fromhex(o["_pickle_"]))
+        return o
 
 
 _decoder = Decoder()
