@@ -206,6 +206,22 @@ class AdbClient:
                                                          hostport, devport)
         get_kernel().run(_command_transact(self._conn, msg))
 
+    def list_forward(self):
+        """Return a list of currently forwarded ports.
+
+        Returns:
+            Tuple of (serial, host_port, device_port).
+        """
+        resp = self._message(b"host:list-forward")
+        fl = []
+        for line in resp.splitlines():
+            # <serial> " " <local> " " <remote> "\n"
+            serno, host_port, remote_port = line.split()
+            fl.append((serno.decode("ascii"),
+                       int(host_port.split(b":")[1]),
+                       int(remote_port.split(b":")[1])))
+        return fl
+
     def reconnect_offline(self):
         self._message(b"host:reconnect-offline")
 
@@ -249,8 +265,6 @@ class _AsyncAndroidDeviceClient:
         await self.get_features()
 
     async def _message(self, msg):
-        if not self._conn.isopen():
-            raise Error("Operation on a closed device client.")
         return await _transact(self._conn, msg)
 
     async def get_features(self):
@@ -299,6 +313,29 @@ class _AsyncAndroidDeviceClient:
         """
         msg = b"host-serial:%b:killforward:tcp:%d" % (self.serial, hostport)
         await _command_transact(self._conn, msg)
+
+    async def kill_forward_all(self):
+        """Tell server to remove all forwarding TCP ports.
+        """
+        msg = b"host-serial:%b:killforward-all" % (self.serial,)
+        await _command_transact(self._conn, msg)
+
+    async def list_forward(self):
+        """Return a list of currently forwarded ports.
+
+        Returns:
+            Tuple of (host_port, device_port).
+        """
+        msg = b"host-serial:%b:list-forward" % (self.serial,)
+        resp = await self._message(msg)
+        fl = []
+        for line in resp.splitlines():
+            # <serial> " " <local> " " <remote> "\n"
+            serno, host_port, remote_port = line.split()
+            if serno == self.serial:
+                fl.append((int(host_port.split(b":")[1]),
+                           int(remote_port.split(b":")[1])))
+        return fl
 
     async def wait_for(self, state: str):
         """Wait for device to be in a particular state.
@@ -442,6 +479,10 @@ class AndroidDeviceClient:
         get_kernel().run(self._aadb.open())
 
     @property
+    def serial(self):
+        return self._aadb.serial
+
+    @property
     def async_client(self):
         return self._aadb
 
@@ -476,6 +517,10 @@ class AndroidDeviceClient:
         """Tell server to remove forwarding TCP ports.
         """
         return get_kernel().run(self._aadb.kill_forward(hostport))
+
+    def list_forward(self):
+        """Get a list of currently forwarded ports."""
+        return get_kernel().run(self._aadb.list_forward())
 
     def wait_for(self, state: str):
         """Wait for device to be in a particular state.
@@ -765,6 +810,7 @@ if __name__ == "__main__":
     print("  Server version:", c.server_version)
     for devinfo in c.get_device_list():
         print("    ", devinfo)
+    print("Forwards:", c.list_forward())
     c.close()
     del c
 
@@ -778,6 +824,8 @@ if __name__ == "__main__":
     print("    ", es)
     print("    stdout:", repr(stdout))
     print("    stderr:", repr(stderr))
+    print("forward list:")
+    print(repr(ac.list_forward()))
     ac.close()
     del ac
 
@@ -790,6 +838,10 @@ if __name__ == "__main__":
         print("    stdout:", repr(stdout))
         print("    stderr:", repr(stderr))
 
+        fl = await ac.list_forward()
+        print("Forward list:")
+        print(repr(fl))
+
         signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
         await ac.wait_for("device")
         try:
@@ -798,6 +850,7 @@ if __name__ == "__main__":
             await task.cancel()
         finally:
             await ac.close()
+        await ac.close()
 
     kern = get_kernel()
     kern.run(dostuff)
