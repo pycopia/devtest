@@ -182,6 +182,17 @@ class AndroidController(devices.Controller):
             raise AndroidControllerError(out)
         return out
 
+    def instrument(self, package, runner, wait=False, **extra):
+        """Run instrumented code like 'am instrument'."""
+        cmd = ('export CLASSPATH=/system/framework/am.jar; '
+               'exec app_process /system/bin com.android.commands.am.Am instrument')
+        if wait:
+            cmd += " -w"
+        for name, value in extra.items():
+            cmd += ' -e "{}" "{}"'.format(name, value)
+        cmd += ' "{}/{}"'.format(package, runner)
+        return self.shell(cmd)
+
     def get_property(self, name):
         """Get a single Android property.
         """

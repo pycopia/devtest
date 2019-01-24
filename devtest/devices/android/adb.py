@@ -548,6 +548,14 @@ class AndroidDeviceClient:
         """
         return get_kernel().run(self._aadb.command(cmdline, usepty))
 
+    def spawn(self, cmdline):
+        """Start a process on device in raw mode.
+
+        Return:
+            DeviceProcess with active connection.
+        """
+        return get_kernel().run(self._aadb.spawn(cmdline))
+
     def install(self, apkfile, **kwargs):
         """Install an APK.
 
@@ -620,6 +628,9 @@ class DeviceProcess:
         if self.socket is not None:
             await self.socket.close()
             self.socket = None
+
+    def sync_close(self):
+        return get_kernel().run(self.close)
 
 
 def _fix_command_line(cmdline):
