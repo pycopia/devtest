@@ -447,6 +447,12 @@ class _AsyncAndroidDeviceClient:
         await self._conn.close()
         await self._init()
 
+    async def logcat_clear(self):
+        """Clear logcat buffer."""
+        stdout, stderr, es = await self.command(["logcat", "-c"])
+        if not es:
+            raise AdbCommandFail("Didn't clear logcat")
+
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
@@ -566,6 +572,10 @@ class AndroidDeviceClient:
     def reconnect(self):
         """Reconnect from device side."""
         return get_kernel().run(self._aadb.reconnect())
+
+    def logcat_clear(self):
+        """Clear logcat buffer."""
+        return get_kernel().run(self._aadb.logcat_clear())
 
     async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
