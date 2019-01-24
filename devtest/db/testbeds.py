@@ -420,9 +420,10 @@ class EquipmentRuntime:
         role = self._attributes["role"]
         return [EquipmentRuntime(eq, role) for eq in self._equipment.subcomponents]
 
-    def service_want(self, name):
+    def service_want(self, name, **kwargs):
         """Request a service from the services modules."""
-        return signals.service_want.send(self, service=name)
+        kwargs.pop("service", None)
+        return signals.service_want.send(self, service=name, **kwargs)
 
     def service_dontwant(self, name):
         """Relinquish a service from the services modules."""

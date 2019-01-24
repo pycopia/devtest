@@ -39,8 +39,8 @@ def log_receiver_connected(sig, receiver=None, sender=None, weak=None):
             name=sig.name, recv=receiver, sender=sender))
 
 
-def log_service_want(equipment, service=None):
-    logging.info("service wanted by {!r}: {!r}".format(equipment.name, service))
+def log_service_want(equipment, service=None, **kwargs):
+    logging.info("service wanted by {!r}: {!r} kwargs={!r}".format(equipment.name, service, kwargs))
 
 
 def log_service_dontwant(equipment, service=None):
@@ -53,7 +53,7 @@ class Service(abc.ABC):
     Service class in submodules inherit from this class.
     """
 
-    def provide_for(self, needer):
+    def provide_for(self, needer, **kwargs):
         """Provide the service for the needer (equipment).
         """
         raise NotImplementedError("provide_for must be implemented")
@@ -101,12 +101,12 @@ class ServiceManager:
                 "Service {!r} is not registered.".format(name))
         return srv
 
-    def _fulfiller(self, needer, service=None):
+    def _fulfiller(self, needer, service=None, **kwargs):
         srv = self._servicemap.get(service)
         if srv is None:
             raise exceptions.ConfigError(
                 "{} wants {!r} but is not provided.".format(needer, service))
-        return srv.provide_for(needer)
+        return srv.provide_for(needer, **kwargs)
 
     def _releaser(self, needer, service=None):
         srv = self._servicemap.get(service)

@@ -72,7 +72,7 @@ class SerialCaptureService(Service):
         self._logdir = path
         self.set_logdir(path)
 
-    def provide_for(self, device):
+    def provide_for(self, device, **kwargs):
         hostname = device.get("hostname")
         console_config = device.get("console")
         if console_config:

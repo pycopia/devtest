@@ -35,10 +35,11 @@ class LogcatService(Service):
     def _set_logdir(self, runner, path=None):
         self._logdir = path
 
-    def provide_for(self, needer):
+    def provide_for(self, needer, **kwargs):
+        logtags = kwargs.get("logcat_tags", getattr(needer, "logcat_tags", ""))
         pm = process.get_manager()
         coproc = pm.coprocess()
-        coproc.start(make_logcat_coroutine, needer.serno, self._logdir)
+        coproc.start(make_logcat_coroutine, needer.serno, self._logdir, logtags)
         self._inuse[needer.serno] = coproc
 
     def release_for(self, needer):
@@ -52,7 +53,7 @@ class LogcatService(Service):
 
 
 # Runs from coprocess server
-def make_logcat_coroutine(serialno, logdir):
+def make_logcat_coroutine(serialno, logdir, logtags):
     import os
     import signal
     from devtest.io.reactor import spawn, SignalEvent
@@ -60,14 +61,16 @@ def make_logcat_coroutine(serialno, logdir):
 
     logfilename = os.path.join(logdir, "logcat_{}.txt".format(serialno))
 
-    async def dologcat(logfilename):
+    async def dologcat(logfilename, logtags):
         aadc = await adb.AsyncAndroidDeviceClient(serialno)
         await aadc.wait_for("device")
+        await aadc.logcat_clear()
         try:
             signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
             try:
                 with open(logfilename, "ab", 0) as logfile:
-                    task = await spawn(aadc.logcat(logfile, logfile))
+                    task = await spawn(aadc.logcat(logfile, logfile,
+                                                   logtags=logtags))
                     await signalset.wait()
                     await task.cancel()
             finally:
@@ -75,7 +78,7 @@ def make_logcat_coroutine(serialno, logdir):
         except KeyboardInterrupt:
             pass
 
-    return dologcat(logfilename)
+    return dologcat(logfilename, logtags)
 
 
 def initialize(manager):

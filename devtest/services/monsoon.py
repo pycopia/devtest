@@ -58,7 +58,7 @@ class MonsoonService(Service):
                 break
         return hvpm, passthrough  # model object
 
-    def provide_for(self, needer):
+    def provide_for(self, needer, **kwargs):
         hvpm, passthrough = self._find_hvpm(needer)
         if hvpm is None:
             raise exceptions.ConfigNotFoundError("Device has no connected HVPM")
