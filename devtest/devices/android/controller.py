@@ -159,16 +159,19 @@ class AndroidController(devices.Controller):
                        action='android.intent.action.MAIN', **extra):
         """Start an activity on device.
 
+        This also force-stops a prior instance.
+
         Args:
             package: str with package name.
             activity: str with activity name.
             action: str of action, default is 'android.intent.action.MAIN'.
+
         Extra options may be supplied as additional keyword arguments.
 
         Returns:
             output of activity start command.
         """
-        cmd = ['cmd', 'activity', 'start', '-a', action,
+        cmd = ['cmd', 'activity', 'start-activity', '-S', '-a', action,
                "{}/{}".format(package, activity)]
         for key, value in extra.items():
             if value is not None:
