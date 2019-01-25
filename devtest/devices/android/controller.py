@@ -193,6 +193,16 @@ class AndroidController(devices.Controller):
         cmd += ' "{}/{}"'.format(package, runner)
         return self.shell(cmd)
 
+    def pgrep(self, pattern):
+        """Run pgrep and returns a list of PIDs and names matching pattern."""
+        rv = []
+        out, stderr, es = self.adb.command(['pgrep', '-l', '-f', pattern])
+        if es and out:
+            for line in out.splitlines():
+                pid, cmd = line.split(None, 1)
+                rv.append((int(pid), cmd))
+        return rv
+
     def get_property(self, name):
         """Get a single Android property.
         """
