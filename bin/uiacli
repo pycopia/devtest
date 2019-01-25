@@ -1,0 +1,588 @@
+#!/usr/bin/env python3.6
+
+
+"""
+Command interface to UIAutomator.
+"""
+
+import code
+import io
+import os
+import sys
+import textwrap
+import xml.dom.minidom
+
+from elicit import commands
+from elicit import console
+from elicit import controller
+from elicit import env
+from elicit import exceptions
+from elicit import parser
+from elicit import themes
+from elicit import ui
+
+from devtest.third_party import uiautomator
+
+
+class UICommands(commands.ObjectCommands):
+
+    def dump(self, arguments):
+        """Dump the GUI object tree as XML.
+
+        Usage:
+            dump [<filename>]
+        """
+        self._ui.print(self._obj.dump(filename=arguments["<filename>"]))
+
+    def info(self, arguments):
+        """Show some device info.
+        """
+        for k, v in self._obj.info.items():
+            self._ui.print("{:>30.30s} : {}".format(k, v))
+
+    def screen(self, arguments):
+        """Turn on or off the screen, or report current state.
+
+        Usage:
+            screen [on|off]
+        """
+        if arguments["on"]:
+            self._obj.screen.on()
+        elif arguments["off"]:
+            self._obj.screen.off()
+        else:
+            self._ui.print("screen is", "on" if self._obj.info["screenOn"] else "off")
+
+    def orientation(self, arguments):
+        """Change screen orientation.
+
+        Usage:
+            orientation (n|l|r)
+        """
+        if arguments["n"]:
+            self._obj.orientation = "n"
+        elif arguments["r"]:
+            self._obj.orientation = "r"
+        elif arguments["l"]:
+            self._obj.orientation = "l"
+
+    def screenshot(self, arguments):
+        """Take a screenshot.
+
+        Usage:
+            screenshot [--scale=<scale>] [--quality=<quality>] <filename>
+
+        Options:
+            --scale=<scale>      Scale factor [default: 1.0]
+            --quality=<quality>  Quality factor [default: 100]
+        """
+        filename = os.path.expandvars(os.path.expanduser(arguments["<filename>"]))
+        if not filename.endswith(".png"):
+            filename = filename + ".png"
+        scale = float(arguments["--scale"])
+        quality = float(arguments["--scale"])
+        self._obj.screenshot(filename, scale=scale, quality=quality)
+        self._ui.print("Write PNG to", filename)
+
+    def open(self, arguments):
+        """Open an overlay screen.
+
+        Usage:
+            open (notification | settings)
+        """
+        if arguments["notification"]:
+            self._obj.open.notification()
+        elif arguments["settings"]:
+            self._obj.open.quick_settings()
+
+    def sleep(self, arguments):
+        """Sleep the device.
+        """
+        self._obj.sleep()
+
+    def wakeup(self, arguments):
+        """Wake up the device.
+        """
+        self._obj.wakeup()
+
+    def wait(self, arguments):
+        """Wait for idle or update.
+
+        Usage:
+            wait [--timeout=<timeout>]
+            wait update [--timeout=<timeout>] [--package=<package>]
+            wait exists [--timeout=<timeout>] <text>...
+
+        Options:
+            --timeout=<timeout>  Max time to wait (secs) [default: 1]
+            --package=<package>  Package name to wait for [default: com.android.settings]
+        """
+        tm = int(arguments["--timeout"]) * 1000
+        if arguments["update"]:
+            self._obj.wait.update(timeout=tm,
+                                  package_name=arguments["--package"])
+        elif arguments["exists"]:
+            text = " ".join(arguments["<text>"])
+            self._obj(textContains=text).wait.exists(timeout=tm)
+        else:
+            self._obj.wait.idle(timeout=tm)
+
+    def home(self, arguments):
+        """Press the home "button".
+        """
+        self._obj.press.home()
+
+    def back(self, arguments):
+        """Press the back "button".
+        """
+        self._obj.press.back()
+
+    def press(self, arguments):
+        """Press some key.
+
+        Usage:
+            press <keyname>
+
+        available key names:
+
+            "home", "back", "left", "right", "up", "down", "center",
+            "menu", "search", "enter", "delete", "del", "recent",
+            "volume_up", "volume_down", "volume_mute", "camera", "power"
+        """
+        self._obj.press(arguments["<keyname>"])
+
+    def click(self, arguments):
+        """Click a point on the screen.
+
+        Usage:
+            click
+            click <x> <y>
+            click <resourceid>
+        """
+        if arguments["<y>"]:
+            self._obj.click(int(arguments["<x>"]), int(arguments["<y>"]))
+        elif arguments["<resourceid>"]:
+            self._obj(resourceId=arguments["<resourceid>"]).click.wait()
+        else:
+            uiobj = self._environ["_"]
+            if isinstance(uiobj, uiautomator.AutomatorDeviceUiObject):
+                uiobj.click.wait()
+            else:
+                self._ui.printf("%yNothing clicked.%N\n")
+
+    def longclick(self, arguments):
+        """Click a point on the screen for a long time.
+
+        Usage:
+            longclick
+            longclick <x> <y>
+            longclick <resourceid>
+        """
+        if arguments["<y>"]:
+            self._obj.long_click(int(arguments["<x>"]), int(arguments["<y>"]))
+        elif arguments["<resourceid>"]:
+            self._obj(resourceId=arguments["<resourceid>"]).long_click.wait()
+        else:
+            uiobj = self._environ["_"]
+            if isinstance(uiobj, uiautomator.AutomatorDeviceUiObject):
+                uiobj.long_click()
+            else:
+                self._ui.printf("%yNothing long clicked.%N\n")
+
+    def swipe(self, arguments):
+        """Perform a swipe gesture.
+
+        Usage:
+            swipe [--steps=<steps>] <sx> <sy> <ex> <ey>
+            swipe [--steps=<steps>] (left | right | top | bottom)
+
+        Options:
+            --steps=<steps>  step increment [default: 10]
+        """
+        steps = int(arguments["--steps"])
+        if arguments["<sx>"]:
+            self._obj.swipe(int(arguments["<sx>"]),
+                            int(arguments["<sy>"]),
+                            int(arguments["<ex>"]),
+                            int(arguments["<ey>"]),
+                            steps=steps,
+                            )
+        uiobj = self._environ["_"]
+        if isinstance(uiobj, uiautomator.AutomatorDeviceUiObject):
+            if arguments["left"]:
+                uiobj.swipe.left(steps=steps)
+            elif arguments["right"]:
+                uiobj.swipe.right(steps=steps)
+            elif arguments["top"]:
+                uiobj.swipe.top(steps=steps)
+            elif arguments["bottom"]:
+                uiobj.swipe.bottom(steps=steps)
+        else:
+            self._ui.printf("%yNo object selected.%N\n")
+
+    def drag(self, arguments):
+        """Perform a drag gesture.
+
+        Usage:
+            drag [--steps=<steps>] <sx> <sy> <ex> <ey>
+
+        Options:
+            --steps=<steps>  step increment [default: 10]
+        """
+        self._obj.drag(int(arguments["<sx>"]),
+                       int(arguments["<sy>"]),
+                       int(arguments["<ex>"]),
+                       int(arguments["<ey>"]),
+                       steps=int(arguments["--steps"]),
+                       )
+
+    def fling(self, arguments):
+        """Fling currently selected object.
+        """
+        uiobj = self._environ["_"]
+        if isinstance(uiobj, uiautomator.AutomatorDeviceUiObject):
+            uiobj.fling()
+        else:
+            self._ui.printf("%yNo object selected.%N\n")
+
+    def entertext(self, arguments):
+        """Enter text into a text entry.
+        """
+
+        uiobj = self._environ["_"]
+        if not isinstance(uiobj, uiautomator.AutomatorDeviceUiObject):
+            findtext = self._ui.user_input("Text to find? ")
+            uiobj = self._obj(textContains=findtext)
+        if uiobj:
+            mytext = self._ui.user_input("Text to enter? ")
+            uiobj.set_text(mytext)
+            self._obj.press("enter")
+        else:
+            self._ui.error("Input not found.")
+
+    def freeze(self, arguments):
+        """freeze screen rotation.
+
+        Usage:
+            freeze (on | off)
+        """
+        if arguments["on"]:
+            self._obj.freeze_rotation(True)
+        elif arguments["off"]:
+            self._obj.freeze_rotation(False)
+
+    def find(self, arguments):
+        """Find a UI node.
+
+        Usage:
+            find resourceid <resourceid>
+            find text <text>
+            find clickable
+            find scrollable
+        """
+        # resourceid = arguments["--resourceid"]
+        resourceid = arguments["resourceid"]
+        text = arguments["text"]
+        clickable = arguments["clickable"]
+        scrollable = arguments["scrollable"]
+        content = self._obj.server.jsonrpc.dumpWindowHierarchy(True, None)
+        doc = xml.dom.minidom.parseString(content.encode("utf-8"))
+        for el in doc.getElementsByTagName("node"):
+            if resourceid and arguments["<resourceid>"] in el.getAttribute("resource-id"):
+                self._dump_elementnode(el)
+            if text and arguments["<text>"] in el.getAttribute("text"):
+                self._dump_elementnode(el)
+            if clickable and el.getAttribute("clickable") == "true":
+                self._dump_elementnode(el)
+            if scrollable and el.getAttribute("scrollable") == "true":
+                self._dump_elementnode(el)
+
+    def _dump_elementnode(self, el):
+        ui = self._ui
+        rid = el.getAttribute("resource-id")
+        if rid:
+            ui.write("resourceId: ")
+            ui.write(str(rid))
+            ui.write("\n")
+        else:
+            text = el.getAttribute("text")
+            if text:
+                ui.write("text: ")
+                ui.write(text)
+                ui.write("\n")
+            else:
+                desc = el.getAttribute("content-desc")
+                if desc:
+                    ui.write("description: ")
+                    ui.write(desc)
+                    ui.write("\n")
+                else:
+                    ui.write("Node: \n")
+                    buf = io.StringIO()
+                    el.writexml(buf, indent="", addindent="", newl="\n")
+                    els = textwrap.fill(buf.getvalue(), width=ui.columns - 8)
+                    ui.write(textwrap.indent(els, "    "))
+                    ui.write("\n")
+
+    def select(self, arguments):
+        """Select a particular node using one or more match criteria.
+
+        Matched object is stored for other commands, such as click and fling.
+
+        Usage:
+            select [options]
+
+        Options:
+            --text=<text>
+            --textContains=<textContains>
+            --textMatches=<textMatches>
+            --textStartsWith=<textStartsWith>
+            --className=<className>
+            --classNameMatches=<classNameMatches>
+            --description=<description>
+            --descriptionContains=<descriptionContains>
+            --descriptionMatches=<descriptionMatches>
+            --descriptionStartsWith=<descriptionStartsWith>
+            --checkable=<checkable>
+            --checked=<checked>
+            --clickable=<clickable>
+            --longClickable=<longClickable>
+            --scrollable=<scrollable>
+            --enabled=<enabled>
+            --focusable=<focusable>
+            --focused=<focused>
+            --selected=<selected>
+            --packageName=<packageName>
+            --packageNameMatches=<packageNameMatches>
+            --resourceId=<resourceId>
+            --resourceIdMatches=<resourceIdMatches>
+            --index=<index>
+            --instance=<instance>
+        """
+        kwargs = {}
+        for argname in ("--text", "--textContains", "--textMatches",
+                        "--textStartsWith", "--className",
+                        "--classNameMatches", "--description",
+                        "--descriptionContains", "--descriptionMatches",
+                        "--descriptionStartsWith", "--checkable", "--checked",
+                        "--clickable", "--longClickable", "--scrollable",
+                        "--enabled", "--focusable", "--focused", "--selected",
+                        "--packageName", "--packageNameMatches",
+                        "--resourceId", "--resourceIdMatches", "--index",
+                        "--instance"):
+            val = arguments.get(argname)
+            if val:
+                kwargs[argname[2:]] = val
+        node = self._obj(**kwargs)
+        if node:
+            self._ui.print("Selected:")
+            for k, v in node.info.items():
+                self._ui.print("{:>30.30s} : {}".format(k, v))
+        else:
+            self._ui.print("    Nothing.")
+        return node
+
+    def watcher(self, arguments):
+        """Manage watchers.
+
+        Usage:
+            watcher list
+            watcher remove [<watchname>]
+            watcher triggered [<watchname>]
+            watcher reset
+            watcher run
+            watcher add <watchname> [options]
+
+        Options used for selection:
+            --text=<text>
+            --textContains=<textContains>
+            --textMatches=<textMatches>
+            --textStartsWith=<textStartsWith>
+            --className=<className>
+            --classNameMatches=<classNameMatches>
+            --description=<description>
+            --descriptionContains=<descriptionContains>
+            --descriptionMatches=<descriptionMatches>
+            --descriptionStartsWith=<descriptionStartsWith>
+            --checkable=<checkable>
+            --checked=<checked>
+            --clickable=<clickable>
+            --longClickable=<longClickable>
+            --scrollable=<scrollable>
+            --enabled=<enabled>
+            --focusable=<focusable>
+            --focused=<focused>
+            --selected=<selected>
+            --packageName=<packageName>
+            --packageNameMatches=<packageNameMatches>
+            --resourceId=<resourceId>
+            --resourceIdMatches=<resourceIdMatches>
+            --index=<index>
+            --instance=<instance>
+
+        """
+        if arguments["list"]:
+            for w in self._obj.watchers:
+                self._ui.print("    ", w)
+        elif arguments["remove"]:
+            wn = arguments["<watchname>"]
+            if wn:
+                self._obj.watcher(wn).remove()
+            else:
+                self._obj.watchers.remove()
+        elif arguments["triggered"]:
+            wn = arguments["<watchname>"]
+            if wn:
+                if self._obj.watcher(wn).triggered:
+                    self._ui.print("DID trigger.")
+                else:
+                    self._ui.print("Did NOT trigger.")
+            else:
+                if self._obj.watchers.triggered:
+                    self._ui.print("Some watcher triggered.")
+                else:
+                    self._ui.print("No watcher triggered.")
+        elif arguments["reset"]:
+            self._obj.watchers.reset()
+        elif arguments["run"]:
+            self._obj.watchers.run()
+        elif arguments["add"]:
+            wn = arguments["<watchname>"]
+            kwargs = {}
+            for argname in ("--text", "--textContains", "--textMatches",
+                            "--textStartsWith", "--className",
+                            "--classNameMatches", "--description",
+                            "--descriptionContains", "--descriptionMatches",
+                            "--descriptionStartsWith", "--checkable", "--checked",
+                            "--clickable", "--longClickable", "--scrollable",
+                            "--enabled", "--focusable", "--focused", "--selected",
+                            "--packageName", "--packageNameMatches",
+                            "--resourceId", "--resourceIdMatches", "--index",
+                            "--instance"):
+                val = arguments.get(argname)
+                if val:
+                    kwargs[argname[2:]] = val
+            self._ui.warning("Not implemented. Use the 'api' command to add a watcher.")
+
+    def api(self, arguments):
+        """Interact with the API in a Python REPL.
+        """
+        ns = {"device": self._obj, "environ": self._environ}
+        pycon = code.InteractiveConsole(ns)
+        pycon.raw_input = self._ui.user_input
+        try:
+            saveps1, saveps2 = sys.ps1, sys.ps2
+        except AttributeError:
+            saveps1, saveps2 = ">>> ", "... "
+        sys.ps1, sys.ps2 = "api> ", "more> "
+        pycon.interact("You are now in Python. ^D exits. 'device' is active device object. "
+                       "See https://github.com/xiaocong/uiautomator")
+        sys.ps1, sys.ps2 = saveps1, saveps2
+
+    def reboot(self, arguments):
+        """reboot the device.
+        """
+        self._adb.reboot()
+        self._ui.print("Device is rebooting, come back later.")
+        raise exceptions.CommandQuit("rebooting")
+
+    def remount(self, arguments):
+        """Remount the filesystem as read/write.
+        """
+        self._adb.remount()
+        self._ui.print("FS should be remounted.")
+
+    def adb(self, arguments):
+        """Enter ADB commands.
+        """
+        cmd = self.clone(AdbCommands)
+        adb_client = self._obj.server._adb
+        cmd.setup(adb_client,
+                  prompt="%gADB %w@ {}%N> ".format(adb_client.serial.decode("ascii")))
+        raise exceptions.NewCommand(cmd)
+
+
+class AdbCommands(commands.ObjectCommands):
+
+    def reboot(self, arguments):
+        """reboot the device.
+        """
+        self._obj.reboot()
+        self._ui.print("Device is rebooting, come back later.")
+        raise exceptions.CommandQuit("rebooting from adb")
+
+    def root(self, arguments):
+        """Enable root on device.
+        """
+        resp = self._obj.root()
+        self._ui.print(resp)
+
+    def remount(self, arguments):
+        """Remount the file system read-write.
+        """
+        resp = self._obj.remount()
+        self._ui.print(resp)
+
+    def command(self, arguments):
+        """Run an arbitrary command on device.
+
+        Usage:
+            command <cmdline>...
+        """
+        out, err, exit_status = self._obj.command(arguments["<cmdline>"])
+        if not exit_status:
+            self._ui.error(str(exit_status))
+        else:
+            self._ui.print(out)
+            if err:
+                self._ui.warning(err)
+
+    def ls(self, arguments):
+        """ls [path]
+
+        Usage:
+            ls [<path>]...
+        """
+        out, err, exit_status = self._obj.command(arguments["argv"])
+        if not exit_status:
+            self._ui.error(str(exit_status))
+        else:
+            self._ui.print(out)
+            if err:
+                self._ui.warning(err)
+
+
+def uiacli(argv):
+    """uiacli [<serial>]
+
+    Connect to device with given serial number and interact with the
+    uiautomator.  You may also set ANDROID_SERIAL environment variable.
+    """
+    serial = argv[1] if len(argv) > 1 else os.environ.get("ANDROID_SERIAL")
+    if not serial:
+        print(uiacli.__doc__)
+        return 2
+    uia = uiautomator.AutomatorDevice(serial=serial)
+    # Create some basic CLI parts
+    uio = console.ConsoleIO()
+    environment = env.Environ.from_system()
+    theme = themes.DefaultTheme()
+    # Assemble the compound parts
+    theui = ui.UserInterface(uio, environment, theme)
+    cmd = UICommands(theui, uia,
+                     prompt="%YUIAutomator%w@{}%N> ".format(serial))
+    ctl = controller.CommandController(cmd)
+    p = parser.CommandParser(ctl, historyfile="~/.uiacli_hist")
+    # run the CLI using the parser
+    try:
+        p.interact()
+    except KeyboardInterrupt:
+        theui.printf("\n%gBye!%N\n")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(uiacli(sys.argv))
+
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

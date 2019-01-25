@@ -1,15 +1,27 @@
 resultsdir: "$HOME/tmp/resultsdir"
 
 database:
-        url: "postgresql://devtest@localhost/devtest"
-        # url: "sqlite:///var/tmp/devtest.db"
+    url: "postgresql://devtest@localhost/devtest"
+    # url: "sqlite:///var/tmp/devtest.db"
 
 flags:
-        debug: 0
-        verbose: 0
-        keep: 0
-        stderr: 0
-        repeat: 1
+    debug: 0
+    verbose: 0
+    keep: 0
+    stderr: 0
+    repeat: 1
+
+uiautomator:
+    google:
+        runner: "com.github.uiautomator.test/androidx.test.runner.AndroidJUnitRunner"
+        apks:
+            - "apks/app_uiautomator.apk"
+            - "apks/app_uiautomator_test.apk"
+    upstream:
+        runner: "com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner"
+        apks:
+            - "apks/app-uiautomator.apk"
+            - "apks/app-uiautomator-test.apk"
 
 webui:
     static_folder: "/var/www/devtest/static"
