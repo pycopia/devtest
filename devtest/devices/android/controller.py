@@ -19,6 +19,7 @@ from __future__ import generator_stop
 import os
 import re
 import stat
+from datetime import datetime, timezone
 from ast import literal_eval
 
 from devtest import devices
@@ -27,8 +28,7 @@ from devtest.core import exceptions
 from devtest.devices.android import adb
 from devtest.devices.android import sl4a
 from devtest.devices.android import snippets
-
-import uiautomator
+from devtest.third_party import uiautomator
 
 
 class AndroidControllerError(exceptions.ControllerError):
@@ -42,10 +42,11 @@ class AndroidController(devices.Controller):
 
     Properties:
         adb: An adb.AndroidDeviceClient instance.
-        uia: An uiautomator.Device instance.
+        uia: An uiautomator.AutomatorDevice instance.
         api: An sl4a.SL4AInterface instance.
         snippets: An snippets.SnippetsInterface instance.
         properties: A dictionary of all Android property values (from getprop).
+        currenttime: Device's current time.
         settings: Access to settings.
         buttons: Access to button press interaction.
         thermal: Access to thermal information
@@ -89,9 +90,7 @@ class AndroidController(devices.Controller):
     @property
     def uia(self):
         if self._uia is None:
-            # TODO(dart) uiautomator.Device has reliability issues. Need a
-            # wrapper.
-            self._uia = uiautomator.Device(self._equipment["serno"])
+            self._uia = uiautomator.AutomatorDevice(self._equipment["serno"])
         return self._uia
 
     @uia.deleter
@@ -136,6 +135,12 @@ class AndroidController(devices.Controller):
                 name, value = m.group(1, 2)
                 pd[name] = value
         return pd
+
+    @property
+    def currenttime(self):
+        """Return device's time as datetime object, UTC."""
+        out = self.shell("date +%s.%N")
+        return datetime.fromtimestamp(float(out), tz=timezone.utc)
 
     def shell(self, cmd):
         """Run a shell command and return stdout.

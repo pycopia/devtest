@@ -453,6 +453,8 @@ class TestCase:
         raise TestFailure(
             message or "{!r} did not raise {!r}.".format(method, exception))
 
+    # Some generally useful utility methods follow.
+
     def record_data(self, data):
         """Send arbitrary data to the report.
 
@@ -497,6 +499,15 @@ class TestCase:
         """
         fname = self.get_filename(basename, ext)
         return open(fname, mode)
+
+    @property
+    def currenttime(self):
+        """Return current UTC time as datetime.
+
+        Subtrace self.starttime from this to get current test running time as
+        timedelta.
+        """
+        return datetime.now(timezone.utc)
 
 
 class _PreReq:

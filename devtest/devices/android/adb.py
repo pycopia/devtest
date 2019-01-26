@@ -453,16 +453,56 @@ class _AsyncAndroidDeviceClient:
         if not es:
             raise AdbCommandFail("Didn't clear logcat")
 
-    async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
+    async def logcat(self, stdoutstream, stderrstream, format="threadtime",
+                     buffers="default", modifiers=None, binary=False,
+                     regex=None, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
+
+        Args:
+            stdout, stderr: file-like object to write log events to.
+            binary: bool output binary format if True.
+            regex: A Perl compatible regular expression to match messages against.
+            format: str of one of the following:
+                    "brief", "long", "process", "raw", "tag", "thread",
+                    "threadtime", "time".
+            buffers: list or comma separated string of:
+                     'main', 'system', 'radio', 'events', 'crash', 'default' or 'all'
+            modifiers: str of one or more of:
+                       epoch", "monotonic", "uid", "usec", "UTC", "year", "zone"
+            logcats: str of space separated filter expressions.
         """
         logtags = os.environ.get("ANDROID_LOG_TAGS", logtags)
-        logtags = logtags.replace('"', '\\"')
-        longopt = "-v long" if longform else ""
-        cmdline = 'export ANDROID_LOG_TAGS="{}"; exec logcat {}'.format(logtags,
-                                                                        longopt)
-        cmdline = cmdline.encode("utf8")
+        cmdline = ['exec', 'logcat']
+        # buffers
+        if isinstance(buffers, str):
+            buffers = buffers.split(",")
+        for bufname in buffers:
+            cmdline.extend(["-b", bufname])
+        if binary:
+            cmdline.append("-B")
+        if regex:
+            cmdline.extend(["-e", regex])
+        # output format
+        if format not in {"brief", "long", "process", "raw", "tag",
+                          "thread", "threadtime", "time"}:
+            raise ValueError("Bad format type.")
+        if modifiers:
+            if isinstance(modifiers, str):
+                modifiers = modifiers.split(",")
+            for modifier in modifiers:
+                if modifier in {"epoch", "monotonic", "uid", "usec", "UTC",
+                                "year", "zone"}:
+                    format += ("," + modifier)
+                else:
+                    raise ValueError("Invalid logcat format modifier")
+        cmdline.extend(["-v", format])
+        # logtags
+        if logtags:
+            logtags = logtags.replace('"', '\\"')
+            cmdline.extend(logtags.split())
+        # go!
+        cmdline, _ = _fix_command_line(cmdline)
         await _start_shell(self.serial, self._conn, False, cmdline)
         sp = ShellProtocol(self._conn.socket)
         await sp.run(None, stdoutstream, stderrstream)
@@ -585,11 +625,15 @@ class AndroidDeviceClient:
         """Clear logcat buffer."""
         return get_kernel().run(self._aadb.logcat_clear())
 
-    async def logcat(self, stdoutstream, stderrstream, longform=False, logtags=""):
+    async def logcat(self, stdoutstream, stderrstream, format="threadtime",
+                     buffers="default", modifiers=None, binary=False,
+                     regex=None, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
         """
-        await self._aadb.logcat(stdoutstream, stderrstream, longform=longform, logtags=logtags)
+        await self._aadb.logcat(stdoutstream, stderrstream, format=format,
+                                buffers=buffers, modifiers=modifiers,
+                                binary=binary, regex=regex, logtags=logtags)
 
 
 class DeviceProcess:
@@ -862,11 +906,16 @@ if __name__ == "__main__":
         fl = await ac.list_forward()
         print("Forward list:")
         print(repr(fl))
-
+        print("Logcat:")
         signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
         await ac.wait_for("device")
         try:
-            task = await spawn(ac.logcat(sys.stdout.buffer, sys.stdout.buffer))
+            await ac.logcat_clear()
+            task = await spawn(ac.logcat(sys.stdout.buffer, sys.stdout.buffer,
+                                         buffers="kernel,main",
+                                         format="long", modifiers="epoch,usec",
+                                         binary=False,
+                                         logtags=" ".join(sys.argv[1:])))
             await signalset.wait()
             await task.cancel()
         finally:
