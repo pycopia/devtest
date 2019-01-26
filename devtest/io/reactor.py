@@ -17,6 +17,9 @@
 
 from __future__ import generator_stop
 
+import os
+import fcntl
+import signal
 import atexit
 
 from devtest import logging  # This must be first
@@ -60,6 +63,33 @@ def _shutdown_kernel():
         _default_kernel = None
         logging.info("Shutting down curio.Kernel at exit.")
         kern.run(None, shutdown=True)
+
+
+def set_asyncio(fd_or_obj):
+    """Sets file descriptor or object to raise SIGIO on readiness."""
+    if isinstance(fd_or_obj, int):
+        fd = fd_or_obj
+    else:
+        fd = fd_or_obj.fileno()
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    flags |= os.O_ASYNC
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+    fcntl.fcntl(fd, fcntl.F_SETOWN, os.getpid())
+
+
+class SIGIOHandler:
+    def __init__(self):
+        self.on()
+
+    def on(self):
+        signal.signal(signal.SIGIO, self)
+        signal.siginterrupt(signal.SIGIO, True)
+
+    def off(self):
+        signal.signal(signal.SIGIO, signal.SIG_IGN)
+
+    def __call__(self, sig, frame):
+        get_kernel().run(None)
 
 
 def _test(argv):
