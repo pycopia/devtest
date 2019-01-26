@@ -17,7 +17,10 @@ This is an async implementation, suitable for including in an event loop.
 """
 
 import os
+import sys
+import enum
 import struct
+import signal
 
 from devtest import timers
 from devtest import ringbuffer
@@ -26,7 +29,8 @@ from devtest.io import streams
 from devtest.os import process
 from devtest.os import procutils
 from devtest.os import exitstatus
-from devtest.io.reactor import get_kernel, spawn, block_in_thread, sleep
+from devtest.io.reactor import (get_kernel, spawn, block_in_thread, sleep,
+                                SignalEvent, timeout_after, TaskTimeout)
 
 
 ADB = procutils.which("adb")
@@ -50,6 +54,18 @@ class AdbProtocolError(Error):
 
 class AdbCommandFail(Error):
     """An error indicated by the server."""
+
+
+class LogPriority(enum.IntEnum):
+    """Logging priority levels."""
+    UNKNOWN = 0
+    DEFAULT = 1
+    VERBOSE = 2
+    DEBUG = 3
+    INFO = 4
+    WARN = 5
+    ERROR = 6
+    FATAL = 7
 
 
 def _run_adb(adbcommand):
@@ -829,6 +845,92 @@ class SyncProtocol:
             await cb_coro(stat, name.decode("utf-8"))
 
 
+class LogcatMessage:
+    def __init__(self, pid, tid, sec, nsec, lid, uid, msg):
+        self.pid = pid
+        self.tid = tid
+        self.timestamp = float(sec) + (nsec / 1e9)
+        self.lid = lid
+        self.uid = uid
+        self.priority = LogPriority(msg[0])
+        tagend = msg.find(b'\x00')
+        self.tag = (msg[1:tagend]).decode("ascii")
+        self.message = (msg[tagend + 1:-1]).decode("utf8")
+
+    def __str__(self):
+        return "{} {}|{} {}:{} {}".format(self.timestamp, self.tag,
+                                          self.priority.name, self.pid, self.tid,
+                                          self.message)
+
+
+class LogcatHandler:
+    """Host side logcat handler that receives logcat messages in binary mode
+    over raw connection.
+    """
+
+    LOGCAT_MESSAGE = struct.Struct("<HHiIIIII")  # logger_entry_v4
+    #  uint16_t len;       length of the payload
+    #  uint16_t hdr_size;  sizeof(struct logger_entry_v4)
+    #  int32_t pid;        generating process's pid
+    #  uint32_t tid;       generating process's tid
+    #  uint32_t sec;       seconds since Epoch
+    #  uint32_t nsec;      nanoseconds
+    #  uint32_t lid;       log id of the payload, bottom 4 bits currently
+    #  uint32_t uid;       generating process's uid
+    #  char msg[0];        the entry's payload
+
+    def __init__(self, aadb):
+        self._aadb = aadb
+
+    def dump(self):
+        """Dump logs to stdout until interrupted."""
+        return get_kernel().run(self._dump())
+
+    async def _dump(self):
+        ac = self._aadb
+        signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
+        await ac.logcat_clear()
+        proc = await ac.spawn('logcat -B -b default')
+        task = await spawn(self._read_and_dump(proc, streams.FileStream(sys.stdout.buffer)))
+        await signalset.wait()
+        await task.cancel()
+        await proc.close()
+
+    async def _read_and_dump(self, proc, out):
+        while True:
+            lm = await self._read_one(proc)
+            await out.write(str(lm).encode("utf8"))
+            await out.write(b'\n')
+
+    async def _read_one(self, proc):
+        s = self.LOGCAT_MESSAGE
+        rawhdr = await proc.read(s.size)
+        payload_len, hdr_size, pid, tid, sec, nsec, lid, uid = s.unpack(rawhdr)
+        payload = await proc.read(payload_len)
+        return LogcatMessage(pid, tid, sec, nsec, lid, uid, payload)
+
+    def watch_for(self, tag, timeout=90):
+        """Watch for first occurence of a particular tag."""
+        return get_kernel().run(self._watch_for(tag, timeout))
+
+    async def _watch_for(self, tag, timeout):
+        lm = None
+        ac = self._aadb
+        await ac.logcat_clear()
+        proc = await ac.spawn('logcat -B -b default')
+        try:
+            async with timeout_after(timeout):
+                while True:
+                    new = await self._read_one(proc)
+                    if new.tag == tag:
+                        lm = new
+                        break
+        except TaskTimeout:
+            pass
+        await proc.close()
+        return lm
+
+
 class AndroidDevice:
     """Information about attached Android device.
 
@@ -864,9 +966,6 @@ def _device_factory(line):
 
 
 if __name__ == "__main__":
-    import sys
-    import signal
-    from devtest.io.reactor import SignalEvent
     from devtest import debugger
     debugger.autodebug()
     start_server()

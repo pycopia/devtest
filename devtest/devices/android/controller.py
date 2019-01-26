@@ -321,6 +321,11 @@ class AndroidController(devices.Controller):
         """
         return _Thermal(self)
 
+    @property
+    def logcat(self):
+        """Access to special logcat functions."""
+        return adb.LogcatHandler(self.adb.async_client)
+
 
 class _Buttons:
     def __init__(self, controller):
