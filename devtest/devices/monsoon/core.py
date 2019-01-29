@@ -311,7 +311,7 @@ class MeasurementResult:
         for name in ("duration", "captured", "dropped", "sample_count",
                      "main_current", "main_power", "main_voltage",
                      "usb_current", "usb_power", "usb_voltage",
-                     "aux_current"):
+                     "aux_current", "passthrough", "samplefile"):
             val = getattr(self, name, None)
             if val is not None:
                 s.append("{:>15.15s}: {!s}".format(name, val))

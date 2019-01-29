@@ -15,16 +15,17 @@
 """A service for using Monsoon current and voltage measuring device.
 
 Provides background capture during span of time the service is wanted.
+Measures average power during the span of time service runs.
 
-When no longer wanted the service_dontwant signal will return a finalized
-`measure.AveragePowerHandler` instance.
+When no longer wanted the service_dontwant signal will return a
+`core.MeasurementResult` instance.
+
 """
 
 from devtest import logging
 from devtest.core import constants
 from devtest.core import exceptions
 from devtest.os import process
-from devtest.devices.monsoon import core as monsoon_core
 from . import Service
 
 
@@ -49,11 +50,11 @@ class MonsoonService(Service):
         for conn in needer.connections:
             if conn.type == constants.ConnectionType.USB2:
                 if "HVPM" in conn.destination.model.name:
-                    passthrough = monsoon_core.USBPassthrough.On
+                    passthrough = "on"
                     hvpm = conn.destination
                     break
             elif conn.type == constants.ConnectionType.Power:
-                passthrough = monsoon_core.USBPassthrough.Auto
+                passthrough = "auto"
                 hvpm = conn.destination
                 break
         return hvpm, passthrough  # model object
@@ -67,10 +68,11 @@ class MonsoonService(Service):
                 "HVPM {} is already being used!".format(hvpm.serno))
 
         ctx = {
-                "serialno": hvpm.serno,
-                "passthrough": passthrough,
-                "voltage": needer.get("voltage", 4.2),
+            "serialno": hvpm.serno,
+            "passthrough": passthrough,
+            "voltage": needer.get("voltage", 4.2),
         }
+        ctx.update(kwargs)
         pm = process.get_manager()
         logging.info("Providing {} for {}".format(hvpm, needer))
         coproc = pm.coprocess()
@@ -96,7 +98,7 @@ class MonsoonService(Service):
                 coproc.interrupt()
                 coproc.wait()
             except Exception as ex:
-                logging.exception_warning("Leftover monsonn during close, errored", ex)
+                logging.exception_warning("MonsoonService: error in close:", ex)
         self._server = None
 
 
@@ -106,32 +108,27 @@ def domeasure(ctx):
     """
     # Imports are here because this runs in a subprocess
     import signal
+    from devtest import logging
     from devtest.devices.monsoon import measure
     from devtest.devices.monsoon import simple as monsoon_simple
 
     def _stop(sig, f):
         raise monsoon_simple.StopSampling("stop!")
 
-    dev = monsoon_simple.HVPM()
-    dev.open(ctx["serialno"])
-
-    dev.voltage_channel = ctx.get("voltage_channel",
-                                  monsoon_core.VoltageChannel.MainAndUSB)
-    dev.usb_passthrough = ctx.get("passthrough",
-                                  monsoon_core.USBPassthrough.Auto)
-    dev.voltage = ctx.get("voltage", 4.2)
-
-    handler = measure.AveragePowerHandler(ctx, dev.info)
+    ctx["duration"] = None
+    ctx["numsamples"] = 4294967295
+    if "output" not in ctx:
+        ctx["output"] = "power"
+    logging.info(repr(ctx))
     oldint = signal.signal(signal.SIGINT, _stop)
     oldterm = signal.signal(signal.SIGTERM, _stop)
     try:
-        captured, dropped = dev.capture(samples=4294967295, handler=handler)
+        measurer = measure.MonsoonCurrentMeasurer(ctx)
+        result = measurer.measure()
     finally:
-        dev.close()
         signal.signal(signal.SIGINT, oldint)
         signal.signal(signal.SIGTERM, oldterm)
-    handler.finalize(captured, dropped)
-    return handler
+    return result
 
 
 def initialize(manager):

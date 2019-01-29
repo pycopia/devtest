@@ -414,12 +414,14 @@ class MonsoonCurrentMeasurer(Measurer):
                              "subclass of MeasurementHandler.")
         handler = handlerclass(ctx, dev.info)
         # Perform the capture run.
-        captured, dropped = dev.capture(samples=ctx["numsamples"],
-                                        duration=ctx["duration"],
-                                        handler=handler,
-                                        calsamples=ctx.get("calsamples", 1250),
-                                        startdelay=ctx.get("delay", 0))
-        dev.close()
+        try:
+            captured, dropped = dev.capture(samples=ctx["numsamples"],
+                                            duration=ctx["duration"],
+                                            handler=handler,
+                                            calsamples=ctx.get("calsamples", 1250),
+                                            startdelay=ctx.get("delay", 0))
+        finally:
+            dev.close()
         handler.finalize(captured, dropped)
         return core.MeasurementResult.from_context_and_handler(ctx, handler)
 
