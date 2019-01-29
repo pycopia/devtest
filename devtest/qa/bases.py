@@ -534,11 +534,12 @@ class _PreReq:
 class _TestEntry:
     """Helper class to run a TestCase with arguments at some later time.
 
-    Also helps manage prerequisite matching and track test results.
+    Also helps manage prerequisite matching and verify test implementation
+    correctness.
 
     Raises:
         raises TestImplementationError if a disposition is attempted a second
-        time.
+        time, or was never set.
     """
     def __init__(self, inst, args=None, kwargs=None, autoadded=False):
         self.inst = inst
@@ -551,6 +552,7 @@ class _TestEntry:
         test_incomplete.connect(self._incomplete, sender=inst)
         test_failure.connect(self._failure, sender=inst)
         test_expected_failure.connect(self._expected_failure, sender=inst)
+        test_end.connect(self._test_end, sender=inst)
 
     def _passed(self, testcase, message=None):
         if self.result != TestResult.NA:
@@ -575,6 +577,11 @@ class _TestEntry:
             raise TestImplementationError(
                 "Setting EXPECTED_FAIL when result already set.")
         self.result = TestResult.EXPECTED_FAIL
+
+    def _test_end(self, testcase, time=None):
+        if self.result == TestResult.NA:
+            raise TestImplementationError(
+                'Test case "{}" ended without setting result.'.format(testcase.test_name))
 
     def run(self):
         """Invoke the test with its arguments. The config argument is passed

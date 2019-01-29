@@ -224,6 +224,9 @@ class DefaultReport(BaseReport):
         print(" Data {}:".format("added to" if olddata else "available in"),
                                  repr(fname), file=self._file)
 
+    def on_suite_summary(self, suite, result=None):
+        print("Aggregate Suite Result:", result, file=self._file)
+
 
 class DefaultReportUnicode(DefaultReport):
 
