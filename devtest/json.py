@@ -89,6 +89,18 @@ def encode(data):
     return _encoder.encode(data)
 
 
+def from_file(filename):
+    """Read JSON from a file.
+
+    Args:
+        filename: (str) path the JSON file to read.
+        """
+    with open(filename, "r", encoding="utf8") as fo:
+        s = fo.read()
+        o = _decoder.decode(s)
+    return o
+
+
 # Compatibility functions.
 
 def dump(obj, fp):
