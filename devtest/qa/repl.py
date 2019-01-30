@@ -16,6 +16,7 @@
 """
 
 import sys
+import os
 import readline
 import traceback
 import rlcompleter  # noqa
@@ -31,7 +32,10 @@ class InteractiveConsole:
                  history=None):
         self._ns = namespace or globals()
         self._io = io or ConsoleIO()
-        self.history = history
+        if history:
+            self.history = os.path.expandvars(os.path.expanduser(history))
+        else:
+            self.history = None
         readline.set_history_length(1000)
         if sys.platform == "darwin":
             readline.parse_and_bind("^I rl_complete")
