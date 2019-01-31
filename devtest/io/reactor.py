@@ -51,9 +51,10 @@ def _get_kernel(selector=None):
     atexit.register(_shutdown_kernel)
 
 
-def get_new_kernel(selector=None):
-    selector = selector or eventloop.EventLoop()
-    return Kernel(selector=selector)
+def get_new_kernel(**kwargs):
+    selector = eventloop.EventLoop()
+    kwargs["selector"] = selector
+    return Kernel(**kwargs)
 
 
 def _shutdown_kernel():
