@@ -19,6 +19,8 @@ This is an async implementation, suitable for including in an event loop.
 import os
 import sys
 import enum
+import stat
+import errno
 import struct
 import signal
 
@@ -400,7 +402,34 @@ class _AsyncAndroidDeviceClient:
         sp = SyncProtocol(self.serial)
         await sp.connect_with(self._conn)
         await sp.list(name, coro_cb)
+        await sp.quit()
         await self._conn.close()
+
+    async def stat(self, path):
+        """stat a remote file or directory.
+
+        Return os.stat_result with attributes from remote path.
+        """
+        sp = SyncProtocol(self.serial)
+        await sp.connect_with(self._conn)
+        try:
+            st = await sp.stat(path)
+        finally:
+            await sp.quit()
+            await self._conn.close()
+        return st
+
+    async def push(self, localfiles: list, remotepath: str):
+        """Push a list of local files to remote file or directory.
+        """
+        sp = SyncProtocol(self.serial)
+        await sp.connect_with(self._conn)
+        try:
+            resp = await sp.push(localfiles, remotepath)
+        finally:
+            await sp.quit()
+            await self._conn.close()
+        return resp
 
     async def start(self, cmdline, stdoutstream, stderrstream):
         """Start a process on device with the shell protocol.
@@ -431,7 +460,8 @@ class _AsyncAndroidDeviceClient:
         """
         # TODO(dart) other options
         st = os.stat(apkfile)  # TODO(dart) fix potential long blocker
-
+        if not stat.S_ISREG(st.st_mode):
+            raise ValueError("The apkfile must be a regular file.")
         cmdline = ["cmd", "package", "install"]
         if allow_test:
             cmdline.append("-t")
@@ -633,6 +663,20 @@ class AndroidDeviceClient:
         coro = self._aadb.list(name, acb)
         return get_kernel().run(coro)
 
+    def stat(self, path: str):
+        """stat a remote file or directory.
+
+        Return os.stat_result with attributes from remote path.
+        """
+        coro = self._aadb.stat(path)
+        return get_kernel().run(coro)
+
+    def push(self, localfiles: list, remotepath: str):
+        """Push a list of local files to remote file or directory.
+        """
+        coro = self._aadb.push(localfiles, remotepath)
+        return get_kernel().run(coro)
+
     def reconnect(self):
         """Reconnect from device side."""
         return get_kernel().run(self._aadb.reconnect())
@@ -792,6 +836,10 @@ class ShellProtocol:
 
 
 class SyncProtocol:
+    """Implementation of Android SYNC protocol.
+
+    Only recent devices are supported.
+    """
 
     mkid = lambda code: int.from_bytes(code, byteorder='little')  # noqa
     ID_LSTAT_V1 = mkid(b'STAT')
@@ -808,8 +856,13 @@ class SyncProtocol:
     ID_QUIT = mkid(b'QUIT')
     del mkid
 
-    SYNC_MSG = struct.Struct("<II")
-    DIRENT = struct.Struct("<IIIII")  # id; mode; size; time; namelen;
+    SYNC_DATA_MAX = 65536
+    SYNCMSG_DATA = struct.Struct("<II")  # id, size
+    # id; mode; size; time; namelen;
+    SYNCMSG_DIRENT = struct.Struct("<IIIII")
+    # id; error; dev; ino; mode; nlink; uid; gid; size; atime; mtime; ctime;
+    SYNCMSG_STAT_V2 = struct.Struct("<IIQQIIIIQqqq")
+    SYNCMSG_STATUS = struct.Struct("<II")  # id, msglen
 
     def __init__(self, serial):
         self.serial = serial
@@ -823,29 +876,166 @@ class SyncProtocol:
         await adbconnection.message(msg, expect_response=False)
         self.socket = adbconnection.socket
 
+    async def quit(self):
+        msg = SyncProtocol.SYNCMSG_STATUS.pack(SyncProtocol.ID_QUIT, 0)
+        self.socket.sendall(msg)
+
     async def send_request(self, protoid: int, path_and_mode: str):
         path_and_mode = path_and_mode.encode("utf-8")
         length = len(path_and_mode)
         if length > 1024:
             raise ValueError("Can't send message > 1024")
-        hdr = SyncProtocol.SYNC_MSG.pack(protoid, length)
+        hdr = SyncProtocol.SYNCMSG_DATA.pack(protoid, length)
         await self.socket.sendall(hdr + path_and_mode)
 
     async def list(self, path, cb_coro):
+        """List a directory on device."""
         await self.send_request(SyncProtocol.ID_LIST, path)
         while True:
-            resp = await self.socket.recv(SyncProtocol.DIRENT.size)
-            msgid, mode, size, time, namelen = SyncProtocol.DIRENT.unpack(resp)
+            resp = await self.socket.recv(SyncProtocol.SYNCMSG_DIRENT.size)
+            msgid, mode, size, time, namelen = SyncProtocol.SYNCMSG_DIRENT.unpack(resp)
             if msgid == SyncProtocol.ID_DONE:
                 return True
             if msgid != SyncProtocol.ID_DENT:
                 return False
             name = await self.socket.recv(namelen)
-            stat = os.stat_result((mode, None, None, None, 0, 0, size, None, time, None))
+            stat = os.stat_result((mode, None, None, None, 0, 0, size, None, float(time), None))
             await cb_coro(stat, name.decode("utf-8"))
+
+    async def stat(self, remotepath):
+        """Stat a path."""
+        s = SyncProtocol.SYNCMSG_STAT_V2
+        await self.send_request(SyncProtocol.ID_STAT_V2, remotepath)
+        resp = await self.socket.recv(s.size)
+        stat_id, err, dev, ino, mode, nlink, uid, gid, size, atime, mtime, ctime = s.unpack(resp)
+        if stat_id == SyncProtocol.ID_STAT_V2:
+            if err != 0:
+                raise OSError(err, errno.errorcode[err], remotepath)
+            sr = os.stat_result((mode, ino, dev, nlink, uid, gid, size,
+                                 float(atime), float(mtime), float(ctime),  # floats
+                                 # int nanoseconds, but not really
+                                 atime * 1e9, mtime * 1e9, ctime * 1e9))
+            return sr
+        else:
+            raise AdbProtocolError("SyncProtocol: invalid response type.")
+
+    async def push(self, localfiles, remotepath, sync=False):
+        """Push files to device destination."""
+        try:
+            dest_st = await self.stat(remotepath)
+        except FileNotFoundError:
+            dst_exists = False
+            dst_isdir = False
+        else:
+            dst_exists = True
+            if stat.S_ISDIR(dest_st.st_mode):
+                dst_isdir = True
+            elif stat.S_ISREG(dest_st.st_mode):
+                dst_isdir = False
+            else:
+                raise ValueError("push: destination is not a directory or "
+                                 "regular file")
+        if not dst_isdir:
+            if len(localfiles) > 1:
+                raise ValueError("push: destination is not a dir when copying "
+                                 "multiple files.")
+            if dst_exists:
+                raise ValueError("push: destination exists")
+        for localfile in localfiles:
+            local_st = os.stat(localfile)
+
+            if stat.S_ISDIR(local_st.st_mode):
+                rpath = os.path.join(remotepath, os.path.basename(localfile))
+                await self._copy_local_dir_remote(localfile, rpath, sync)
+
+            if stat.S_ISREG(local_st.st_mode):
+                if dst_isdir:
+                    rpath = os.path.join(remotepath, os.path.basename(localfile))
+                await self._sync_send(localfile.encode("utf8"),
+                                      rpath.encode("utf8"),
+                                      local_st, sync)
+
+    async def pull(self, remotepath, localpath):
+        pass  # TODO(dart)
+
+    async def _sync_send(self, src_path, dst_path, local_st, sync):
+        # TODO(dart) sync check
+        if stat.S_ISLNK(local_st.st_mode):
+            raise NotImplementedError("TODO(dart)")
+
+        if local_st.st_size < SyncProtocol.SYNC_DATA_MAX:
+            async with streams.aopen(src_path, "rb") as fo:
+                data = await fo.read()
+            path_and_mode = b"%s,%d" % (dst_path, local_st.st_mode)
+            return await self._send_small_file(path_and_mode, data, int(local_st.st_mtime))
+        else:
+            return await self._send_large_file(src_path, dst_path, local_st)
+
+    async def _send_small_file(self, path_and_mode, data, mtime):
+        sm = SyncProtocol.SYNCMSG_DATA
+        buf = ringbuffer.RingBuffer(SyncProtocol.SYNC_DATA_MAX << 1)  # big enough to not wrap
+        buf.write(sm.pack(SyncProtocol.ID_SEND, len(path_and_mode)))
+        buf.write(path_and_mode)
+        buf.write(sm.pack(SyncProtocol.ID_DATA, len(data)))
+        buf.write(data)
+        buf.write(sm.pack(SyncProtocol.ID_DONE, mtime))
+        await self.socket.sendall(buf.read())
+        return await self._copy_done()
+
+    async def _send_large_file(self, src_path, dst_path, local_st):
+        sm = SyncProtocol.SYNCMSG_DATA
+        buf = ringbuffer.RingBuffer(SyncProtocol.SYNC_DATA_MAX << 1)
+
+        path_and_mode = b"%s,%d" % (dst_path, local_st.st_mode)
+        buf.write(sm.pack(SyncProtocol.ID_SEND, len(path_and_mode)))
+        buf.write(path_and_mode)
+        await self.socket.sendall(buf.read())
+
+        buf.clear()
+        chunksize = SyncProtocol.SYNC_DATA_MAX - sm.size
+
+        async with streams.aopen(src_path, "rb") as fo:
+            while True:
+                chunk = await fo.read(chunksize)
+                if not chunk:
+                    break
+                buf.write(sm.pack(SyncProtocol.ID_DATA, len(chunk)))
+                buf.write(chunk)
+                await self.socket.sendall(buf.read())
+
+        buf.clear()
+        buf.write(sm.pack(SyncProtocol.ID_DONE, int(local_st.st_mtime)))
+        await self.socket.sendall(buf.read())
+        return await self._copy_done()
+
+    async def _copy_done(self):
+        sm = SyncProtocol.SYNCMSG_STATUS
+        raw = await self.socket.recv(sm.size)
+        msg_id, msg_len = sm.unpack(raw)
+        if msg_id == SyncProtocol.ID_OKAY:
+            return True
+        if msg_id == SyncProtocol.ID_FAIL:
+            msg = await self.socket.recv(msg_len)
+            raise AdbCommandFail(
+                "large file copy not OKAY: {!r}".format(msg.decode("utf8")))
+
+    async def _copy_local_dir_remote(self, localfile, remotepath, sync):
+        raise NotImplementedError("TODO(dart)")
 
 
 class LogcatMessage:
+    """An Android log message.
+
+    Attributes:
+        tag: (str) The tag of the message as set by the sender.
+        priority: (LogPriority) The priority of the message.
+        message: (str) The text message given by the caller.
+        timestamp: (float) The devices' time that the message was created.
+        pid: (int) The process ID of sending process.
+        tid: (int) The thread ID of sending thread.
+        lid: (int) The log ID.
+        uid: (int) The user ID of the process that sent this message.
+    """
     def __init__(self, pid, tid, sec, nsec, lid, uid, msg):
         self.pid = pid
         self.tid = tid
@@ -858,9 +1048,9 @@ class LogcatMessage:
         self.message = (msg[tagend + 1:-1]).decode("utf8")
 
     def __str__(self):
-        return "{} {}|{} {}:{} {}".format(self.timestamp, self.tag,
-                                          self.priority.name, self.pid, self.tid,
-                                          self.message)
+        return "{:11.6f} {}:{} {}|{} {}".format(self.timestamp, self.pid, self.tid,
+                                                self.tag, self.priority.name,
+                                                self.message)
 
 
 class LogcatHandler:
@@ -909,11 +1099,22 @@ class LogcatHandler:
         payload = await proc.read(payload_len)
         return LogcatMessage(pid, tid, sec, nsec, lid, uid, payload)
 
-    def watch_for(self, tag, timeout=90):
-        """Watch for first occurence of a particular tag."""
-        return get_kernel().run(self._watch_for(tag, timeout))
+    def watch_for(self, tag=None, priority=None, text=None, timeout=90):
+        """Watch for first occurence of a particular set of tag, priority, or
+        message text.
 
-    async def _watch_for(self, tag, timeout):
+        If tag is given watch for first of that tag.
+        If tag and priority is given watch for tag only with that priority.
+        if tag and text is given watch for tag with the given text in the
+        message part.
+        If text is given look for first occurence of text in message part.
+        """
+        if tag is None and text is None:
+            raise ValueError("watch_for: must supply one or both of 'tag' or "
+                             "'text' parameters.")
+        return get_kernel().run(self._watch_for(tag, priority, text, timeout))
+
+    async def _watch_for(self, tag, priority, text, timeout):
         lm = None
         ac = self._aadb
         await ac.logcat_clear()
@@ -922,7 +1123,19 @@ class LogcatHandler:
             async with timeout_after(timeout):
                 while True:
                     new = await self._read_one(proc)
-                    if new.tag == tag:
+                    if tag and tag == new.tag:
+                        if priority is not None:
+                            if new.priority == priority:
+                                lm = new
+                                break
+                        else:
+                            lm = new
+                            break
+                        if text is not None:
+                            if text in new.message:
+                                lm = new
+                                break
+                    if text and text in new.message:
                         lm = new
                         break
         except TaskTimeout:

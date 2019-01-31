@@ -13,41 +13,38 @@
 # limitations under the License.
 
 """
-Demonstrate using the async remote list.
+Demonstrate using adb push.
 
-    $ python3.6 -m devtest.devices.android.examples.adb_list <path>
+    $ python3.6 -m devtest.devices.android.examples.adb_push <localpath>... <remotepath>
 """
 
 import os
 import sys
-import signal
 
 from devtest.devices.android import adb
 
 from devtest.io import reactor
-from devtest.io import streams
-
-out = streams.FileStream(sys.stdout.buffer)
-
-async def printer(stat, name):
-    await out.write(("{} {}\n".format(stat, name)).encode("utf-8"))
 
 
-async def adb_list(serial, pathname):
+async def adb_push(serial, localfiles, remotepath):
     ac = await adb.AsyncAndroidDeviceClient(serial)
-    st = await ac.stat(pathname)
-    await out.write(("stat: {}\n".format(st)).encode("utf-8"))
-    await ac.list(pathname, printer)
+    await ac.push(localfiles, remotepath)
     await ac.close()
+    return 0
 
 
 def main(argv):
-    pathname = argv[1]
-    kern = reactor.get_kernel()
-    return kern.run(adb_list, os.environ["ANDROID_SERIAL"], pathname)
+    if len(argv) >= 3:
+        localpaths = argv[1:-1]
+        remotepath = argv[-1]
+        kern = reactor.get_new_kernel(debug=True)
+        return kern.run(adb_push, os.environ["ANDROID_SERIAL"], localpaths, remotepath, shutdown=True)
+    else:
+        print(__doc__)
+        return 2
 
 
 if __name__ == "__main__":
-    sys.exit(not main(sys.argv))
+    sys.exit(main(sys.argv))
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
