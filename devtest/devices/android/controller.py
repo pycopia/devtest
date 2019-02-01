@@ -21,8 +21,10 @@ import re
 import stat
 from datetime import datetime, timezone
 from ast import literal_eval
+from array import array
 
 from devtest import devices
+from devtest import logging
 from devtest.io import reactor
 from devtest.core import exceptions
 from devtest.devices.android import adb
@@ -154,14 +156,16 @@ class AndroidController(devices.Controller):
         Raises:
             AndroidControllerError with exit status and stderr as args.
         """
+        logging.info("AndroidController.shell({!r})".format(cmd))
         stdout, stderr, es = self.adb.command(cmd)
         if es:
             return stdout
         else:
             raise AndroidControllerError((es, stderr))
 
-    def start_activity(self, package, activity,
-                       action='android.intent.action.MAIN', **extra):
+    def start_activity(self, package=None, component=None,
+                       action='android.intent.action.MAIN',
+                       data=None, mimetype=None, **extra):
         """Start an activity on device.
 
         This also force-stops a prior instance.
@@ -176,16 +180,36 @@ class AndroidController(devices.Controller):
         Returns:
             output of activity start command.
         """
-        cmd = ['cmd', 'activity', 'start-activity', '-S', '-a', action,
-               "{}/{}".format(package, activity)]
+        cmd = ['cmd', 'activity', 'start-activity']
+        if action:
+            if action == 'android.intent.action.MAIN':
+                cmd.append("-S")
+            cmd.append("-a")
+            cmd.append(str(action))
+        if data is not None:
+            cmd.append("-d")
+            cmd.append(str(data))
+        if mimetype is not None:
+            cmd.append("-t")
+            cmd.append(str(mimetype))
+
+        if package and component:
+            cmd.append("{}/{}".format(package, component))
+        elif package:
+            cmd.append(package)
+
         for key, value in extra.items():
             if value is not None:
-                option, optionval = _activity_extra_type(value)
+                option, optionval = _intent_extra_type(value)
                 cmd.extend([option, key, optionval])
         out = self.shell(cmd)
         if "Error:" in out:
             raise AndroidControllerError(out)
         return out
+
+    def package(self, cmd, *args, user=None, **kwargs):
+        """Manage packages."""
+        return self.adb.package(cmd, *args, user=user, **kwargs)
 
     def instrument(self, package, runner, wait=False, **extra):
         """Run instrumented code like 'am instrument'."""
@@ -431,7 +455,84 @@ class _Thermal:
                 "Couldn't read board temperature file: {}".format(self._board_temp_file))
 
 
-def _activity_extra_type(value):
+class Intent:
+    r"""An Android intent constructor.
+
+    Makes creating intents easier from Python code.
+
+    INTENT> specifications include these flags and arguments:
+        [-a <ACTION>] [-d <DATA_URI>] [-t <MIME_TYPE>]
+        [-c <CATEGORY> [-c <CATEGORY>] ...]
+        [-n <COMPONENT_NAME>]
+        [-e|--es <EXTRA_KEY> <EXTRA_STRING_VALUE> ...]
+        [--esn <EXTRA_KEY> ...]
+        [--ez <EXTRA_KEY> <EXTRA_BOOLEAN_VALUE> ...]
+        [--ei <EXTRA_KEY> <EXTRA_INT_VALUE> ...]
+        [--el <EXTRA_KEY> <EXTRA_LONG_VALUE> ...]
+        [--ef <EXTRA_KEY> <EXTRA_FLOAT_VALUE> ...]
+        [--eu <EXTRA_KEY> <EXTRA_URI_VALUE> ...]
+        [--ecn <EXTRA_KEY> <EXTRA_COMPONENT_NAME_VALUE>]
+        [--eia <EXTRA_KEY> <EXTRA_INT_VALUE>[,<EXTRA_INT_VALUE...]]
+            (mutiple extras passed as Integer[])
+        [--eial <EXTRA_KEY> <EXTRA_INT_VALUE>[,<EXTRA_INT_VALUE...]]
+            (mutiple extras passed as List<Integer>)
+        [--ela <EXTRA_KEY> <EXTRA_LONG_VALUE>[,<EXTRA_LONG_VALUE...]]
+            (mutiple extras passed as Long[])
+        [--elal <EXTRA_KEY> <EXTRA_LONG_VALUE>[,<EXTRA_LONG_VALUE...]]
+            (mutiple extras passed as List<Long>)
+        [--efa <EXTRA_KEY> <EXTRA_FLOAT_VALUE>[,<EXTRA_FLOAT_VALUE...]]
+            (mutiple extras passed as Float[])
+        [--efal <EXTRA_KEY> <EXTRA_FLOAT_VALUE>[,<EXTRA_FLOAT_VALUE...]]
+            (mutiple extras passed as List<Float>)
+        [--esa <EXTRA_KEY> <EXTRA_STRING_VALUE>[,<EXTRA_STRING_VALUE...]]
+            (mutiple extras passed as String[]; to embed a comma into a string,
+             escape it using "\,")
+        [--esal <EXTRA_KEY> <EXTRA_STRING_VALUE>[,<EXTRA_STRING_VALUE...]]
+            (mutiple extras passed as List<String>; to embed a comma into a string,
+             escape it using "\,")
+        [-f <FLAG>]
+        [--grant-read-uri-permission] [--grant-write-uri-permission]
+        [--grant-persistable-uri-permission] [--grant-prefix-uri-permission]
+        [--debug-log-resolution] [--exclude-stopped-packages]
+        [--include-stopped-packages]
+        [--activity-brought-to-front] [--activity-clear-top]
+        [--activity-clear-when-task-reset] [--activity-exclude-from-recents]
+        [--activity-launched-from-history] [--activity-multiple-task]
+        [--activity-no-animation] [--activity-no-history]
+        [--activity-no-user-action] [--activity-previous-is-top]
+        [--activity-reorder-to-front] [--activity-reset-task-if-needed]
+        [--activity-single-top] [--activity-clear-task]
+        [--activity-task-on-home] [--activity-match-external]
+        [--receiver-registered-only] [--receiver-replace-pending]
+        [--receiver-foreground] [--receiver-no-abort]
+        [--receiver-include-background]
+        [--selector]
+        [<URI> | <PACKAGE> | <COMPONENT>]
+    """
+    DEFAULT_ACTION = 'android.intent.action.MAIN'
+
+    def __init__(self, uri=None, package=None, component=None,
+                 action=None, data=None, mimetype=None,
+                 **extra):
+        intent = []
+        if data is not None:
+            intent.append("-d")
+            intent.append(str(data))
+        if mimetype is not None:
+            intent.append("-t")
+            intent.append(str(mimetype))
+        intent.append("{}/{}".format(package, component))
+        for key, value in extra.items():
+            if value is not None:
+                option, optionval = _intent_extra_type(value)
+                intent.extend([option, key, optionval])
+        self._intent = intent
+
+    def __str__(self):
+        return "TODO(dart)"  # .join(self._intent)
+
+
+def _intent_extra_type(value):
     """Figure out the intent extra type option from the Python type.
 
     Best effort, might not work for all cases.
@@ -449,12 +550,24 @@ def _activity_extra_type(value):
         return "--ef", str(value)
     elif isinstance(value, list):
         if all(isinstance(v, int) for v in value):
-            return "--eia", ",".join(str(v) for v in value)
+            return "--eial", ",".join(str(v) for v in value)
         elif all(isinstance(v, float) for v in value):
             return "--efa", ",".join(str(v) for v in value)
         elif all(isinstance(v, str) for v in value):
             return "--esa", ",".join(value)
+    elif isinstance(value, array):
+        if value.typecode == 'i':
+            return "--eia", ",".join(value)
     raise ValueError("Don't have conversion for type: {}".format(type(value)))
+
+
+class AndroidIntArray(array):
+    def __new__(cls, init=()):
+        return super().__new__(cls, 'i', init)
+
+    def __repr__(self):
+        return "{}([{}])".format(self.__class__.__name__,
+                                 ", ".join(str(i) for i in self))
 
 
 def _evaluate_value(value):
