@@ -419,13 +419,13 @@ class _AsyncAndroidDeviceClient:
             await self._conn.close()
         return st
 
-    async def push(self, localfiles: list, remotepath: str):
+    async def push(self, localfiles: list, remotepath: str, sync: bool = False):
         """Push a list of local files to remote file or directory.
         """
         sp = SyncProtocol(self.serial)
         await sp.connect_with(self._conn)
         try:
-            resp = await sp.push(localfiles, remotepath)
+            resp = await sp.push(localfiles, remotepath, sync)
         finally:
             await sp.quit()
             await self._conn.close()
@@ -486,6 +486,26 @@ class _AsyncAndroidDeviceClient:
         await p.close()
         return b'Success' in status_response
     # TODO(dart) install sessions
+
+    async def package(self, cmd, *args, user=None, **kwargs):
+        """Manage packages.
+
+        Equivalent of 'pm' command.
+        """
+        cmdline = ['cmd', 'package']
+        if user is not None:
+            cmdline.append("--user")
+            cmdline.append(str(user))
+        cmdline.append(cmd)
+        cmdline.extend(str(arg) for arg in args)
+        for opt, optarg in kwargs.items():
+            cmdline.append("--" + opt)
+            if optarg not in (None, True):
+                cmdline.append(str(optarg))
+        out, err, es = await self.command(cmdline)
+        if not es:
+            raise AdbCommandFail(err)
+        return out
 
     async def reconnect(self):
         msg = b"host-serial:%b:reconnect" % (self.serial,)
@@ -651,6 +671,14 @@ class AndroidDeviceClient:
         coro = self._aadb.install(apkfile, **kwargs)
         return get_kernel().run(coro)
 
+    def package(self, cmd, *args, user=None, **kwargs):
+        """Manage packages.
+
+        Equivalent of 'pm' command.
+        """
+        coro = self._aadb.package(cmd, *args, user=user, **kwargs)
+        return get_kernel().run(coro)
+
     def list(self, name, cb):
         """Perform a directory listing.
 
@@ -671,10 +699,10 @@ class AndroidDeviceClient:
         coro = self._aadb.stat(path)
         return get_kernel().run(coro)
 
-    def push(self, localfiles: list, remotepath: str):
+    def push(self, localfiles: list, remotepath: str, sync: bool = False):
         """Push a list of local files to remote file or directory.
         """
-        coro = self._aadb.push(localfiles, remotepath)
+        coro = self._aadb.push(localfiles, remotepath, sync)
         return get_kernel().run(coro)
 
     def reconnect(self):
