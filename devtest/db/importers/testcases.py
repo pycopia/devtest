@@ -44,7 +44,7 @@ def parts_from_doctree(document):
     pub = docutils_core.Publisher(reader, None, None,
                                   source=io.DocTreeInput(document),
                                   destination_class=io.StringOutput)
-    pub.set_writer("html_plain")
+    pub.set_writer("html4css1")
     pub.process_programmatic_settings(None, None, None)
     pub.set_destination(None, None)
     pub.publish(enable_exit_status=False)
@@ -70,7 +70,7 @@ def plain_doc(input_string):
                  'initial_header_level': 2}
     parts = docutils_core.publish_parts(
         source=input_string, source_path=None, destination_path=None,
-        writer_name="html_plain", settings_overrides=overrides)
+        writer_name="html4css1", settings_overrides=overrides)
     return parts["body"]
 
 
