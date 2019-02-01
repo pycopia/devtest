@@ -15,6 +15,7 @@
 """The power measuring role.
 """
 
+from devtest.core import constants
 from devtest.devices.monsoon import measure
 
 from . import BaseRole
@@ -64,6 +65,21 @@ class PowerMeterRole(BaseRole):
         measurer = measure.MonsoonCurrentMeasurer(measure_context)
         result = measurer.measure(handlerclass=measure.FileHandler)
         return result
+
+    def get_passthrough_mode(self, equipment):
+        """Inspect the equipment's connection type to determine the passthrough
+        mode.
+        """
+        passthrough = None
+        for conn in equipment.connections:
+            if conn.type == constants.ConnectionType.USB2:
+                if "HVPM" in conn.destination.model.name:
+                    passthrough = "on"
+                    break
+            elif conn.type == constants.ConnectionType.Power:
+                passthrough = "auto"
+                break
+        return passthrough
 
 
 if __name__ == "__main__":
