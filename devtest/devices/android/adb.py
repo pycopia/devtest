@@ -24,6 +24,7 @@ import errno
 import struct
 import signal
 
+from devtest import logging
 from devtest import timers
 from devtest import ringbuffer
 from devtest.io import socket
@@ -448,6 +449,7 @@ class _AsyncAndroidDeviceClient:
             DeviceProcess with active connection.
         """
         cmdline, name = _fix_command_line(cmdline)
+        logging.info("adb.spawn({})".format(cmdline))
         sock = await _start_exec(self.serial, self._conn, cmdline)
         return DeviceProcess(sock, name)
 
@@ -521,7 +523,7 @@ class _AsyncAndroidDeviceClient:
 
     async def logcat(self, stdoutstream, stderrstream, format="threadtime",
                      buffers="default", modifiers=None, binary=False,
-                     regex=None, logtags=""):
+                     regex=None, dump=False, logtags=""):
         """Coroutine for streaming logcat output to the provided file-like
         streams.
 
@@ -549,6 +551,8 @@ class _AsyncAndroidDeviceClient:
             cmdline.append("-B")
         if regex:
             cmdline.extend(["-e", regex])
+        if dump:
+            cmdline.append("-d")
         # output format
         if format not in {"brief", "long", "process", "raw", "tag",
                           "thread", "threadtime", "time"}:
@@ -1100,6 +1104,10 @@ class LogcatHandler:
     def __init__(self, aadb):
         self._aadb = aadb
 
+    def clear(self):
+        """Clear logcat buffers."""
+        return get_kernel().run(self._aadb.logcat_clear())
+
     def dump(self):
         """Dump logs to stdout until interrupted."""
         return get_kernel().run(self._dump())
@@ -1126,6 +1134,19 @@ class LogcatHandler:
         payload_len, hdr_size, pid, tid, sec, nsec, lid, uid = s.unpack(rawhdr)
         payload = await proc.read(payload_len)
         return LogcatMessage(pid, tid, sec, nsec, lid, uid, payload)
+
+    def dump_to(self, localfile, logtags=None):
+        """Dump all current logs to a file, in binary format."""
+        return get_kernel().run(self._dump_to(localfile, logtags))
+
+    async def _dump_to(self, localfile, logtags):
+        cmdline = ['logcat', '-d', '-B', '-b', 'all']
+        if logtags:
+            cmdline.extend(logtags.split())
+        proc = await self._aadb.spawn(cmdline)
+        with open(localfile, "wb") as fo:
+            await proc.copy_to(streams.FileStream(fo))
+        await proc.close()
 
     def watch_for(self, tag=None, priority=None, text=None, timeout=90):
         """Watch for first occurence of a particular set of tag, priority, or

@@ -254,7 +254,10 @@ class AndroidController(devices.Controller):
 
         Wait for it to become known to adb again.
         """
-        return adb.AdbClient().reconnect(self._equipment["serno"])
+        del self.adb
+        c = adb.AdbClient()
+        c.reconnect(self._equipment["serno"])
+        c.close()
 
     def airplane_mode(self, onoff):
         """Set airplane mode on or off.
