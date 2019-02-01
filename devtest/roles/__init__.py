@@ -16,15 +16,16 @@ field of an equipment, that should point to something in here. But it could be
 in another package.
 """
 
-from __future__ import generator_stop
-
 import abc
-from .. import importlib
 
+from .. import importlib
+from .. import config
 
 class BaseRole(metaclass=abc.ABCMeta):
     """Base, abstract, role for equipment role controllers."""
     def __init__(self, equipment):
+        cf = config.get_config()
+        self.config = cf.roles.get(equipment["role"])
         self._equipment = equipment
         self.initialize()
 
