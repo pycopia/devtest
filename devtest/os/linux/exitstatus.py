@@ -17,7 +17,7 @@ import signal
 
 
 class ExitStatus:
-    """Common exit status object for subprocesses.
+    """Common exit status object for subprocesses and devices.
 
     Can be avaluated for truthiness and will avaluate True only if status
     indicates a normal process exit. A normal exit is zero, but this will still
@@ -33,7 +33,8 @@ class ExitStatus:
         Args:
             sts: raw status value from OS.
             name: name of the process to report when stringified.
-            exitstatus: optional, pre-cooked returncode from subprocess module.
+            returncode: optional, pre-cooked returncode from subprocess module.
+                        overrides sts if used.
         """
         self.name = name
         if returncode is not None:
