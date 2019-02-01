@@ -30,3 +30,12 @@ webui:
     auth_password: "devtest"
     realm: "devtest"
     redis_url: "redis://localhost:6379/0"
+
+roles:
+    displayer:
+        package: "com.google.android.apps.photos"
+        intent: ".home.HomeActivity"
+        destdir: "/sdcard/Pictures"  # TODO(dart) query device
+        images:  # ResultType to image
+            CONTACT:
+                "/google/src/files/head/depot/google3/lens/testing/tests/lenslite_datasets/english_business_card.png"
