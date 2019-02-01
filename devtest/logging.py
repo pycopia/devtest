@@ -336,7 +336,7 @@ _LOGGERS = {}
 
 
 def get_logger(*args, **kwargs):
-    name = args[0] if len(args) > 1 else "root"
+    name = args[0] if len(args) > 1 else os.path.basename(sys.argv[0])
     if name in _LOGGERS:
         return _LOGGERS[name]
     facility = kwargs.get("facility", FACILITY)
