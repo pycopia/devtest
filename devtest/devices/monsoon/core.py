@@ -297,6 +297,8 @@ class MeasurementResult:
                    usb_power=getattr(handler, "usb_power", None),
                    usb_voltage=getattr(handler, "usb_voltage", None),
                    aux_current=getattr(handler, "aux_current", None),
+                   sample_rate=getattr(handler, "sample_rate", 5000),
+                   start_time=ctx.get("start_time"),
                    samplefile=ctx.get("filename"),
                    duration=ctx.get("duration"),
                    delay=ctx.get("delay", 0),
@@ -308,9 +310,9 @@ class MeasurementResult:
 
     def __str__(self):
         s = ["{} for {}:".format(self.__class__.__name__, self.handler)]
-        for name in ("duration", "captured", "dropped", "sample_count",
-                     "main_current", "main_power", "main_voltage",
-                     "usb_current", "usb_power", "usb_voltage",
+        for name in ("start_time", "duration", "captured", "dropped",
+                     "sample_count", "main_current", "main_power",
+                     "main_voltage", "usb_current", "usb_power", "usb_voltage",
                      "aux_current", "passthrough", "samplefile"):
             val = getattr(self, name, None)
             if val is not None:

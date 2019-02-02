@@ -16,6 +16,7 @@
 with different measurement handlers.
 """
 
+import time
 import struct
 import collections
 
@@ -80,6 +81,7 @@ class MeasurementHandler:
     def __init__(self, context, metadata, calsize=5):
         self.metadata = metadata
         self.sample_count = 0
+        self.sample_rate = 5000  # fixed samples/sec
         self.cal_count = 0
         self.captured = 0
         self.dropped = 0
@@ -414,6 +416,7 @@ class MonsoonCurrentMeasurer(Measurer):
                              "subclass of MeasurementHandler.")
         handler = handlerclass(ctx, dev.info)
         # Perform the capture run.
+        ctx["start_time"] = time.time()
         try:
             captured, dropped = dev.capture(samples=ctx["numsamples"],
                                             duration=ctx["duration"],

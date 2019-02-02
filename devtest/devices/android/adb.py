@@ -1074,13 +1074,20 @@ class LogcatMessage:
         self.timestamp = float(sec) + (nsec / 1e9)
         self.lid = lid
         self.uid = uid
-        self.priority = LogPriority(msg[0])
+        try:
+            self.priority = LogPriority(msg[0])
+        except ValueError:
+            self.priority = LogPriority.UNKNOWN
         tagend = msg.find(b'\x00')
-        self.tag = (msg[1:tagend]).decode("ascii")
-        self.message = (msg[tagend + 1:-1]).decode("utf8")
+        if tagend > 0:
+            self.tag = (msg[1:tagend]).decode("ascii")
+            self.message = (msg[tagend + 1:-1]).decode("utf8")
+        else:
+            self.tag = None
+            self.message = msg.decode("utf8")
 
     def __str__(self):
-        return "{:11.6f} {}:{} {}|{} {}".format(self.timestamp, self.pid, self.tid,
+        return "{:11.6f} {}:{} {}|{}¦{}".format(self.timestamp, self.pid, self.tid,
                                                 self.tag, self.priority.name,
                                                 self.message)
 
@@ -1140,7 +1147,7 @@ class LogcatHandler:
         return get_kernel().run(self._dump_to(localfile, logtags))
 
     async def _dump_to(self, localfile, logtags):
-        cmdline = ['logcat', '-d', '-B', '-b', 'all']
+        cmdline = ['logcat', '-d', '-B', '-b', 'default']
         if logtags:
             cmdline.extend(logtags.split())
         proc = await self._aadb.spawn(cmdline)
@@ -1191,6 +1198,71 @@ class LogcatHandler:
             pass
         await proc.close()
         return lm
+
+
+class LogcatFileReader:
+    """Read and decode binary logcat files.
+
+    These are usually obtained from a LogcatHandler dump_to.
+    """
+    LOGCAT_MESSAGE = struct.Struct("<HHiIIIII")  # logger_entry_v4
+
+    def __init__(self, filename):
+        self.filename = os.fspath(filename)
+
+    def __repr__(self):
+        return "{}({!r})".format(self.__class__.__name__, self.filename)
+
+    def dump(self, tag=None):
+        """Write deocded log to stdout."""
+        return self.dump_to(sys.stdout.buffer, tag=tag)
+
+    def dump_to(self, fo, tag=None):
+        """Dump decoded text to a file-like object."""
+        with open(self.filename, "rb") as lfo:
+            self._sync_file(lfo)
+            lines = self._dump(lfo, fo, tag)
+        return lines
+
+    def _dump(self, fo, out, tag):
+        lines = 0
+        while True:
+            lm = self._read_one(fo)
+            if lm is None:
+                break
+            if tag and tag != lm.tag:
+                continue
+            lines += 1
+            out.write(str(lm).encode("utf8"))
+            out.write(b'\n')
+        return lines
+
+    def dump_to_file(self, localfile, tag=None):
+        with open(localfile, "wb") as fo:
+            lines = self.dump_to(fo, tag)
+        return lines
+
+    def _read_one(self, fo):
+        s = self.LOGCAT_MESSAGE
+        rawhdr = fo.read(s.size)
+        if len(rawhdr) < s.size:
+            return None
+        payload_len, hdr_size, pid, tid, sec, nsec, lid, uid = s.unpack(rawhdr)
+        payload = fo.read(payload_len)
+        return LogcatMessage(pid, tid, sec, nsec, lid, uid, payload)
+
+    def _sync_file(self, fo):
+        # in case of cruft at start of file.
+        # The header size is fixed, so will always have the same value, and
+        # hdr_size field equals LOGCAT_MESSAGE size. Look for that.
+        header_peek = struct.Struct("<HH")
+        while True:
+            payload_len, hdr_size = header_peek.unpack(fo.read(header_peek.size))
+            if hdr_size == self.LOGCAT_MESSAGE.size:
+                fo.seek(-header_peek.size, 1)
+                return
+            else:
+                fo.seek(-(header_peek.size - 1), 1)
 
 
 class AndroidDevice:
