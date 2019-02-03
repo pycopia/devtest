@@ -11,6 +11,7 @@ import urllib.parse
 from http.client import HTTPException, RemoteDisconnected
 import portpicker
 
+from devtest import logging
 from devtest.devices.android import adb
 from devtest import json
 from devtest import timers
@@ -26,7 +27,7 @@ if 'localhost' not in os.environ.get('no_proxy', ''):
 
 
 __authors__ = ["Xiaocong He", "Keith Dart"]
-__all__ = ["device", "Device", "rect", "point", "Selector", "JsonRPCError"]
+__all__ = ["device", "AutomatorDevice", "rect", "point", "Selector", "JsonRPCError"]
 
 
 class Error(Exception):
@@ -364,8 +365,9 @@ class AutomatorServer:
                 raise UIAutomatorError("Couldn't get SDK version")
         return self._sdk
 
-    def start(self, timeout=10):
+    def start(self, timeout=30):
         """Start the device side server."""
+        logging.debug("AutomationServer: attempting to start")
         cf = config.get_config()
         runner = cf.uiautomator[self.source].runner
         cmd = "am instrument -w -e class com.github.uiautomator.stub.Stub " + runner
@@ -381,10 +383,12 @@ class AutomatorServer:
             self._uia_device_process.sync_close()
             self._uia_device_process = None
             raise UIAutomatorError("RPC server not started!")
+        logging.debug("AutomationServer: started")
 
     def stop(self):
         """Stop the rpc server."""
         if self._uia_device_process is not None:
+            logging.debug("AutomationServer: stopping")
             res = None
             try:
                 try:
@@ -407,7 +411,8 @@ class AutomatorServer:
         """Check if the rpc server is alive."""
         try:
             return self.ping() == "pong"
-        except:  # noqa
+        except Exception as err:  # noqa
+            logging.exception_warning("AutomationServer: not alive", err)
             return False
 
     @property
