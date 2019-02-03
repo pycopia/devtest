@@ -62,17 +62,22 @@ PACKER = struct.Struct("!II")
 class SerialCaptureService(Service):
 
     def __init__(self):
+        self._server = None
         signals.logdir_location.connect(self._set_logdir, weak=False)
-        self._server = SerialCaptureServer()
-        self._server.start()
-        time.sleep(1)
         self._set_logdir(None, path="/var/tmp")
 
     def _set_logdir(self, runner, path=None):
         self._logdir = path
         self.set_logdir(path)
 
+    def _start_server(self):
+        if self._server is None:
+            self._server = SerialCaptureServer()
+            self._server.start()
+            time.sleep(1)
+
     def provide_for(self, device, **kwargs):
+        self._start_server()
         hostname = device.get("hostname")
         console_config = device.get("console")
         if console_config:
