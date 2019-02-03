@@ -691,7 +691,7 @@ class TestSuite:
     any are incomplete the suite is incomplete.
     """
 
-    def __init__(self, config, testbed=None, ui=None, nested=0, name=None, doc=None):
+    def __init__(self, config, testbed, ui, nested=0, name=None, doc=None):
         self.config = config
         self.testbed = testbed
         self.UI = ui
