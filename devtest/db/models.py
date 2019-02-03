@@ -24,6 +24,7 @@ from pytz import timezone
 from peewee import *  # noqa
 from .fields import *  # noqa
 
+from .. import json
 from ..core import constants
 from ..core.exceptions import ModelError
 
@@ -98,7 +99,7 @@ class EquipmentModel(BaseModel):
     note = TextField(null=True)
     picture = BlobField(null=True)
     specs = CharField(max_length=255, null=True)  # URL
-    attributes = BinaryJSONField(default=None, null=True)
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
     class Meta:
         table_name = 'equipment_model'
@@ -152,7 +153,7 @@ class Equipment(BaseModel):
                              on_update="CASCADE", on_delete="SET NULL")
     location = TextField(null=True)
     notes = TextField(null=True)
-    attributes = BinaryJSONField(default=None, null=True)
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
     active = BooleanField(default=True)
 
     class Meta:
@@ -288,7 +289,7 @@ class Software(BaseModel):
     implements = ForeignKeyField(column_name='category_id',
                                  model=Function, field='id',
                                  backref="implementations")
-    attributes = BinaryJSONField(default=None, null=True)
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
     class Meta:
         table_name = 'software'
@@ -336,7 +337,7 @@ class TestBed(BaseModel):
     """
     name = CharField(max_length=255, unique=True)
     notes = TextField(null=True)
-    attributes = BinaryJSONField(default=None, null=True)
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
     class Meta:
         table_name = 'testbeds'
@@ -520,7 +521,8 @@ class Networks(BaseModel):
     type = EnumField(constants.NetworkType,
                      default=constants.NetworkType.Unknown)
     notes = TextField(null=True)
-    attributes = BinaryJSONField(default=None, null=True)  # User defined attributes
+    # User defined attributes.
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
     class Meta:
         table_name = 'networks'
@@ -615,7 +617,7 @@ class TestCases(BaseModel):
     procedure = TextField(null=True)  # a.k.a instructions
 
     # Extra data
-    attributes = BinaryJSONField(default=None, null=True)
+    attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
     # Reviews and status notes.
     comments = TextField(null=True)
@@ -684,7 +686,7 @@ class Scenario(BaseModel):
     purpose = TextField(null=True)
     purpose_search = TSVectorField()  # Enable full-text search of purpose.
     implementation = CharField(max_length=255, null=True)
-    parameters = BinaryJSONField(default=None, null=True)
+    parameters = BinaryJSONField(dumps=json.dumps, default=None, null=True)
     reportname = CharField(max_length=80, null=True)
     owners = ArrayField(null=True)  # Array of user IDs
     notes = TextField(null=True)
@@ -716,7 +718,7 @@ class TestResults(BaseModel):
     # Troubleshooting and data gathering
     diagnostic = TextField(null=True)
     resultslocation = CharField(max_length=255, null=True)
-    data = BinaryJSONField(null=True)
+    data = BinaryJSONField(dumps=json.dumps, null=True)
 
     # Timing history
     starttime = DateTimeTZField(index=True)
@@ -778,8 +780,8 @@ class TestResults(BaseModel):
 
     @classmethod
     def for_testcase(cls, testcase, limit=100):
-        return cls.select().where(
-            cls.testcase == testcase).order_by(cls.starttime).limit(limit).execute()
+        return cls.select().where((cls.testcase == testcase) &
+                                  (cls.valid == True)).order_by(cls.starttime).limit(limit).execute()  # noqa
 
     @classmethod
     def get_runs(cls, limit=20):

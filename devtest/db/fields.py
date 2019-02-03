@@ -16,6 +16,13 @@ import enum
 import ipaddress
 from datetime import timedelta
 
+# Need to register alternate JSON codecs early
+from devtest import json
+from psycopg2 import extras
+extras.register_default_json(globally=True, loads=json.loads)
+extras.register_default_jsonb(globally=True, loads=json.loads)
+del extras, json
+
 from peewee import Field
 from playhouse.postgres_ext import (BinaryJSONField, TSVectorField,  # noqa
                                     DateTimeTZField, ArrayField)
