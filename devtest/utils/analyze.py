@@ -25,6 +25,7 @@ from devtest.devices.monsoon import core as monsoon_core
 from devtest.devices.android import adb
 from devtest import json
 from devtest import config
+from devtest.db import models
 
 
 class SampleData:
@@ -38,8 +39,8 @@ class SampleData:
         sample_rate: int number of samples per second in samples array.
     """
 
-    def __init__(self, samples, result=None):
-        self.samples = samples
+    def __init__(self, samples=None, result=None):
+        self._samples = samples
         if result is not None:
             self.columns = result.columns
             self.units = result.units
@@ -48,6 +49,7 @@ class SampleData:
             self.voltage = result.voltage
             self.dropped = result.dropped
             self.sample_count = result.sample_count
+            self.samplefile = result.samplefile
         else:
             self.heading = None
             self.units = None
@@ -56,6 +58,14 @@ class SampleData:
             self.voltage = None
             self.dropped = None
             self.sample_count = None
+            self.samplefile = None
+
+    @property
+    def samples(self):
+        if self._samples is None:
+            if self.samplefile:
+                self._samples = SampleData.read_file(self.samplefile)
+        return self._samples
 
     @property
     def heading(self):
@@ -84,8 +94,7 @@ class SampleData:
     def from_result(cls, result):
         """Read result object and load samples from samplefile, and metadata.
         """
-        data = SampleData.read_file(result.samplefile)
-        return cls(data, result)
+        return cls(None, result)
 
     @classmethod
     def from_file(cls, filename):
@@ -130,14 +139,16 @@ def load_data(md, _dataobjects=None):
         fname = md.get("logfile")
         if fname:
             _dataobjects.append(adb.LogcatFileReader(fname))
+        else:
+            _dataobjects.append(md)
     elif isinstance(md, monsoon_core.MeasurementResult):
         _dataobjects.append(SampleData.from_result(md))
     else:
-        print("Warning: unhandled toplevel:", md)
+        _dataobjects.append(md)
     return _dataobjects
 
 
-def find_metadata(testcasename):
+def find_data_files(testcasename):
     """Find all data files as written by devtest.qa.bases.TestCase.record_data()
     and default output.
 
@@ -148,16 +159,23 @@ def find_metadata(testcasename):
     for dirpath, dirnames, filenames in os.walk(resultsdir):
         for fname in filenames:
             if testcasename in fname and fname.endswith("json"):
-                yield os.path.join(dirpath, fname)
+                md = read_metadata(os.path.join(dirpath, fname))
+                yield md
+
+
+def find_data(testcasename):
+    """Find metadata of a test case result in the database."""
+    models.connect()
+    TC = models.TestCases
+    tc = TC.select().where(TC.name == testcasename).get()
+    return [r.data for r in tc.testresults if r.data is not None]
 
 
 if __name__ == "__main__":
     import sys
     testname = sys.argv[1]
-    for name in find_metadata(testname):
-        md = read_metadata(name)
-        print(name, ":")
-        for obj in load_data(md):
+    for data in find_data_files(testname):
+        for obj in load_data(data):
             print(obj)
         print()
 
