@@ -25,7 +25,7 @@ from devtest.devices.monsoon import core as monsoon_core
 from devtest.devices.android import adb
 from devtest import json
 from devtest import config
-from devtest.db import models
+from devtest.db import controllers
 
 
 class SampleData:
@@ -120,7 +120,7 @@ def read_metadata(filename):
     return json.from_file(filename)
 
 
-def dump_logfile(fname, tag=None):
+def dump_logcat(fname, tag=None):
     """Dump a binary logcat file to stdout as text.
     """
     lfr = adb.LogcatFileReader(fname)
@@ -128,7 +128,7 @@ def dump_logfile(fname, tag=None):
 
 
 def load_data(md, _dataobjects=None):
-    """Convert metadata records to data objects.
+    """Convert metadata records to known data objects.
     """
     if _dataobjects is None:
         _dataobjects = []
@@ -165,10 +165,9 @@ def find_data_files(testcasename):
 
 def find_data(testcasename):
     """Find metadata of a test case result in the database."""
-    models.connect()
-    TC = models.TestCases
-    tc = TC.select().where(TC.name == testcasename).get()
-    return [r.data for r in tc.testresults if r.data is not None]
+    controllers.connect()
+    return [r.data for r in
+            controllers.TestResultsController.results_for(testcasename) if r.data is not None]
 
 
 if __name__ == "__main__":
