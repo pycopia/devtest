@@ -19,6 +19,12 @@ import curses
 import curses.ascii
 import curses.textpad
 
+# keep this import. It works around some strange Python behavior.
+# Without it, the built-in function "input" writes prompt to stderr.
+# With this imported, the "input" function writes prompt to stdout (as it
+# should).
+import readline  # noqa
+
 
 try:
     COLUMNS, LINES = os.get_terminal_size()
