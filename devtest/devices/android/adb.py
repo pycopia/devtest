@@ -1213,6 +1213,47 @@ class LogcatFileReader:
     def __repr__(self):
         return "{}({!r})".format(self.__class__.__name__, self.filename)
 
+    def search(self, tag=None, priority=None, regex=None):
+        """Search the log for tag or regular expression in text.
+
+        If tag is given, match on tag. If priority is also given, must match
+        both tag and priority.
+        IF a Regex object is given, match the message body only with that regex.
+        If both tag and regex given, both must match. If all given, all must
+        match.
+
+        Yield LogcatMessage and MatchObject on matches. MatchObject will be None
+        if regex is not given.
+        """
+        if tag is None and regex is None:
+            raise ValueError("At least one of tag or regex must be supplied.")
+        with open(self.filename, "rb") as lfo:
+            self._sync_file(lfo)
+            while True:
+                lm = self._read_one(lfo)
+                if lm is None:
+                    break
+                if tag and tag == lm.tag:
+                    if priority is not None:
+                        if lm.priority == priority:
+                            if regex is not None:
+                                mo = regex.search(lm.message)
+                                if mo:
+                                    yield lm, mo
+                            else:
+                                yield lm, None
+                    else:
+                        if regex is not None:
+                            mo = regex.search(lm.message)
+                            if mo:
+                                yield lm, mo
+                        else:
+                            yield lm, None
+                if regex is not None:
+                    mo = regex.search(lm.message)
+                    if mo:
+                        yield lm, mo
+
     def dump(self, tag=None):
         """Write deocded log to stdout."""
         return self.dump_to(sys.stdout.buffer, tag=tag)

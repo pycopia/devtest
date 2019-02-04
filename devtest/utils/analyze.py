@@ -21,22 +21,29 @@ import os
 
 import numpy as np
 
-from devtest.devices.monsoon import core as monsoon_core
-from devtest.devices.android import adb
 from devtest import json
 from devtest import config
 from devtest.db import controllers
+from devtest.devices.android import adb
+from devtest.devices.monsoon import core as monsoon_core
 
 
 class SampleData:
     """Monsoon sample data plus metadata.
 
     Attributes:
-        samples: ndarray of all samples
+        samples: ndarray of all samples (from samplefile).
         columns: List of columns labels, in order of columns in samples.
         units: List of unit labels, in order of columns in samples.
-        start_time: float of time measurement run started.
+        start_time: float of time measurement run started, unix time.
         sample_rate: int number of samples per second in samples array.
+        voltage: The voltage set during measurement.
+        dropped: Number of samples dropped by device.
+        sample_count: number of actual data samples.
+        samplefile: name of the file where raw samples are stored.
+        heading: str of column names and units suitable for printing a table.
+        main_current: vector of main current samples only, and unit string.
+        main_voltage: vector of main voltage readings only, and unit string.
     """
 
     def __init__(self, samples=None, result=None):
@@ -51,7 +58,7 @@ class SampleData:
             self.sample_count = result.sample_count
             self.samplefile = result.samplefile
         else:
-            self.heading = None
+            self.columns = None
             self.units = None
             self.start_time = None
             self.sample_rate = None
@@ -69,7 +76,7 @@ class SampleData:
 
     @property
     def heading(self):
-        heads = ["{} ({})".format(n, u) for n, u in zip(self.heading, self.units)]
+        heads = ["{} ({})".format(n, u) for n, u in zip(self.columns, self.units)]
         return " | ".join(heads)
 
     def __str__(self):
@@ -79,7 +86,7 @@ class SampleData:
 
     def get_column(self, name):
         """Return column data and unit of column."""
-        index = self.heading.index(name)
+        index = self.columns.index(name)
         return self.samples[index], self.units[index]
 
     @property
@@ -138,14 +145,27 @@ def load_data(md, _dataobjects=None):
     elif isinstance(md, dict):
         fname = md.get("logfile")
         if fname:
+            fname = _fix_path(fname)
             _dataobjects.append(adb.LogcatFileReader(fname))
         else:
             _dataobjects.append(md)
     elif isinstance(md, monsoon_core.MeasurementResult):
+        md.samplefile = _fix_path(md.samplefile)
         _dataobjects.append(SampleData.from_result(md))
     else:
         _dataobjects.append(md)
     return _dataobjects
+
+
+def _fix_path(path):
+    """Fix the the logdir path, in case it was moved."""
+    cf = config.get_config()
+    resultsdir = os.path.expandvars(cf.resultsdir)
+    if path.startswith(resultsdir):
+        return path
+    dirname, fname = os.path.split(path)
+    origresultsdir, subdir = os.path.split(dirname)
+    return os.path.join(resultsdir, subdir, fname)
 
 
 def find_data_files(testcasename):
@@ -168,6 +188,20 @@ def find_data(testcasename):
     controllers.connect()
     return [r.data for r in
             controllers.TestResultsController.results_for(testcasename) if r.data is not None]
+
+
+def get_latest_samples(testcasename):
+    """Get the latest sample data and logs from a test case that records samples.
+    """
+    sampledata = None
+    logfile = None
+    data = find_data(testcasename)[-1]
+    for resultobj in load_data(data):
+        if isinstance(resultobj, SampleData):
+            sampledata =  resultobj
+        elif isinstance(resultobj, adb.LogcatFileReader):
+            logfile = resultobj
+    return sampledata, logfile
 
 
 if __name__ == "__main__":
