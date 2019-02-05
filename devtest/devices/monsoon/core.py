@@ -290,6 +290,7 @@ class MeasurementResult:
                    captured=handler.captured,
                    dropped=handler.dropped,
                    sample_count=handler.sample_count,
+                   measure_count=handler.measure_count,
                    main_current=getattr(handler, "main_current", None),
                    main_power=getattr(handler, "main_power", None),
                    main_voltage=getattr(handler, "main_voltage", None),
@@ -311,7 +312,7 @@ class MeasurementResult:
     def __str__(self):
         s = ["{} for {}:".format(self.__class__.__name__, self.handler)]
         for name in ("start_time", "duration", "captured", "dropped",
-                     "sample_count", "main_current", "main_power",
+                     "sample_count", "measure_count", "main_current", "main_power",
                      "main_voltage", "usb_current", "usb_power", "usb_voltage",
                      "aux_current", "passthrough", "samplefile"):
             val = getattr(self, name, None)
