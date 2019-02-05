@@ -39,7 +39,8 @@ class SampleData:
         sample_rate: int number of samples per second in samples array.
         voltage: The voltage set during measurement.
         dropped: Number of samples dropped by device.
-        sample_count: number of actual data samples.
+        sample_count: number of raw data samples (includes ref and cal samples).
+        measure_count: number of actual, measurement data samples.
         samplefile: name of the file where raw samples are stored.
         heading: str of column names and units suitable for printing a table.
         main_current: vector of main current samples only, and unit string.
@@ -55,7 +56,8 @@ class SampleData:
             self.sample_rate = result.sample_rate
             self.voltage = result.voltage
             self.dropped = result.dropped
-            self.sample_count = result.sample_count
+            self.sample_count = result.sample_count  # total samples
+            self.measure_count = result.measure_count  # samples counting for measurement
             self.samplefile = result.samplefile
         else:
             self.columns = None
@@ -66,6 +68,36 @@ class SampleData:
             self.dropped = None
             self.sample_count = None
             self.samplefile = None
+
+    def __str__(self):
+        s = [self.heading]
+        s.append(repr(self.samples))
+        return "\n".join(s)
+
+    def get_column(self, name):
+        """Return column data and unit of column."""
+        index = self.columns.index(name)
+        return self.samples[index], self.units[index]
+
+    def get_time_axis(self, absolute=False):
+        """Create a time datapoint axis from the measure data.
+
+        Use the measure count and sample rate from the result.
+        """
+        offset = self.start_time if absolute else 0.0
+        times = np.arange(offset,
+                          offset + (self.measure_count / self.sample_rate),
+                          1.0 / self.sample_rate,
+                          np.float64)
+        assert len(times) == self.measure_count
+        return times
+
+    def get_xy(self, name, absolute=False):
+        """Return tuple of time and column value arrays, x unit, y unit.
+        """
+        col, unit = self.get_column(name)
+        times = self.get_time_axis(absolute=absolute)
+        return times, col, "s", unit
 
     @property
     def samples(self):
@@ -79,16 +111,6 @@ class SampleData:
         heads = ["{} ({})".format(n, u) for n, u in zip(self.columns, self.units)]
         return " | ".join(heads)
 
-    def __str__(self):
-        s = [self.heading]
-        s.append(repr(self.samples))
-        return "\n".join(s)
-
-    def get_column(self, name):
-        """Return column data and unit of column."""
-        index = self.columns.index(name)
-        return self.samples[index], self.units[index]
-
     @property
     def main_current(self):
         return self.get_column("main_current")
@@ -96,6 +118,7 @@ class SampleData:
     @property
     def main_voltage(self):
         return self.get_column("main_voltage")
+
 
     @classmethod
     def from_result(cls, result):
@@ -195,13 +218,38 @@ def get_latest_samples(testcasename):
     """
     sampledata = None
     logfile = None
+    extra = None
     data = find_data(testcasename)[-1]
     for resultobj in load_data(data):
         if isinstance(resultobj, SampleData):
             sampledata =  resultobj
         elif isinstance(resultobj, adb.LogcatFileReader):
             logfile = resultobj
-    return sampledata, logfile
+        else:
+            extra = resultobj
+    return sampledata, logfile, extra
+
+
+def get_all_samples(testcasename):
+    """Get all available data objects for a test.
+
+    Returns
+        List of tuples of (sampledata, logfile, extradata).
+    """
+    alldata = []
+    for data in find_data(testcasename):
+        sampledata = None
+        logfile = None
+        extra = None
+        for resultobj in load_data(data):
+            if isinstance(resultobj, SampleData):
+                sampledata = resultobj
+            elif isinstance(resultobj, adb.LogcatFileReader):
+                logfile = resultobj
+            else:
+                extra = resultobj
+        alldata.append((sampledata, logfile, extra))
+    return alldata
 
 
 if __name__ == "__main__":
