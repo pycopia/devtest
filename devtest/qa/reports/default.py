@@ -227,6 +227,9 @@ class DefaultReport(BaseReport):
     def on_suite_summary(self, suite, result=None):
         print("Aggregate Suite Result:", result, file=self._file)
 
+    def on_run_comment(self, runner, message=None):
+        print("NOTE:", str(message), file=self._file)
+
 
 class DefaultReportUnicode(DefaultReport):
 

@@ -67,7 +67,7 @@ class DatabaseReport(BaseReport):
         self._resultstack[0].dutbuild = "{} ({})".format(build, variant)
 
     def on_run_comment(self, runner, message=None):
-        self._resultstack[0].note = message
+        _add_note(self._resultstack[0], message)
 
     def on_test_start(self, testcase, time=None):
         tr = models.TestResults(starttime=time,
@@ -88,7 +88,7 @@ class DatabaseReport(BaseReport):
     def on_test_passed(self, testcase, message=None):
         tr = self._resultstack[-1]
         tr.result = TestResult.PASSED
-        tr.note = message
+        _add_note(tr, message)
 
     def on_test_incomplete(self, testcase, message=None):
         tr = self._resultstack[-1]
@@ -138,6 +138,15 @@ def _add_diagnostic(obj, message):
             obj.diagnostic += message
         else:
             obj.diagnostic = message
+
+
+def _add_note(obj, note):
+    if note:
+        if obj.note:
+            obj.note += "\n"
+            obj.note += note
+        else:
+            obj.note = note
 
 
 def _test(argv):
