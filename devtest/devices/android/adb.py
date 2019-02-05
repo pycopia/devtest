@@ -71,6 +71,21 @@ class LogPriority(enum.IntEnum):
     FATAL = 7
 
 
+class LogId(enum.IntEnum):
+    """Source of the log entry.
+
+    See: android/core/include/android/log.h
+    """
+    MAIN = 0
+    RADIO = 1
+    EVENTS = 2
+    SYSTEM = 3
+    CRASH = 4
+    STATS = 5
+    SECURITY = 6
+    KERNEL = 7
+
+
 def _run_adb(adbcommand):
     """Run the adb binary."""
     cmd = [ADB]
@@ -1072,7 +1087,7 @@ class LogcatMessage:
         self.pid = pid
         self.tid = tid
         self.timestamp = float(sec) + (nsec / 1e9)
-        self.lid = lid
+        self.lid = LogId(lid)
         self.uid = uid
         try:
             self.priority = LogPriority(msg[0])
