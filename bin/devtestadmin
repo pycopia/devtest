@@ -965,6 +965,8 @@ def show_testresult(result, failures=False, summarize=False):
         print("  Artifact location:", result.resultslocation)
         if result.arguments:
             print("Arguments:", result.arguments)
+        if result.note:
+            print("  NOTE:", result.note)
         for result in controllers.TestResultsController.subresults(result, failures=failures):
             _print_result_other(result, 0, failures, summarize)
         print()

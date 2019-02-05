@@ -1,0 +1,57 @@
+#!/usr/bin/env python3.6
+
+"""Python based logcat.
+
+Reads and dumps logcat from a device, or from a capture file.
+"""
+
+import os
+import sys
+
+import docopt
+
+from devtest.devices.android import adb
+from devtest.io.reactor import get_kernel
+
+
+async def adb_logcat(serial, tag=None):
+    ac = await adb.AsyncAndroidDeviceClient(serial)
+    h = adb.LogcatHandler(ac)
+    await ac.wait_for("device")
+    try:
+        await ac.logcat_clear()
+        if tag is None:
+            await h._dump()
+        else:
+            lm = await h._watch_for(tag, None, None, 90)
+            print(lm)
+    finally:
+        await ac.close()
+    return 0
+
+
+def main(argv):
+    """Dump Android device logcat in realtime, or dump captured file.
+
+    Usage:
+        pylogcat [--serial=<serial>] [--tag=<tag>] [<file>]
+    """
+    arguments = docopt.docopt(main.__doc__, argv[1:])
+    serial = arguments["--serial"]
+    fname = arguments["<file>"]
+    tag = arguments["--tag"]
+    serial = serial or os.environ.get("ANDROID_SERIAL")
+    if fname:
+        lfr = adb.LogcatFileReader(fname)
+        lfr.dump(tag=tag)
+        return 0
+    elif serial:
+        kern = get_kernel()
+        return kern.run(adb_logcat(serial, tag))
+    else:
+        print(main.__doc__)
+
+
+main(sys.argv)
+
+# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
