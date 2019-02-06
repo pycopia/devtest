@@ -206,11 +206,12 @@ def find_data_files(testcasename):
                 yield md
 
 
-def find_data(testcasename):
+def find_test_results(testcasename):
     """Find metadata of a test case result in the database."""
     controllers.connect()
-    return [r.data for r in
-            controllers.TestResultsController.results_for(testcasename) if r.data is not None]
+    return [result for result in
+            controllers.TestResultsController.results_for(testcasename)
+            if result.data is not None]
 
 
 def get_latest_samples(testcasename):
@@ -219,15 +220,15 @@ def get_latest_samples(testcasename):
     sampledata = None
     logfile = None
     extra = None
-    data = find_data(testcasename)[-1]
-    for resultobj in load_data(data):
+    result = find_test_results(testcasename)[-1]
+    for resultobj in load_data(result.data):
         if isinstance(resultobj, SampleData):
             sampledata =  resultobj
         elif isinstance(resultobj, adb.LogcatFileReader):
             logfile = resultobj
         else:
             extra = resultobj
-    return sampledata, logfile, extra
+    return result, sampledata, logfile, extra
 
 
 def get_all_samples(testcasename):
@@ -237,18 +238,18 @@ def get_all_samples(testcasename):
         List of tuples of (sampledata, logfile, extradata).
     """
     alldata = []
-    for data in find_data(testcasename):
+    for testresult in find_test_results(testcasename):
         sampledata = None
         logfile = None
         extra = None
-        for resultobj in load_data(data):
+        for resultobj in load_data(testresult.data):
             if isinstance(resultobj, SampleData):
                 sampledata = resultobj
             elif isinstance(resultobj, adb.LogcatFileReader):
                 logfile = resultobj
             else:
                 extra = resultobj
-        alldata.append((sampledata, logfile, extra))
+        alldata.append((testresult, sampledata, logfile, extra))
     return alldata
 
 
