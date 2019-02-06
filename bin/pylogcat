@@ -24,7 +24,8 @@ async def adb_logcat(serial, tag=None):
             await h._dump()
         else:
             lm = await h._watch_for(tag, None, None, 90)
-            print(lm)
+            sys.stdout.write(str(lm))
+            sys.stdout.flush()
     finally:
         await ac.close()
     return 0

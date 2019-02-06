@@ -1269,6 +1269,12 @@ class LogcatFileReader:
                     if mo:
                         yield lm, mo
 
+    def find_first_tag(self, tag):
+        """Find first occurence of a tag.
+        """
+        for lm, _ in self.search(tag=tag):
+            return lm
+
     def dump(self, tag=None):
         """Write deocded log to stdout."""
         return self.dump_to(sys.stdout.buffer, tag=tag)
@@ -1282,15 +1288,18 @@ class LogcatFileReader:
 
     def _dump(self, fo, out, tag):
         lines = 0
-        while True:
-            lm = self._read_one(fo)
-            if lm is None:
-                break
-            if tag and tag != lm.tag:
-                continue
-            lines += 1
-            out.write(str(lm).encode("utf8"))
-            out.write(b'\n')
+        try:
+            while True:
+                lm = self._read_one(fo)
+                if lm is None:
+                    break
+                if tag and tag != lm.tag:
+                    continue
+                lines += 1
+                out.write(str(lm).encode("utf8"))
+                out.write(b'\n')
+        except BrokenPipeError:
+            pass
         return lines
 
     def dump_to_file(self, localfile, tag=None):
