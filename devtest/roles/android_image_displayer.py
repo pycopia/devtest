@@ -19,7 +19,6 @@ Controller role that displays images on an Android device screen.
 import os
 import mimetypes
 
-from devtest.core import exceptions
 from devtest.devices.android import controller
 
 from . import BaseRole
@@ -41,9 +40,13 @@ class ImageDisplayer(BaseRole):
             $ devtestadmin testbed <testbed> add <mydisplayandroid> displayer
     """
 
+    DESTINATION_DEFAULT = "/sdcard/Pictures"  # TODO(dart) query device
+    BRIGHTNESS_DEFAULT = 64
+
     def initialize(self):
         self._controller = controller.AndroidController(self._equipment)
-        self.destdir = self.config["destdir"]
+        self.destdir = self.config.get("destdir",
+                                       ImageDisplayer.DESTINATION_DEFAULT)
 
     def finalize(self):
         self._controller.buttons.home()
@@ -53,32 +56,34 @@ class ImageDisplayer(BaseRole):
             self._controller.close()
             self._controller = None
 
-    def prepare(self, imagename):
-        filename = self.config["images"].get(imagename)
-        if not filename:
-            raise exceptions.ConfigNotFoundError(
-                "no image for name {} configured.".format(imagename))
+    def prepare(self, filename, destdir=None):
+        destdir = destdir or self.destdir
+        filename = os.fspath(filename)
+        filename = os.path.expandvars(os.path.expanduser(filename))
         mimetype, enc = mimetypes.guess_type(filename)
-        remotepath = os.path.join(self.destdir, os.path.basename(filename))
-        self._controller.adb.push([filename], self.destdir, sync=True)
+        remotepath = os.path.join(destdir, os.path.basename(filename))
+        self._controller.adb.push([filename], destdir, sync=True)
         # turn off auto brightness and dim screen so target doesn't get washed
         # out.
+        brightness = self.config.get("brightness",
+                                     ImageDisplayer.BRIGHTNESS_DEFAULT)
         self._controller.settings.put("system", "screen_brightness_mode", False)
-        self._controller.settings.put("system", "screen_brightness", 64)
+        self._controller.settings.put("system", "screen_brightness", brightness)
         return remotepath, mimetype
 
-    def display(self, imagename):
-        remotepath, mimetype = self.prepare(imagename)
+    def display(self, imagepath, destdir=None):
+        remotepath, mimetype = self.prepare(imagepath, destdir)
         self._controller.buttons.power()
         self._controller.start_activity(action='android.intent.action.VIEW',
                                         data=remotepath,
                                         mimetype=mimetype)
 
+
 if __name__ == "__main__":
     # Unit test case...
     import sys
 
-    IMAGE = "CONTACT"
+    IMAGE = "~/tmp/english_business_card.png"
     SERNO = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("ANDROID_SERIAL")
 
     class MockEquipment:

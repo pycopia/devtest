@@ -25,7 +25,7 @@ class BaseRole(metaclass=abc.ABCMeta):
     """Base, abstract, role for equipment role controllers."""
     def __init__(self, equipment):
         cf = config.get_config()
-        self.config = cf.roles.get(equipment["role"])
+        self.config = cf.roles.get(equipment["role"], config.ConfigDict())
         self._equipment = equipment
         self.initialize()
 
