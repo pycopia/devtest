@@ -208,7 +208,7 @@ class DefaultReport(BaseReport):
     def on_test_data(self, testcase, data=None):
         # If the same test is run multiple times, add new data to top-level
         # list. Make a new top-level list if required.
-        fname = "{}_data.json".format(testcase.test_name)
+        fname = "{}_data.json".format(testcase.test_name.replace(".", "_"))
         fpath = os.path.join(self._logdir, fname)
         olddata = None
         if os.path.exists(fpath):
