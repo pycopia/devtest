@@ -2,7 +2,6 @@ resultsdir: "$HOME/tmp/resultsdir"
 
 database:
     url: "postgresql://devtest@localhost/devtest"
-    # url: "sqlite:///var/tmp/devtest.db"
 
 flags:
     debug: 0
@@ -23,19 +22,4 @@ uiautomator:
             - "apks/app-uiautomator.apk"
             - "apks/app-uiautomator-test.apk"
 
-webui:
-    static_folder: "/var/www/devtest/static"
-    secret_key: "sKlSkwdtEstbdlKD94$$kldspCwLdkkDAld"
-    auth_username: "admin"
-    auth_password: "devtest"
-    realm: "devtest"
-    redis_url: "redis://localhost:6379/0"
-
-roles:
-    displayer:
-        package: "com.google.android.apps.photos"
-        intent: ".home.HomeActivity"
-        destdir: "/sdcard/Pictures"  # TODO(dart) query device
-        images:  # ResultType to image
-            CONTACT:
-                "/google/src/files/head/depot/google3/lens/testing/tests/lenslite_datasets/english_business_card.png"
+roles: {}

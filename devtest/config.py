@@ -24,11 +24,44 @@ directoryies.
 - ~/.config/devtest/
 """
 
+import sys
+import os
+from copy import deepcopy
+from collections import ChainMap
+
 from devtest.third_party import confit
 
-from copy import deepcopy
 
 _CONFIG = None
+
+
+class AttributeChainMap(ChainMap):
+    """Top-level configuration object.
+
+    Used by most of the rest of the framework.
+    A subclass of ChainMap, it allows chaining other configurations later.
+    """
+    def __init__(self, *maps):
+        self.__dict__["maps"] = list(maps) or [{}]
+
+    def __getattr__(self, name):
+        try:
+            return self.__getitem__(name)
+        except KeyError:
+            raise AttributeError(
+                "AttributeChainMap: No attribute or key {!r}".format(name)) from None
+
+    def __setattr__(self, name, val):
+        self.__setitem__(name, val)
+
+    def __delattr__(self, name):
+        self.__delitem__(name)
+
+    # Behave like defaultdict, returning empty ConfigDict by default.
+    def __missing__(self, key):
+        value = ConfigDict()
+        self.__setitem__(key, value)
+        return value
 
 
 class ConfigDict(dict):
@@ -121,7 +154,7 @@ def get_config(initdict=None, _filename=None, **kwargs):
         if isinstance(initdict, dict):
             cf.add(initdict)
         cf.add(kwargs)
-        _CONFIG = cf.flatten(dclass=ConfigDict)
+        _CONFIG = AttributeChainMap(cf.flatten(dclass=ConfigDict))
     return _CONFIG
 
 
@@ -138,6 +171,31 @@ def show_config(cf, _path=None):
         else:
             print(".".join(path), "=", repr(value))
         path.pop(-1)
+
+
+def get_testcase_config(testclass):
+    """Add configuration specific to a class.
+
+    Will load YAML files that are specific to a test case class. If there is a
+    YAML file in the same directory as the test case, with the same name as the
+    test case, it will get a configuration with that data merged in.
+
+    If there is a file named "config_default.yaml" in the directory that is also
+    merged in, for all tests contained there.
+
+    Arguments:
+        testname: str in the from of the full path name to a class that is a
+        TestCase subclass. E.g. "testcases.demo.InteractiveTest".
+    """
+    modname = testclass.__module__
+    newcf = confit.Configuration(modname.split(".")[0], modname)
+    mod = sys.modules[modname]
+    filename = os.path.join(os.path.dirname(mod.__file__),
+                            testclass.__name__ + ".yaml")
+    if os.path.exists(filename):
+        newcf.set_file(filename)
+    cf = get_config()
+    return cf.new_child(newcf.flatten(dclass=ConfigDict))
 
 
 def _test(argv):

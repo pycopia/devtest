@@ -19,9 +19,10 @@ import math
 from datetime import datetime, timezone
 from typing import Optional, BinaryIO
 
+from .. import logging
 from .. import debugger
 from .. import importlib
-from .. import logging
+from .. import config as config_module
 from ..utils import combinatorics
 
 from ..core.types import AttrDictDefault
@@ -158,8 +159,8 @@ class TestCase:
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestCase", val)
             if self._debug:
-                debugger.post_mortem(tb)
-                tb = None
+                del tb
+                debugger.from_exception(val)
             self._exception_diagnostic(ex, val)
             self.incomplete("Uncaught Exception: ({})".format(ex.__name__))
         test_end.send(self, time=datetime.now(timezone.utc))
@@ -174,7 +175,8 @@ class TestCase:
             logging.exception_error("Error in TestCase.initialize", val)
             self._exception_diagnostic(ex, val)
             if self._debug:
-                debugger.post_mortem(tb)
+                del tb
+                debugger.from_exception(val)
             raise TestSuiteAbort("Test initialization failed!") from val
 
     # Run user-defined `finalize()` and catch exceptions. If an exception
@@ -190,7 +192,8 @@ class TestCase:
             logging.exception_error("Error in TestCase.finalize", val)
             self._exception_diagnostic(ex, val)
             if self._debug:
-                debugger.post_mortem(tb)
+                del tb
+                debugger.from_exception(val)
             raise TestSuiteAbort("Test finalize failed!") from val
 
     def _exception_diagnostic(self, ex, val):
@@ -722,9 +725,9 @@ class TestSuite:
                     prereq.implementation = impl
                 pretestclass = importlib.get_class(impl)
                 pretestclass.set_test_options()
-                preentry = _TestEntry(
-                    pretestclass(self.config, self.testbed, self.UI),
-                    prereq.args, prereq.kwargs, True)
+                cf = config_module.get_testcase_config(pretestclass)
+                preentry = _TestEntry(pretestclass(cf, self.testbed, self.UI),
+                                      prereq.args, prereq.kwargs, True)
                 presig, argsig = preentry.signature
                 if presig not in self._multitestset:
                     self._add_with_prereq(preentry, True)
@@ -755,7 +758,8 @@ class TestSuite:
         if kwargs is None:
             kwargs = {}
         for i in range(_testclass.OPTIONS.repeat):
-            testinstance = _testclass(self.config, self.testbed, self.UI, name=name)
+            cf = config_module.get_testcase_config(_testclass)
+            testinstance = _testclass(cf, self.testbed, self.UI, name=name)
             entry = _TestEntry(testinstance, args, kwargs, False)
             self._add_with_prereq(entry)
 
@@ -774,9 +778,10 @@ class TestSuite:
         parameters.
         """
         _testclass.set_test_options()
+        cf = config_module.get_testcase_config(_testclass)
         combiner = combinatorics.KeywordCounter(**argsets)
         for kwargs in combiner:
-            testinstance = _testclass(self.config, self.testbed, self.UI)
+            testinstance = _testclass(cf, self.testbed, self.UI)
             entry = _TestEntry(testinstance, (), kwargs, True)
             self._add_with_prereq(entry)
 
@@ -872,7 +877,8 @@ class TestSuite:
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestSuite.initialize", val)
             if self._debug:
-                debugger.post_mortem(tb)
+                del tb
+                debugger.from_exception(val)
             self.info(
                 "Suite failed to initialize: {} ({})".format(ex.__name__, val))
             raise TestSuiteAbort(val)
@@ -933,7 +939,8 @@ class TestSuite:
             ex, val, tb = sys.exc_info()
             logging.exception_error("Error in TestSuite.finalize", val)
             if self._debug:
-                debugger.post_mortem(tb)
+                del tb
+                debugger.from_exception(val)
             self.info(
                 "Suite failed to finalize: {} ({})".format(ex.__name__, val))
             if self._nested:
