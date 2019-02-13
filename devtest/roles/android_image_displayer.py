@@ -47,6 +47,12 @@ class ImageDisplayer(BaseRole):
         self._controller = controller.AndroidController(self._equipment)
         self.destdir = self.config.get("destdir",
                                        ImageDisplayer.DESTINATION_DEFAULT)
+        # turn off auto brightness and dim screen so target doesn't get washed
+        # out.
+        brightness = self.config.get("brightness",
+                                     ImageDisplayer.BRIGHTNESS_DEFAULT)
+        self._controller.settings.put("system", "screen_brightness_mode", False)
+        self._controller.settings.put("system", "screen_brightness", brightness)
 
     def finalize(self):
         self._controller.buttons.home()
@@ -63,12 +69,6 @@ class ImageDisplayer(BaseRole):
         mimetype, enc = mimetypes.guess_type(filename)
         remotepath = os.path.join(destdir, os.path.basename(filename))
         self._controller.adb.push([filename], destdir, sync=True)
-        # turn off auto brightness and dim screen so target doesn't get washed
-        # out.
-        brightness = self.config.get("brightness",
-                                     ImageDisplayer.BRIGHTNESS_DEFAULT)
-        self._controller.settings.put("system", "screen_brightness_mode", False)
-        self._controller.settings.put("system", "screen_brightness", brightness)
         return remotepath, mimetype
 
     def display(self, imagepath, destdir=None):
