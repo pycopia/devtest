@@ -998,21 +998,30 @@ class SyncProtocol:
             if stat.S_ISREG(local_st.st_mode):
                 if dst_isdir:
                     rpath = os.path.join(remotepath, os.path.basename(localfile))
+                # If synchronize requested, just stat remote and return if size
+                # and mtime are equal.
+                if sync:
+                    try:
+                        dst_stat = await self.stat(rpath)
+                    except OSError:
+                        pass
+                    else:
+                        if (local_st.st_size == dst_stat.st_size and
+                            local_st.st_mtime == dst_stat.st_mtime):
+                            return
                 await self._sync_send(localfile.encode("utf8"),
                                       rpath.encode("utf8"),
-                                      local_st, sync)
+                                      local_st)
 
     async def pull(self, remotepath, localpath):
         pass  # TODO(dart)
 
-    async def _sync_send(self, src_path, dst_path, local_st, sync):
-        # TODO(dart) sync check
+    async def _sync_send(self, src_path, dst_path, local_st):
         if stat.S_ISLNK(local_st.st_mode):
             raise NotImplementedError("TODO(dart)")
-
         if local_st.st_size < SyncProtocol.SYNC_DATA_MAX:
-            async with streams.aopen(src_path, "rb") as fo:
-                data = await fo.read()
+            with open(src_path, "rb") as fo:
+                data = fo.read()
             path_and_mode = b"%s,%d" % (dst_path, local_st.st_mode)
             return await self._send_small_file(path_and_mode, data, int(local_st.st_mtime))
         else:
@@ -1040,10 +1049,9 @@ class SyncProtocol:
 
         buf.clear()
         chunksize = SyncProtocol.SYNC_DATA_MAX - sm.size
-
-        async with streams.aopen(src_path, "rb") as fo:
+        with open(src_path, "rb") as fo:
             while True:
-                chunk = await fo.read(chunksize)
+                chunk = fo.read(chunksize)
                 if not chunk:
                     break
                 buf.write(sm.pack(SyncProtocol.ID_DATA, len(chunk)))
