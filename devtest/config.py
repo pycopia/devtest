@@ -32,7 +32,7 @@ from collections import ChainMap
 from devtest.third_party import confit
 
 
-_CONFIG = None
+_CONFIG = None  # singleton instance.
 
 
 class AttributeChainMap(ChainMap):
@@ -180,12 +180,12 @@ def get_testcase_config(testclass):
     YAML file in the same directory as the test case, with the same name as the
     test case, it will get a configuration with that data merged in.
 
-    If there is a file named "config_default.yaml" in the directory that is also
-    merged in, for all tests contained there.
+    If there is a file named "config_default.yaml" in the directory then that is
+    also merged in, for all tests contained there. The `confit` module handles
+    that part.
 
     Arguments:
-        testname: str in the from of the full path name to a class that is a
-        TestCase subclass. E.g. "testcases.demo.InteractiveTest".
+        testclass: a test class object (not instance).
     """
     modname = testclass.__module__
     newcf = confit.Configuration(modname.split(".")[0], modname)
