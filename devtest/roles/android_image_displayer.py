@@ -69,13 +69,14 @@ class ImageDisplayer(BaseRole):
         mimetype, enc = mimetypes.guess_type(filename)
         remotepath = os.path.join(destdir, os.path.basename(filename))
         self._controller.adb.push([filename], destdir, sync=True)
+        self._controller.buttons.power()
         return remotepath, mimetype
 
     def display(self, imagepath, destdir=None):
         remotepath, mimetype = self.prepare(imagepath, destdir)
-        self._controller.buttons.power()
+        self._controller.buttons.back()  # undo previous display.
         self._controller.start_activity(action='android.intent.action.VIEW',
-                                        data=remotepath,
+                                        data="file://" + remotepath,
                                         mimetype=mimetype)
 
 
