@@ -232,6 +232,17 @@ class AndroidController(devices.Controller):
                 rv.append((int(pid), cmd))
         return rv
 
+    def listdir(self, path):
+        """Return a list of names in a directory.
+        """
+        result = []
+        def cb(stat, name):
+            nonlocal result
+            result.append(name)
+
+        self.adb.list(path, cb)
+        return result
+
     def get_property(self, name):
         """Get a single Android property.
         """
