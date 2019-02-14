@@ -116,7 +116,13 @@ def inverse_red(text):
 class DefaultReport(BaseReport):
 
     def initialize(self, config=None):
-        self._file = sys.stdout
+        reportfile = config.get("reportfile")
+        if reportfile is None:
+            self._file = sys.stdout
+            self._doclose = False
+        else:
+            self._file = open(reportfile, "w")
+            self._doclose = True
         self._logdir = "/tmp"
         if config is not None:
             self._logdir = config.get("resultsdir", "/tmp")
@@ -127,6 +133,8 @@ class DefaultReport(BaseReport):
 
     def finalize(self):
         super(DefaultReport, self).finalize()
+        if self._doclose:
+            self._file.close()
         self._file = None
 
     def on_test_start(self, testcase, time=None):
@@ -222,7 +230,7 @@ class DefaultReport(BaseReport):
         with open(fpath, "w") as fo:
             json.dump(data, fo)
         print(" Data {}:".format("added to" if olddata else "available in"),
-                                 repr(fname), file=self._file)
+              repr(fname), file=self._file)
 
     def on_suite_summary(self, suite, result=None):
         print("Aggregate Suite Result:", result, file=self._file)
