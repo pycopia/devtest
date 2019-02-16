@@ -21,6 +21,11 @@ import os
 
 import numpy as np
 
+from matplotlib.backends import backend_agg
+from matplotlib import figure
+from matplotlib import collections as mpl_collections
+from scipy import signal
+
 from devtest import json
 from devtest import config
 from devtest.db import controllers
@@ -101,6 +106,11 @@ class SampleData:
 
     @property
     def samples(self):
+        """All samples from sample file, if available.
+
+        Returns:
+            ndarray of all sample columns.
+        """
         if self._samples is None:
             if self.samplefile:
                 self._samples = SampleData.read_file(self.samplefile)
@@ -108,17 +118,19 @@ class SampleData:
 
     @property
     def heading(self):
+        """String suitable for printing a header line."""
         heads = ["{} ({})".format(n, u) for n, u in zip(self.columns, self.units)]
         return " | ".join(heads)
 
     @property
     def main_current(self):
+        """The main_current column, as ndarray vector."""
         return self.get_column("main_current")
 
     @property
     def main_voltage(self):
+        """The main_voltage column, as ndarray vector."""
         return self.get_column("main_voltage")
-
 
     @classmethod
     def from_result(cls, result):
@@ -251,6 +263,56 @@ def get_all_samples(testcasename):
                 extra = resultobj
         alldata.append((testresult, sampledata, logfile, extra))
     return alldata
+
+
+def plot_samples(samples, events=None, column="main_current", width=8):
+    """Build a Figure with samples plotted.
+
+    Uses the Agg backend.
+
+    Arguments:
+        samples: A SampleData object.
+        events: optional list of times (floats) within sample range to put markers.
+        column: The name (str) of the sample column to plot.
+        width: The width, in inches, of the Figure.
+
+    Returns:
+        A Figure instance ready to be modified or saved.
+    """
+    # Get the X and X data and units.
+    time, colvector, xunit, yunit = samples.get_xy(column)
+    # Make the figure and axes using low-level class API to avoid using local
+    # configuration.
+    fig = figure.Figure(figsize=(width, width * 0.75), dpi=95,
+                        facecolor="white", edgecolor="white",
+                        frameon=True)
+    backend_agg.FigureCanvasAgg(fig)  # The figure keeps a reference to backend.
+    axs = fig.subplots(nrows=1, ncols=1,
+                       sharex=False, sharey=False,
+                       squeeze=True, subplot_kw=None,
+                       gridspec_kw=None)
+    # Plotting at max resolution just makes the plot look solid.
+    # Downsample to pixel resolution.
+    downsample_to = int(fig.get_size_inches()[0] * fig.dpi)
+    downsampled, newtimes = signal.resample(colvector, downsample_to, time)
+    axs.plot(newtimes, downsampled)
+    axs.set_title("{} over time{}.".format(column,
+                                           " with events" if events else ""))
+    if events is not None:
+        events.sort()
+        offset = downsampled.min()
+        length = offset * 2
+        evl = mpl_collections.EventCollection(events,
+                                              color=[(1, 0, 0), (0, 1, 0)],
+                                              linelength=length,
+                                              lineoffset=offset,
+                                              zorder=1)
+        axs.add_collection(evl)
+
+    axs.set_xlabel('time ({})'. format(xunit))
+    axs.set_ylabel("{} ({})".format(column, yunit))
+    axs.grid(True)
+    return fig
 
 
 if __name__ == "__main__":
