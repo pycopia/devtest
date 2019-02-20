@@ -207,8 +207,17 @@ class AndroidController(devices.Controller):
             raise AndroidControllerError(out)
         return out
 
+    def stop_activity(self, package):
+        """Stop a package from running.
+
+        Arguments:
+            package: name (str) of package to stop.
+        """
+        cmd = ['cmd', 'activity', 'force-stop', package]
+        return self.shell(cmd)
+
     def package(self, cmd, *args, user=None, **kwargs):
-        """Manage packages."""
+        """Manage packages using ADB."""
         return self.adb.package(cmd, *args, user=user, **kwargs)
 
     def instrument(self, package, runner, wait=False, **extra):
