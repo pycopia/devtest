@@ -1016,7 +1016,15 @@ class Scenario:
 
     @classmethod
     def run(cls, config, testbed, ui):
-        suite = cls.get_suite(config, testbed, ui)
+        """Called by test runner.
+
+        This calls the get_suite static method and runs the returned suite.
+
+        Returns:
+            Suite result (aggregate of test case results) as TestResult.
+        """
+        newconfig = config_module.get_package_config(".".join(cls.__module__.split(".")[:-1]))
+        suite = cls.get_suite(newconfig, testbed, ui)
         suite.run()
         return suite.result
 

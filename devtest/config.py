@@ -186,6 +186,9 @@ def get_testcase_config(testclass):
 
     Arguments:
         testclass: a test class object (not instance).
+
+    Returns:
+        New AttributeChainMap with added configuration.
     """
     modname = testclass.__module__
     newcf = confit.Configuration(modname.split(".")[0], modname)
@@ -194,6 +197,21 @@ def get_testcase_config(testclass):
                             testclass.__name__ + ".yaml")
     if os.path.exists(filename):
         newcf.set_file(filename)
+    cf = get_config()
+    return cf.new_child(newcf.flatten(dclass=ConfigDict))
+
+
+def get_package_config(packagename):
+    """Add configuration specific to a package.
+
+    Arguments:
+        packagename: name of a package. If the package directory contains a file named
+        "config_default.yaml" the content will be loaded.
+
+    Returns:
+        New AttributeChainMap with added configuration.
+    """
+    newcf = confit.Configuration(packagename, packagename)
     cf = get_config()
     return cf.new_child(newcf.flatten(dclass=ConfigDict))
 
