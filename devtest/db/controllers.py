@@ -725,14 +725,22 @@ class TestResultsController(Controller):
         return list(q.execute())
 
     @staticmethod
+    def count(testcasename):
+        tc = TestCasesController.get(testcasename)
+        if tc:
+            return models.TestResults.select().where(models.TestResults.testcase == tc).count()
+
+    @staticmethod
     def get_by_id(resultid):
         return models.TestResults.get(id=resultid)
 
     @staticmethod
-    def results_for(testcasename, limit=100):
+    def results_for(testcasename, limit=100, offset=0):
         tc = TestCasesController.get(testcasename)
         if tc:
-            return list(models.TestResults.for_testcase(tc, limit=limit))
+            return list(models.TestResults.for_testcase(tc,
+                                                        limit=limit,
+                                                        offset=offset))
         else:
             raise ValueError("TestCase named {} not found.".format(testcasename))
 

@@ -155,8 +155,9 @@ def main(argv):
         devtestadmin testcase search <words>...
         devtestadmin testresult list [<resulttype>] [-F]
         devtestadmin testresult latest [-F] [-s] [-l]
-        devtestadmin testresult for [-s] <testcases>...
+        devtestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] <testcases>...
         devtestadmin testresult run [-l] <id>...
+        devtestadmin testresult count <testcases>...
 
     Options:
         --name=<name>                      The name of something.
@@ -175,6 +176,8 @@ def main(argv):
         --vlanid=<vlanid>                  The VLAN ID number
         --layer=<layer>                    A network ISO layer number [default: 3]
         --type=<type>                      A network type name [default: ethernet]
+        --limit=<limit>                    Limit returned results to this [default: 100]
+        --offset=<offset>                  Offset returned results to this [default: 0]
 
         <resulttype> one of summary, test, or suite.
     """  # noqa
@@ -609,8 +612,12 @@ def main(argv):
                 print(inst)
         elif arguments["for"]:
             summarize = arguments["-s"]
+            limit = int(arguments["--limit"])
+            offset = int(arguments["--offset"])
             for tcname in arguments["<testcases>"]:
-                results = controllers.TestResultsController.results_for(tcname)
+                results = controllers.TestResultsController.results_for(tcname,
+                                                                        limit=limit,
+                                                                        offset=offset)
                 for result in results:
                     show_testresult(result, summarize=summarize)
         elif arguments["latest"]:
@@ -624,6 +631,10 @@ def main(argv):
             show_testresult(tr)
             if arguments["-l"]:  # show logs
                 show_testresult_logs(tr)
+        elif arguments["count"]:
+            for tcname in arguments["<testcases>"]:
+                res = controllers.TestResultsController.count(tcname)
+                print(colors.green(tcname), res)
 
 
 def list_functions(like, verbose):

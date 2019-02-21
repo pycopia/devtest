@@ -779,16 +779,16 @@ class TestResults(BaseModel):
         return r
 
     @classmethod
-    def for_testcase(cls, testcase, limit=100):
+    def for_testcase(cls, testcase, limit=100, offset=0):
         return cls.select().where((cls.testcase == testcase) &
-                                  (cls.valid == True)).order_by(cls.starttime).limit(limit).execute()  # noqa
+                                  (cls.valid == True)).order_by(cls.starttime).limit(limit).offset(offset).execute()  # noqa
 
     @classmethod
-    def get_runs(cls, limit=20):
+    def get_runs(cls, limit=20, offset=0):
         return cls.select().where(
                     (cls.resulttype == constants.TestResultType.TestRunSummary) &
                     (cls.valid == True)  # noqa
-                ).order_by(cls.starttime.desc()).limit(limit).execute()
+                        ).order_by(cls.starttime.desc()).limit(limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
