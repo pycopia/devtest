@@ -17,7 +17,8 @@
 
 import os
 import pathlib
-from collections import namedtuple, defaultdict
+from itertools import zip_longest
+from collections import namedtuple
 
 
 class VmFlags:
@@ -45,18 +46,25 @@ MemUsage = namedtuple("MemUsage",
                        "VmFlags"])
 
 
+# Not using Python 3.7 defaults to keep compatible with Python 3.6
+def _MemUsage_defaults():
+    d = dict(zip_longest(MemUsage._fields, [0], fillvalue=0))
+    d["VmFlags"] = None
+    return d
+
+
 class VirtualMemoryArea:
     """A memory mapped area of a process.
 
     Attributes:
-        name: str
-        start: int
-        end: int
-        offset: int
-        perms: str
-        device: str
-        inode: int
-        usage: MemUsage
+        name: str  Name of mapping (may not exist)
+        start: int  Address of start of range
+        end: int  Address of end of range
+        offset: int  Offset into mapped file, if any
+        perms: str  Permissions of area
+        device: str Device node, if any
+        inode: int  Inode of mapped file, if any.
+        usage: A MemUsage instance.
 
     The permissions are:
         r = read
@@ -112,6 +120,8 @@ class VirtualMemoryArea:
 
 
 class Maps(list):
+    """A list of `VirtualMemoryArea`s.
+    """
 
     SMAPS = "/proc/{pid}/smaps"
 
@@ -119,7 +129,7 @@ class Maps(list):
     def from_text(cls, bytesblob):
         units = {b"kB": 1024}
         currentvma = None
-        currentusage = {}
+        currentusage = _MemUsage_defaults()
         me = cls()
         for line in bytesblob.splitlines():
             if line[0] in b'0123456789abcdef' and b'-' in line:
@@ -127,13 +137,15 @@ class Maps(list):
                     currentusage["Uss"] = (currentusage["Private_Clean"] +
                                            currentusage["Private_Dirty"])
                     currentvma.usage = MemUsage(**currentusage)
-                    currentusage = {}
+                    currentusage = _MemUsage_defaults()
                 vma = VirtualMemoryArea.from_line(line)
                 currentvma = vma
                 me.append(vma)
             elif line[0] >= 65 and line[0] <= 90:  # A-Z
                 # Size:                 32 kB
                 # VmFlags: rd ex mr mw me dw sd
+                if line.startswith(b"Name:"):  # compatibility with older kernels
+                    continue
                 name, rest = line.split(b':')
                 if name == b'VmFlags':
                     currentusage["VmFlags"] = VmFlags.from_string(rest.strip())
@@ -159,7 +171,7 @@ class Maps(list):
         return cls.from_pid(os.getpid())
 
     def rollup(self):
-        acc = defaultdict(int)
+        acc = _MemUsage_defaults()
         for vma in self:
             usage = vma.usage
             acc["Size"] += usage.Size
@@ -220,7 +232,7 @@ class MemoryMonitor:
     def difference(self):
         if self._startmap is None or self._stopmap is None:
             raise RuntimeError("MemoryMonitor was not run.")
-        new = {"VmFlags": None}
+        new = _MemUsage_defaults()
         memstop = self._stopmap.rollup()._asdict()
         memstart = self._startmap.rollup()._asdict()
         for fname in MemUsage._fields:
