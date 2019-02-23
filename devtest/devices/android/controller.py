@@ -26,6 +26,7 @@ from array import array
 from devtest import devices
 from devtest import logging
 from devtest.io import reactor
+from devtest.os import meminfo
 from devtest.core import exceptions
 from devtest.devices.android import adb
 from devtest.devices.android import sl4a
@@ -52,6 +53,7 @@ class AndroidController(devices.Controller):
         settings: Access to settings.
         buttons: Access to button press interaction.
         thermal: Access to thermal information
+        meminfo: Memory information and monitor
     """
 
     _PROPERTY_RE = re.compile(r"\[(.*)\]: \[(.*)\]")
@@ -144,7 +146,7 @@ class AndroidController(devices.Controller):
         out = self.shell("date +%s.%N")
         return datetime.fromtimestamp(float(out), tz=timezone.utc)
 
-    def shell(self, cmd):
+    def shell(self, cmd, usepty=False):
         """Run a shell command and return stdout.
 
         Args:
@@ -157,7 +159,7 @@ class AndroidController(devices.Controller):
             AndroidControllerError with exit status and stderr as args.
         """
         logging.info("AndroidController.shell({!r})".format(cmd))
-        stdout, stderr, es = self.adb.command(cmd)
+        stdout, stderr, es = self.adb.command(cmd, usepty=usepty)
         if es:
             return stdout
         else:
@@ -241,10 +243,25 @@ class AndroidController(devices.Controller):
                 rv.append((int(pid), cmd))
         return rv
 
+    def meminfo(self, pid):
+        """Fetch and monitor memory usage for a process.
+
+        Returns MemoryMonitor instance with PID.
+
+        Args:
+            pid: (int) PID of process to get memory information for.
+
+        Returns:
+            MemoryMonitor instance for attached device and PID.
+
+        """
+        return MemoryMonitor(self, pid)
+
     def listdir(self, path):
         """Return a list of names in a directory.
         """
         result = []
+
         def cb(stat, name):
             nonlocal result
             result.append(name)
@@ -695,6 +712,57 @@ class _Settings:
                     self._cont.shell(
                         ['settings', 'put',
                          'secure', 'location_providers_allowed', '-' + provider])
+
+
+class MemoryMonitor:
+    """Monitor a process memory usage.
+    """
+
+    CLEAR_REFS = "/proc/{pid}/clear_refs"
+
+    def __init__(self, controller, pid):
+        self._cont = controller
+        self._pid = pid
+        self._startmap = None
+        self._stopmap = None
+
+    def start(self):
+        self._stopmap = None
+        self._startmap = self.current()
+        path = MemoryMonitor.CLEAR_REFS.format(pid=self._pid)
+        self._cont.shell(['echo', '1', '>', path])
+
+    def current(self):
+        """Get current memory map.
+        """
+        path = meminfo.Maps.SMAPS.format(pid=self._pid)
+        text = self._cont.shell(["cat", path])
+        return meminfo.Maps.from_text(text.encode("ascii"))
+
+    def stop(self):
+        if self._startmap is None:
+            raise RuntimeError("Stopping memory monitor before starting.")
+        self._stopmap = self.current()
+
+    def difference(self):
+        if self._startmap is None or self._stopmap is None:
+            raise RuntimeError("MemoryMonitor was not run.")
+        new = meminfo._MemUsage_defaults()
+        memstop = self._stopmap.rollup()._asdict()
+        memstart = self._startmap.rollup()._asdict()
+        for fname in meminfo.MemUsage._fields:
+            if fname == "VmFlags":
+                continue
+            new[fname] = memstop[fname] - memstart[fname]
+        return meminfo.MemUsage(**new)
+
+    def referenced_pages(self):
+        """return number of pages referenced during the time span.
+        """
+        if self._stopmap is None:
+            raise RuntimeError("MemoryMonitor was not run.")
+        memstop = self._stopmap.rollup()
+        return memstop.Referenced // memstop.KernelPageSize
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
