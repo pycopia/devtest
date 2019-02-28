@@ -23,6 +23,7 @@ import stat
 import errno
 import struct
 import signal
+import typing
 
 from devtest import logging
 from devtest import timers
@@ -447,6 +448,18 @@ class _AsyncAndroidDeviceClient:
             await self._conn.close()
         return resp
 
+    async def pull_file(self, remotepath: str, filelike: typing.BinaryIO):
+        """Pull a remote file into given file-like object.
+        """
+        sp = SyncProtocol(self.serial)
+        await sp.connect_with(self._conn)
+        try:
+            text = await sp.pull_file(remotepath, filelike)
+        finally:
+            await sp.quit()
+            await self._conn.close()
+        return text
+
     async def start(self, cmdline, stdoutstream, stderrstream):
         """Start a process on device with the shell protocol.
 
@@ -722,6 +735,15 @@ class AndroidDeviceClient:
         """Push a list of local files to remote file or directory.
         """
         coro = self._aadb.push(localfiles, remotepath, sync)
+        return get_kernel().run(coro)
+
+    def pull_file(self, remotepath: str, filelike: typing.BinaryIO):
+        """Pull a file into local memory, as bytes.
+
+        A path to a file on the device.
+
+        """
+        coro = self._aadb.pull_file(remotepath, filelike)
         return get_kernel().run(coro)
 
     def reconnect(self):
@@ -1014,7 +1036,31 @@ class SyncProtocol:
                                       local_st)
 
     async def pull(self, remotepath, localpath):
-        pass  # TODO(dart)
+        smd = SyncProtocol.SYNCMSG_DATA
+        src_st = await self.stat(remotepath)
+        if stat.S_ISREG(src_st.st_mode):
+            pass  # TODO(dart)
+
+    async def pull_file(self, remotepath, filelike):
+        smd = SyncProtocol.SYNCMSG_DATA
+        src_st = await self.stat(remotepath)
+        if stat.S_ISREG(src_st.st_mode):
+            await self.send_request(SyncProtocol.ID_RECV, remotepath)
+            while True:
+                resp = await self.socket.recv(smd.size)
+                msg_id, msg_len = smd.unpack(resp)
+                if msg_id == SyncProtocol.ID_DATA:
+                    data = await self.socket.recv(msg_len)
+                    filelike.write(data)
+                elif msg_id == SyncProtocol.ID_DONE:
+                    break
+                else:
+                    raise AdbProtocolError(
+                        "SyncProtocol: pull: can't handle message: {!r}.".format(msg_id))
+        elif stat.S_ISDIR(src_st.st_mode):
+            raise NotImplementedError("TODO(dart)")
+        else:
+            raise NotImplementedError("TODO(dart)")
 
     async def _sync_send(self, src_path, dst_path, local_st):
         if stat.S_ISLNK(local_st.st_mode):
@@ -1041,7 +1087,6 @@ class SyncProtocol:
     async def _send_large_file(self, src_path, dst_path, local_st):
         sm = SyncProtocol.SYNCMSG_DATA
         buf = ringbuffer.RingBuffer(SyncProtocol.SYNC_DATA_MAX << 1)
-
         path_and_mode = b"%s,%d" % (dst_path, local_st.st_mode)
         buf.write(sm.pack(SyncProtocol.ID_SEND, len(path_and_mode)))
         buf.write(path_and_mode)

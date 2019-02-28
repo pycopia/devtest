@@ -18,6 +18,7 @@ from __future__ import generator_stop
 
 import os
 import re
+import io
 import stat
 from datetime import datetime, timezone
 from ast import literal_eval
@@ -736,8 +737,9 @@ class MemoryMonitor:
         """Get current memory map.
         """
         path = meminfo.Maps.SMAPS.format(pid=self._pid)
-        text = self._cont.shell(["cat", path])
-        return meminfo.Maps.from_text(text.encode("ascii"))
+        with io.BytesIO() as bio:
+            self._cont.adb.pull_file(path, bio)
+            return meminfo.Maps.from_text(bio.getvalue())
 
     def stop(self):
         if self._startmap is None:
