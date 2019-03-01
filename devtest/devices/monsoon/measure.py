@@ -386,7 +386,7 @@ class MonsoonCurrentMeasurer(Measurer):
             will be instantiated here with the device metadata and context.
 
         Returns:
-            The handler instance.
+            A core.MeasurementResult instance.
         """
         ctx = self.context  # shorthand
         dev = self._dev

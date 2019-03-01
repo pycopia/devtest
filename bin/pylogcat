@@ -11,6 +11,7 @@ import sys
 import docopt
 
 from devtest.devices.android import adb
+from devtest.devices.android import logcat
 from devtest.io.reactor import get_kernel
 
 
@@ -43,7 +44,7 @@ def main(argv):
     tag = arguments["--tag"]
     serial = serial or os.environ.get("ANDROID_SERIAL")
     if fname:
-        lfr = adb.LogcatFileReader(fname)
+        lfr = logcat.LogcatFileReader(fname)
         lfr.dump(tag=tag)
         return 0
     elif serial:
