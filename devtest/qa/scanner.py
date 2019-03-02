@@ -39,7 +39,7 @@ def iter_module_specs(package="testcases", onerror=None):
         return
     for finder, name, ispkg in pkgutil.walk_packages(
             path=mod.__path__, prefix=mod.__name__ + '.', onerror=onerror):
-        if not ispkg and "._" not in name:
+        if not ispkg and "._" not in name and "analyze" not in name:
             spec = finder.find_spec(name)
             yield spec
 
