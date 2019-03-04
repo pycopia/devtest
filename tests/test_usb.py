@@ -70,6 +70,8 @@ def test_find_device():
     session = usb.UsbSession()
     if sys.platform == "darwin":  # TODO a better MacOS selector
         dev = session.find(0x05ac, 0x0274) # Apple keyboard and trackpad
+        if dev is None:
+            dev = session.find(0x2109, 0x0812) # USB 3.0 Hub
     else:
         dev = session.find(0x1d6b, 0x0002) # Linux Foundation 2.0 root hub
     del session
