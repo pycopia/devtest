@@ -16,10 +16,13 @@
 """
 
 import numpy as np
-from scipy import signal
 from matplotlib.backends import backend_agg
 from matplotlib import figure
 from matplotlib import collections as mpl_collections
+
+from devtest.qa import signals
+
+from .core import MeasurementResult
 
 
 class SampleData:
@@ -178,7 +181,12 @@ def plot_samples(samples, events=None, column="main_current", width=8):
     # Plotting at max resolution just makes the plot look solid.
     # Downsample to pixel resolution.
     downsample_to = int(fig.get_size_inches()[0] * fig.dpi)
-    downsampled, newtimes = signal.resample(colvector, downsample_to, time)
+    Nx = colvector.shape[0]
+    stride = Nx // downsample_to
+    downsampled = np.fromiter((np.mean(a) for a in colvector[::stride]),
+                              colvector.dtype, count=downsample_to)
+    newtimes = np.arange(0, downsample_to) * (time[1] - time[0]) * Nx / float(downsample_to) + time[0]  # noqa
+
     axs.plot(newtimes, downsampled)
     axs.set_title("{} over time{}.".format(column,
                                            " with events" if events else ""))
@@ -197,5 +205,15 @@ def plot_samples(samples, events=None, column="main_current", width=8):
     axs.set_ylabel("{} ({})".format(column, yunit))
     axs.grid(True)
     return fig
+
+
+def to_monsoon_sampledata(analyzer, data=None, config=None):
+    """Signal handler for analysis system."""
+    if isinstance(data, MeasurementResult):
+        data.samplefile = analyzer.fix_path(data.samplefile)
+        return SampleData.from_result(data)
+
+
+signals.data_convert.connect(to_monsoon_sampledata)
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

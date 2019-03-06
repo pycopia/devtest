@@ -22,6 +22,8 @@ import os
 import struct
 import enum
 
+from devtest.qa import signals
+
 
 class LogPriority(enum.IntEnum):
     """Logging priority levels."""
@@ -200,6 +202,18 @@ class LogcatFileReader:
                 return
             else:
                 fo.seek(-(header_peek.size - 1), 1)
+
+
+def to_logcat_filereader(analyzer, data=None, config=None):
+    """Data converter handler."""
+    if isinstance(data, dict):
+        fname = data.get("logcatfile")
+        if fname:
+            fname = analyzer.fix_path(fname)
+            return LogcatFileReader(fname)
+
+
+signals.data_convert.connect(to_logcat_filereader)
 
 
 if __name__ == "__main__":

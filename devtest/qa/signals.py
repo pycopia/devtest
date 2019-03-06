@@ -67,6 +67,9 @@ service_stop = _signals.signal('service-stop')
 # device state changes
 device_change = _signals.signal('device-change')
 
+# Data analysis
+data_convert = _signals.signal('data-convert')
+
 
 def _test(argv):
     def listener(obj, msg=None):
