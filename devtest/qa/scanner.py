@@ -16,6 +16,7 @@ namespace. The default namespace package is called "testcases".
 
 from __future__ import generator_stop
 
+import re
 import sys
 import pkgutil
 
@@ -24,10 +25,29 @@ from .. import importlib
 from .bases import TestCase, TestSuite, Scenario
 
 
-def iter_module_specs(package="testcases", onerror=None):
+class _DummyPattern:
+    def search(self, string):
+        return False
+
+
+def iter_module_specs(package="testcases", onerror=None, exclude=None):
     """Yield a ModuleSpec for all modules in the base package.
     Default is *testcases* package.
+
+    Args:
+        package: str, name of base package to start scanning from.
+        onerror: optional callable that will be called on ImportError. Callable
+                 will be called with subpackage name.
+        exclude: str or compiled regular expression. Matches will be excluded from modules
+                 yielded. Optional.
     """
+    if exclude:
+        if isinstance(exclude, str):
+            exclude = re.compile(exclude)
+        if not hasattr(exclude, "search"):
+            raise ValueError("Exclude option should be string or RE object.")
+    else:
+        exclude = _DummyPattern()
     try:
         mod = importlib.import_module(package)
     except ImportError as ierr:
@@ -39,13 +59,14 @@ def iter_module_specs(package="testcases", onerror=None):
         return
     for finder, name, ispkg in pkgutil.walk_packages(
             path=mod.__path__, prefix=mod.__name__ + '.', onerror=onerror):
-        if not ispkg and "._" not in name and "analyze" not in name:
+        if not ispkg and "._" not in name and not exclude.search(name):
             spec = finder.find_spec(name)
             yield spec
 
 
-def iter_modules(package="testcases", onerror=None):
-    for spec in iter_module_specs(package=package, onerror=onerror):
+def iter_modules(package="testcases", onerror=None, exclude=None):
+    for spec in iter_module_specs(package=package, onerror=onerror,
+                                  exclude=exclude):
         mod = importlib.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)
@@ -81,8 +102,8 @@ def iter_any_class(package="testcases", onerror=None):
                                package=package, onerror=onerror)
 
 
-def iter_all_runnables(package="testcases", onerror=None):
-    for mod in iter_modules(package=package, onerror=onerror):
+def iter_all_runnables(package="testcases", onerror=None, exclude=None):
+    for mod in iter_modules(package=package, onerror=onerror, exclude=exclude):
         if hasattr(mod, "run"):
             yield mod
         yield from _iter_module(mod, (TestCase, Scenario))

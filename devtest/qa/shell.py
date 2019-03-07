@@ -216,7 +216,8 @@ class ShellInterface:
             errlist.append(err)
 
         print(colors.white("Runnable objects:"))
-        for obj in scanner.iter_all_runnables(onerror=_onerror):
+        for obj in scanner.iter_all_runnables(onerror=_onerror,
+                                              exclude="analyze"):
             if type(obj) is ModuleType:
                 print("    module", colors.cyan("{}".format(obj.__name__)))
             elif issubclass(obj, bases.TestCase):
@@ -268,7 +269,7 @@ def pick_testbed():
 def pick_tests(argumentlist):
     from devtest.ui import simpleui
     testlist = ["-done-"]
-    for obj in scanner.iter_all_runnables():
+    for obj in scanner.iter_all_runnables(exclude="analyze"):
         if type(obj) is ModuleType:
             testlist.append(obj.__name__)
         elif issubclass(obj, bases.TestCase):
