@@ -745,6 +745,14 @@ class TestResultsController(Controller):
             raise ValueError("TestCase named {} not found.".format(testcasename))
 
     @staticmethod
+    def latest_result_for(testcasename):
+        tc = TestCasesController.get(testcasename)
+        if tc:
+            return models.TestResults.get_latest_for_testcase(tc)
+        else:
+            raise ValueError("TestCase named {} not found.".format(testcasename))
+
+    @staticmethod
     def latest():
         return models.TestResults.get_latest_run()
 

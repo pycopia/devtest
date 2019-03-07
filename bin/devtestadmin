@@ -155,6 +155,7 @@ def main(argv):
         devtestadmin testcase search <words>...
         devtestadmin testresult list [<resulttype>] [-F]
         devtestadmin testresult latest [-F] [-s] [-l]
+        devtestadmin testresult latest for <testcases>...
         devtestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] <testcases>...
         devtestadmin testresult run [-l] <id>...
         devtestadmin testresult count <testcases>...
@@ -610,7 +611,7 @@ def main(argv):
             for inst in controllers.TestResultsController.all(arguments["<resulttype>"],
                                                               arguments["-F"]):
                 print(inst)
-        elif arguments["for"]:
+        elif arguments["for"] and not arguments["latest"]:
             summarize = arguments["-s"]
             limit = int(arguments["--limit"])
             offset = int(arguments["--offset"])
@@ -621,10 +622,15 @@ def main(argv):
                 for result in results:
                     show_testresult(result, summarize=summarize)
         elif arguments["latest"]:
-            inst = controllers.TestResultsController.latest()
-            show_testresult(inst, failures=arguments["-F"], summarize=arguments["-s"])
-            if arguments["-l"]:  # show logs
-                show_testresult_logs(inst)
+            if arguments["for"]:
+                for tcname in arguments["<testcases>"]:
+                    inst = controllers.TestResultsController.latest_result_for(tcname)
+                    show_testresult(inst, failures=arguments["-F"], summarize=arguments["-s"])
+            else:
+                inst = controllers.TestResultsController.latest()
+                show_testresult(inst, failures=arguments["-F"], summarize=arguments["-s"])
+                if arguments["-l"]:  # show logs
+                    show_testresult_logs(inst)
         elif arguments["run"]:
             result_id = arguments["<id>"]
             tr = controllers.TestResultsController.get_by_id(result_id)

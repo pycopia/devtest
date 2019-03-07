@@ -797,6 +797,12 @@ class TestResults(BaseModel):
             (cls.testcase == testcase) & (cls.valid == True)  # noqa
             ).order_by(cls.starttime).limit(limit).execute()
 
+    @classmethod
+    def get_latest_for_testcase(cls, testcase):
+        r = cls.select().where(cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
+                (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &
+                (cls.testcase == testcase))).get()
+        return r
 
 def _attribute_get(inst, attrname, default=None):
     if inst.attributes is None:

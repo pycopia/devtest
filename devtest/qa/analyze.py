@@ -41,6 +41,12 @@ class Analyzer:
 
     @classmethod
     def from_testcase(cls, testcase):
+        """Factory method to make Analyzer from TestCase subclass.
+
+        Args:
+            testcase: str or TestCase class object. If str it should be a full
+            path to class object, which will be imported.
+        """
         if isinstance(testcase, str):
             testcase = importlib.get_class(testcase)
         if type(testcase) is type and issubclass(testcase, bases.TestCase):
@@ -84,6 +90,11 @@ class Analyzer:
         return [result for result in
                 controllers.TestResultsController.results_for(self.test_name)
                 if result.data is not None]
+
+    def latest_result(self):
+        """Fetch latest test result from database for this test case."""
+        controllers.connect()
+        return controllers.TestResultsController.latest_result_for(self.test_name)
 
     def load_data(self, data, _dataobjects=None):
         """Convert data records to registered data objects, or use as-is if not
