@@ -137,4 +137,16 @@ class Analyzer:
         origresultsdir, subdir = os.path.split(dirname)
         return os.path.join(resultsdir, subdir, fname)
 
+    def make_filename(self, testresult, extension="png"):
+        # only root result (runner) has location
+        tr = testresult
+        resultslocation = testresult.resultslocation
+        while resultslocation is None and tr is not None:
+            tr = tr.parent
+            resultslocation = tr.resultslocation
+        filename = "{}-{:%Y%m%d%H%M%S.%f}.{}".format(
+                testresult.testcase.name.replace(".", "_"),
+                testresult.starttime, extension)
+        return self.fix_path(os.path.join(resultslocation, filename))
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
