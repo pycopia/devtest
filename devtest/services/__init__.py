@@ -43,8 +43,8 @@ def log_service_want(equipment, service=None, **kwargs):
     logging.info("service wanted by {!r}: {!r} kwargs={!r}".format(equipment.name, service, kwargs))
 
 
-def log_service_dontwant(equipment, service=None):
-    logging.info("service no longer wanted by {!r}: {!r}".format(equipment.name, service))
+def log_service_dontwant(equipment, service=None, **kwargs):
+    logging.info("service no longer wanted by {!r}: {!r} kwargs={!r}".format(equipment.name, service, kwargs))
 
 
 class Service(abc.ABC):
@@ -58,7 +58,7 @@ class Service(abc.ABC):
         """
         raise NotImplementedError("provide_for must be implemented")
 
-    def release_for(self, needer):
+    def release_for(self, needer, **kwargs):
         """Release the service (service_dontwant signal) when no longer needed.
         """
         raise NotImplementedError("release_for must be implemented")
@@ -108,12 +108,12 @@ class ServiceManager:
                 "{} wants {!r} but is not provided.".format(needer, service))
         return srv.provide_for(needer, **kwargs)
 
-    def _releaser(self, needer, service=None):
+    def _releaser(self, needer, service=None, **kwargs):
         srv = self._servicemap.get(service)
         if srv is None:
             raise exceptions.ConfigError(
                 "Service {!r} for {} not needed yet does not exist.".format(service, needer))
-        return srv.release_for(needer)
+        return srv.release_for(needer, **kwargs)
 
 
 def get_manager():

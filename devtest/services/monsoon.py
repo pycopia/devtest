@@ -79,7 +79,7 @@ class MonsoonService(Service):
         coproc.start(domeasure, ctx)
         self._used[hvpm.serno] = coproc
 
-    def release_for(self, needer):
+    def release_for(self, needer, **kwargs):
         hvpm, _ = self._find_hvpm(needer)
         result = None
         if hvpm is not None:

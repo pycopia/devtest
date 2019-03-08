@@ -425,9 +425,9 @@ class EquipmentRuntime:
         kwargs.pop("service", None)
         return signals.service_want.send(self, service=name, **kwargs)
 
-    def service_dontwant(self, name):
+    def service_dontwant(self, name, **kwargs):
         """Relinquish a service from the services modules."""
-        responses = signals.service_dontwant.send(self, service=name)
+        responses = signals.service_dontwant.send(self, service=name, **kwargs)
         for handler, rv in responses:
             if rv is not None:
                 return rv

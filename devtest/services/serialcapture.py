@@ -90,7 +90,7 @@ class SerialCaptureService(Service):
         else:
             logging.warning("SerialCaptureService no console config for {}.".format(hostname))
 
-    def release_for(self, device):
+    def release_for(self, device, **kwargs):
         hostname = device.get("hostname")
         console_config = device.get("console")
         if console_config:

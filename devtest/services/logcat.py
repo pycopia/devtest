@@ -42,7 +42,7 @@ class LogcatService(Service):
         coproc.start(make_logcat_coroutine, needer.serno, self._logdir, logtags)
         self._inuse[needer.serno] = coproc
 
-    def release_for(self, needer):
+    def release_for(self, needer, **kwargs):
         coproc = self._inuse.pop(needer.serno, None)
         if coproc is not None:
             coproc.interrupt()
