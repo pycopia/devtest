@@ -256,7 +256,7 @@ class AndroidController(devices.Controller):
             MemoryMonitor instance for attached device and PID.
 
         """
-        return MemoryMonitor(self, pid)
+        return MemoryMonitor(self.adb, pid)
 
     def listdir(self, path):
         """Return a list of names in a directory.
@@ -721,8 +721,8 @@ class MemoryMonitor:
 
     CLEAR_REFS = "/proc/{pid}/clear_refs"
 
-    def __init__(self, controller, pid):
-        self._cont = controller
+    def __init__(self, adbclient, pid):
+        self._adb = adbclient
         self._pid = pid
         self._startmap = None
         self._stopmap = None
@@ -731,14 +731,16 @@ class MemoryMonitor:
         self._stopmap = None
         self._startmap = self.current()
         path = MemoryMonitor.CLEAR_REFS.format(pid=self._pid)
-        self._cont.shell(['echo', '1', '>', path])
+        stdout, stderr, es = self._adb.command(['echo', '1', '>', path])
+        if not es:
+            raise AndroidControllerError(es)
 
     def current(self):
         """Get current memory map.
         """
         path = meminfo.Maps.SMAPS.format(pid=self._pid)
         with io.BytesIO() as bio:
-            self._cont.adb.pull_file(path, bio)
+            self._adb.pull_file(path, bio)
             return meminfo.Maps.from_text(bio.getvalue())
 
     def stop(self):
