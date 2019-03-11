@@ -25,12 +25,21 @@ from .. import importlib
 from .bases import TestCase, TestSuite, Scenario
 
 
-class _DummyPattern:
+__all__ = ['iter_module_specs', 'iter_modules', 'iter_subclasses',
+           'iter_testcases', 'iter_testsuites', 'iter_scenarios',
+           'iter_any_class', 'iter_all_runnables', 'iter_module_classes']
+
+class _DummyExcluder:
     def search(self, string):
         return False
 
 
-def iter_module_specs(package="testcases", onerror=None, exclude=None):
+class _DummyIncluder:
+    def search(self, string):
+        return True
+
+
+def iter_module_specs(package="testcases", onerror=None, include=None, exclude=None):
     """Yield a ModuleSpec for all modules in the base package.
     Default is *testcases* package.
 
@@ -38,19 +47,29 @@ def iter_module_specs(package="testcases", onerror=None, exclude=None):
         package: str, name of base package to start scanning from.
         onerror: optional callable that will be called on ImportError. Callable
                  will be called with subpackage name.
+        include: str or compiled regular expression. Names to explicity include.
         exclude: str or compiled regular expression. Matches will be excluded from modules
                  yielded. Optional.
     """
+    if include:
+        if isinstance(include, str):
+            include = re.compile(include)
+        if not hasattr(include, "search"):
+            raise ValueError("Include option should be string or RE object.")
+    else:
+        include = _DummyIncluder()
+
     if exclude:
         if isinstance(exclude, str):
             exclude = re.compile(exclude)
         if not hasattr(exclude, "search"):
             raise ValueError("Exclude option should be string or RE object.")
     else:
-        exclude = _DummyPattern()
+        exclude = _DummyExcluder()
+
     try:
         mod = importlib.import_module(package)
-    except ImportError as ierr:
+    except ImportError:
         if callable(onerror):
             onerror(package)
         else:
@@ -59,14 +78,14 @@ def iter_module_specs(package="testcases", onerror=None, exclude=None):
         return
     for finder, name, ispkg in pkgutil.walk_packages(
             path=mod.__path__, prefix=mod.__name__ + '.', onerror=onerror):
-        if not ispkg and "._" not in name and not exclude.search(name):
+        if not ispkg and "._" not in name and include.search(name) and not exclude.search(name):
             spec = finder.find_spec(name)
             yield spec
 
 
-def iter_modules(package="testcases", onerror=None, exclude=None):
+def iter_modules(package="testcases", onerror=None, include=None, exclude=None):
     for spec in iter_module_specs(package=package, onerror=onerror,
-                                  exclude=exclude):
+                                  include=include, exclude=exclude):
         mod = importlib.module_from_spec(spec)
         try:
             spec.loader.exec_module(mod)
@@ -79,10 +98,12 @@ def iter_modules(package="testcases", onerror=None, exclude=None):
         yield mod
 
 
-def iter_subclasses(baseclass, package="testcases", onerror=None):
+def iter_subclasses(baseclass, package="testcases", onerror=None, include=None,
+                    exclude=None):
     """Yield all subclasses of baseclass in provided package."""
-    for mod in iter_modules(package, onerror=None):
-        yield from _iter_module(mod, baseclass)
+    for mod in iter_modules(package, onerror=onerror, include=include,
+                            exclude=exclude):
+        yield from iter_module_classes(mod, baseclass)
 
 
 def iter_testcases(package="testcases", onerror=None):
@@ -102,14 +123,14 @@ def iter_any_class(package="testcases", onerror=None):
                                package=package, onerror=onerror)
 
 
-def iter_all_runnables(package="testcases", onerror=None, exclude=None):
-    for mod in iter_modules(package=package, onerror=onerror, exclude=exclude):
+def iter_all_runnables(package="testcases", onerror=None, include=None, exclude=None):
+    for mod in iter_modules(package=package, onerror=onerror, include=include, exclude=exclude):
         if hasattr(mod, "run"):
             yield mod
-        yield from _iter_module(mod, (TestCase, Scenario))
+        yield from iter_module_classes(mod, (TestCase, Scenario))
 
 
-def _iter_module(mod, baseclass):
+def iter_module_classes(mod, baseclass):
     for name in dir(mod):
         if not name.startswith("_"):
             obj = getattr(mod, name)
