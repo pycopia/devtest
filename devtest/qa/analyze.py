@@ -35,9 +35,12 @@ class Analyzer:
         config: A configuration that includes the test case configuration.
     """
 
+    optionslist = None  # loader may set instance options
+
     def __init__(self, testcase, config):
         self.test_name = testcase.OPTIONS.test_name
         self.config = config
+        self.options = self.optionslist.pop(0) if self.optionslist else {}
 
     @classmethod
     def from_testcase(cls, testcase):

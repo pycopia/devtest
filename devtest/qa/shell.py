@@ -166,7 +166,7 @@ class ShellInterface:
 
     def run(self):
         if self.config.flags.do_list:
-            return self.do_list()
+            return do_list()
         if self.config.flags.do_show_config:
             config.show_config(self.config)
             return
@@ -209,29 +209,30 @@ class ShellInterface:
         else:
             print("Warning: nothing to run.", file=sys.stderr)
 
-    def do_list(self):
-        errlist = []
 
-        def _onerror(err):
-            errlist.append(err)
+def do_list():
+    errlist = []
 
-        print(colors.white("Runnable objects:"))
-        for obj in scanner.iter_all_runnables(onerror=_onerror,
-                                              exclude="analyze"):
-            if type(obj) is ModuleType:
-                print("    module", colors.cyan("{}".format(obj.__name__)))
-            elif issubclass(obj, bases.TestCase):
-                print("      test", colors.green("{}.{}".format(
-                    obj.__module__, obj.__name__)))
-            elif issubclass(obj, bases.Scenario):
-                print("  scenario", colors.yellow("{}.{}".format(
-                    obj.__module__, obj.__name__)))
-            else:
-                print(colors.red("  Unknown: {!r}".format(obj)))
-        if errlist:
-            print("These could not be scanned:")
-            for errored in errlist:
-                print(colors.magenta(errored))
+    def _onerror(err):
+        errlist.append(err)
+
+    print(colors.white("Runnable objects:"))
+    for obj in scanner.iter_all_runnables(onerror=_onerror,
+                                          exclude="analyze"):
+        if type(obj) is ModuleType:
+            print("    module", colors.cyan("{}".format(obj.__name__)))
+        elif issubclass(obj, bases.TestCase):
+            print("      test", colors.green("{}.{}".format(
+                obj.__module__, obj.__name__)))
+        elif issubclass(obj, bases.Scenario):
+            print("  scenario", colors.yellow("{}.{}".format(
+                obj.__module__, obj.__name__)))
+        else:
+            print(colors.red("  Unknown: {!r}".format(obj)))
+    if errlist:
+        print("These could not be scanned:")
+        for errored in errlist:
+            print(colors.magenta(errored))
 
 
 def list_reports():
