@@ -28,6 +28,7 @@ from devtest import devices
 from devtest import logging
 from devtest.io import reactor
 from devtest.os import meminfo
+from devtest.os import cpuinfo
 from devtest.core import exceptions
 from devtest.devices.android import adb
 from devtest.devices.android import sl4a
@@ -54,7 +55,8 @@ class AndroidController(devices.Controller):
         settings: Access to settings.
         buttons: Access to button press interaction.
         thermal: Access to thermal information
-        meminfo: Memory information and monitor
+        meminfo: Memory information and monitor for a process.
+        processinfo: CPU information and monitors for a process.
     """
 
     _PROPERTY_RE = re.compile(r"\[(.*)\]: \[(.*)\]")
@@ -254,9 +256,27 @@ class AndroidController(devices.Controller):
 
         Returns:
             MemoryMonitor instance for attached device and PID.
-
         """
         return MemoryMonitor(self.adb, pid)
+
+    def processinfo(self, name: str = None, pid: int = None) -> "ProcessInfo":
+        """Access information about a process on device.
+
+        Args:
+            pid: (int) PID of process to get CPU information for.
+
+        Returns:
+            ProcessInfo instance for attached device and PID.
+        """
+        if pid is not None:
+            return ProcessInfo(self.adb, int(pid))
+        if name is not None:
+            plist = self.pgrep(name)
+            if len(plist) == 1:
+                return ProcessInfo(self.adb, plist[0][0])
+            else:
+                raise ValueError("Ambiguous process name, or not found. Select only one.")
+        raise ValueError("processinfo: must supply either PID or name of process.")
 
     def listdir(self, path):
         """Return a list of names in a directory.
@@ -768,5 +788,89 @@ class MemoryMonitor:
         memstop = self._stopmap.rollup()
         return memstop.Referenced // memstop.KernelPageSize
 
+
+class CPUMonitor:
+    """Monitor a process CPU utilization.
+    """
+
+    def __init__(self, adbclient, pid):
+        self._adb = adbclient
+        self._pid = pid
+        self._path = "/proc/{pid:d}/stat".format(pid=pid)
+        self._start_jiffies = None
+        self._starttime = None
+
+    def get_timestamp(self):
+        with io.BytesIO() as bio:
+            self._adb.pull_file("/proc/uptime", bio)
+            text = bio.getvalue()
+        # Wall clock since boot, combined idle time of all cpus
+        clock, idle = text.split()
+        return float(clock)
+
+    def get_procstat(self):
+        with io.BytesIO() as bio:
+            self._adb.pull_file(self._path, bio)
+            ps = cpuinfo.ProcStat.from_text(bio.getvalue())
+        return ps
+
+    def start(self):
+        """Start monitor by recording current state.
+        """
+        self._starttime = self.get_timestamp()
+        ps = self.get_procstat()
+        self._start_jiffies = ps.stime + ps.utime
+
+    def current(self):
+        """Return CPU utilization, as percent (float).
+
+        The start method must be called first.
+        """
+        now = self.get_timestamp()
+        ps = self.get_procstat()
+        current_jiffies = ps.stime + ps.utime
+        return float(current_jiffies - self._start_jiffies) / (now - self._starttime)
+
+    def end(self):
+        """Stop monitor.
+
+        Returns:
+            Elapsed time of run, in seconds (float).
+        """
+        st = self._starttime
+        self._starttime = None
+        self._start_jiffies = None
+        return self.get_timestamp() - st
+
+
+class ProcessInfo:
+    """Access point to information about a process on device.
+    """
+
+    def __init__(self, adbclient, pid):
+        self._adb = adbclient
+        self._pid = pid
+        self._mm = None
+        self._cpum = None
+
+    @property
+    def memory_monitor(self):
+        if self._mm is None:
+            self._mm = MemoryMonitor(self._adb, self._pid)
+        return self._mm
+
+    @memory_monitor.deleter
+    def memory_monitor(self):
+        self._mm = None
+
+    @property
+    def cpu_monitor(self):
+        if self._cpum is None:
+            self._cpum = CPUMonitor(self._adb, self._pid)
+        return self._cpum
+
+    @cpu_monitor.deleter
+    def cpu_monitor(self):
+        self._cpum = None
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
