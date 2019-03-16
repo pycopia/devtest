@@ -970,6 +970,16 @@ class TestSuite:
         """
         suite_info.send(self, message=message)
 
+    def record_data(self, data):
+        """Send arbitrary data to the report.
+
+        If the report is a persistent storage then it should save it there. It
+        will be saved with a type of SuiteType.
+
+        The data should be JSON serializable object.
+        """
+        test_data.send(self, data=data)
+
     # Overrideable interface.
     def initialize(self):
         """initialize phase handler for suite-level initialization.

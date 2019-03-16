@@ -210,7 +210,8 @@ def to_logcat_filereader(analyzer, data=None, config=None):
         fname = data.get("logcatfile")
         if fname:
             fname = analyzer.fix_path(fname)
-            return LogcatFileReader(fname)
+            data["logcatfile"] = LogcatFileReader(fname)
+        return data
 
 
 signals.data_convert.connect(to_logcat_filereader)

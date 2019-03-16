@@ -51,15 +51,17 @@ class ShellInterface:
         -h  - This help.
         -d  - Debug on.
         -l  - List available analyzer modules.
+        -L  - Use local data (from resultsdir) rather than result record.
     """
 
     def __init__(self, argv):
         debug = 0
         extra_config = None
         do_list = False
+        use_local = False
 
         try:
-            opts, self.arguments = options.getopt(argv, "h?dlc:")
+            opts, self.arguments = options.getopt(argv, "h?dlLc:")
         except options.GetoptError as geo:
             _usage(geo)
         for opt, optarg in opts:
@@ -69,12 +71,15 @@ class ShellInterface:
                 debug += 1
             elif opt == "l":
                 do_list = True
+            elif opt == "L":
+                use_local = True
             elif opt == "c":
                 extra_config = optarg
         globalargs = self.arguments.pop(0)
         self.config = cf = config.get_config(initdict=globalargs.options,
                                              _filename=extra_config)
         cf.flags.debug = debug
+        cf.flags.use_local = use_local
         cf.flags.do_list = do_list
 
     def run(self):

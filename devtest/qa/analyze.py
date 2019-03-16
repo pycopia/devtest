@@ -23,6 +23,36 @@ from devtest import importlib
 from devtest.db import controllers
 from devtest.qa import signals
 from devtest.qa import bases
+from devtest.os import meminfo
+
+
+def convert_meminfo(mi):
+    return [(ts.timestamp(), meminfo.MemUsage(*memdata)) for ts, memdata in mi]
+
+
+def convert_cpuinfo(cpui):
+    return [(ts, cpuutil) for ts, cpuutil in cpui]
+
+
+def to_memusage(analyzer, data=None, config=None):
+    if isinstance(data, dict):
+        meminfolist = data.get("meminfo")
+        if meminfolist:
+            data["meminfo"] = convert_meminfo(meminfolist)
+        return data
+
+
+def to_cpuinfo(analyzer, data=None, config=None):
+    if isinstance(data, dict):
+        ci = data.get("cpuinfo")
+        if ci:
+            data["cpuinfo"] = convert_cpuinfo(ci)
+        return data
+
+# Connect the general memory usage and CPU usage data to converters for
+# everything.
+signals.data_convert.connect(to_memusage)
+signals.data_convert.connect(to_cpuinfo)
 
 
 class Analyzer:
@@ -59,6 +89,23 @@ class Analyzer:
         cf = config.get_testcase_config(testcase)
         return cls(testcase, cf)
 
+    @classmethod
+    def from_test_entry(cls, testcase):
+        """Factory method to make Analyzer from TestCase model instance.
+        """
+        return cls.from_testcase(testcase.testimplementation)
+
+    @property
+    def use_local_storage(self):
+        return self.config.flags.use_local
+
+    @use_local_storage.setter
+    def use_local_storage(self, yes):
+        if yes:
+            self.config.flags.use_local = True
+        else:
+            self.config.flags.use_local = False
+
     def find_test_data_files(self):
         """Find all data files as written by devtest.qa.bases.TestCase.record_data()
         and default output.
@@ -80,6 +127,31 @@ class Analyzer:
                     md = json.from_file(os.path.join(dirpath, fname))
                     yield md
 
+    def find_latest_data(self):
+        """Find latest data file for the test case.
+
+        These are recorded as files by the default report.
+
+        Returns:
+            Python data structure as recorded by the latest test case run.
+        """
+        jsonname = "{}_data.json".format(self.test_name.replace(".", "_"))
+        resultsdir = os.path.expandvars(self.config.resultsdir)
+        latest = None
+        latest_mtime = 0.0
+        for dirpath, dirnames, filenames in os.walk(resultsdir):
+            for fname in filenames:
+                if jsonname in fname:
+                    fpath = os.path.join(dirpath, fname)
+                    st = os.stat(fpath)
+                    if st.st_mtime > latest_mtime:
+                        latest_mtime = st.st_mtime
+                        latest = fpath
+        if latest is not None:
+            return json.from_file(latest)
+        else:
+            return None
+
     def find_test_results(self):
         """Find test result records for a test case.
 
@@ -99,11 +171,34 @@ class Analyzer:
         controllers.connect()
         return controllers.TestResultsController.latest_result_for(self.test_name)
 
+    def get_latest_data(self, use_local: bool = None):
+        """Get most recent data object from local store (resultsdir) or database
+        depending on use_local flag.
+
+        Args:
+            use_local: (bool) override configuration flag to use local data
+            storage.
+        """
+        if use_local is None:
+            use_local = self.config.flags.use_local
+        if use_local:
+            return self.find_latest_data()
+        else:
+            result = self.latest_result()
+            return result.data
+
     def load_data(self, data, _dataobjects=None):
         """Convert data records to registered data objects, or use as-is if not
         available.
 
+        Registered handlers of the `data_convert` signal are given the data. If
+        one can convert it or otherwise handle it it does so and returns another
+        object.
+
         Also flattens lists of result metadata.
+
+        Returns:
+            List of converted or modified data or data structures.
         """
         if _dataobjects is None:
             _dataobjects = []
@@ -116,6 +211,7 @@ class Analyzer:
                                                                 config=self.config):
                 if response is not None:
                     _dataobjects.append(response)
+                    break
             else:
                 _dataobjects.append(data)
         return _dataobjects
@@ -141,6 +237,9 @@ class Analyzer:
         return os.path.join(resultsdir, subdir, fname)
 
     def make_filename(self, testresult, extension="png"):
+        """Make a new file name from test case name and timestamp,
+        and a path in the same location as the data.
+        """
         # only root result (runner) has location
         tr = testresult
         resultslocation = testresult.resultslocation
@@ -148,8 +247,8 @@ class Analyzer:
             tr = tr.parent
             resultslocation = tr.resultslocation
         filename = "{}-{:%Y%m%d%H%M%S.%f}.{}".format(
-                testresult.testcase.name.replace(".", "_"),
-                testresult.starttime, extension)
+            testresult.testcase.name.replace(".", "_"),
+            testresult.starttime, extension)
         return self.fix_path(os.path.join(resultslocation, filename))
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
