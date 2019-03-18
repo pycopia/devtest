@@ -177,7 +177,7 @@ class LogcatFileReader:
         return lines
 
     def dump_to_file(self, localfile, tag=None):
-        with open(localfile, "wb") as fo:
+        with open(localfile, "ab") as fo:
             lines = self.dump_to(fo, tag)
         return lines
 

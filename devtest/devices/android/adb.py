@@ -1161,7 +1161,7 @@ class LogcatHandler:
         if logtags:
             cmdline.extend(logtags.split())
         proc = await self._aadb.spawn(cmdline)
-        with open(localfile, "wb") as fo:
+        with open(localfile, "ab") as fo:
             await proc.copy_to(streams.FileStream(fo))
         await proc.close()
 
