@@ -15,7 +15,10 @@
 """Output module for use when running a test session from withing Jupyter.
 """
 
+import os
 from datetime import timezone
+
+from devtest import json
 
 from . import BaseReport
 
@@ -31,10 +34,12 @@ class JupyterReport(BaseReport):
         global widgets, display
         import ipywidgets as widgets
         from IPython import display
+        self._logdir = "/tmp"
         widgets.register_comm_target()
         self._out = widgets.Output(layout={"width": "100%"})
         display.display(self._out)
         if config is not None:
+            self._logdir = config.get("resultsdir", "/tmp")
             self.timezone = config.get("timezone", timezone.utc)
         else:
             self.timezone = timezone.utc
@@ -131,11 +136,29 @@ class JupyterReport(BaseReport):
         self._display_html("DUT version: {!s} ({})<br/>".format(build, variant))
 
     def on_logdir_location(self, runner, path=None):
+        self._logdir = path
         self._display_html(
-            'Results location: <a href="file://{path}/" target="_blank">{path}/</a>'.format(path=path))
+            'Results location: '
+            '<a href="file://{path}/" target="_blank">{path}/</a>'.format(path=path))
 
     def on_test_data(self, testcase, data=None):
-        self._display_html("Data: {!r}<br/>".format(data))
+        # If the same test is run multiple times, add new data to top-level
+        # list. Make a new top-level list if required.
+        fname = "{}_data.json".format(testcase.test_name.replace(".", "_"))
+        fpath = os.path.join(self._logdir, fname)
+        olddata = None
+        if os.path.exists(fpath):
+            with open(fpath) as fo:
+                olddata = json.load(fo)
+            if isinstance(olddata, list):
+                olddata.append(data)
+                data = olddata
+            else:
+                data = [olddata, data]
+        with open(fpath, "w") as fo:
+            json.dump(data, fo)
+        self._display_html("Data: {} {!r}<br/>".format(
+            "added to" if olddata else "available in", fname))
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
