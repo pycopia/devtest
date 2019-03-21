@@ -18,7 +18,7 @@
 
 from devtest import config
 from devtest import options
-from devtest.db import models
+from devtest.db import controllers
 from devtest.qa import bases
 from devtest.qa import runner
 from devtest.qa import loader
@@ -31,9 +31,9 @@ from IPython import display
 ModuleType = type(config)
 
 
-def find_runnables():
+def find_runnables(include=None, exclude=None):
     testlist = []
-    for obj in scanner.iter_all_runnables():
+    for obj in scanner.iter_all_runnables(include=include, exclude=exclude):
         if type(obj) is ModuleType:
             testlist.append(obj.__name__)
         elif issubclass(obj, bases.TestCase):
@@ -44,29 +44,30 @@ def find_runnables():
 
 
 class JupyterInterface:
+    """Test runner interface for Jupyter notebooks.
+    """
 
     def __init__(self, argv):
         self._tblist = None
         self._runnables = None
 
     def show_form(self):
-        models.connect()
-        tblist = models.TestBed.get_list()
-        runnables = find_runnables()
+        controllers.connect()
+        tblist = controllers.TestBedController.all(like=None)
+        runnables = find_runnables(exclude="analyze")
 
         self._tbselect = widgets.Select(options=tblist, description="Testbed:")
         self._rselect = widgets.SelectMultiple(options=runnables,
                                                description="Runnable Objects:",
                                                layout=widgets.Layout(width="80%",
                                                                      height="100px"))
-
         display.display(widgets.HBox([self._rselect, self._tbselect]))
         self._tblist = tblist
         self._runnables = runnables
 
     def select(self):
         cf = config.get_config()
-        cf["testbed"] = self._tblist[self._tbselect.index]
+        cf["testbed"] = self._tblist[self._tbselect.index].name
         cf["reportname"] = "jupyter"
 
         selected = []
