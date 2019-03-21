@@ -66,6 +66,23 @@ def insert_options(klass, **kwargs):
         raise ValueError("Need TestCase class.")
 
 
+class Bag(dict):
+    """The "bag" is a shared mapping.
+
+    A test case can put something into the bag, and another test pull it out.
+    """
+
+
+_BAG = None
+
+
+def get_bag():
+    global _BAG
+    if _BAG is None:
+        _BAG = Bag()
+    return _BAG
+
+
 class TestCase:
     """Base class for all test cases.
 
@@ -98,7 +115,7 @@ class TestCase:
         # Chop off "testcases." base package name for brevity.
         test_name = implementation.replace("testcases.", "")
         insert_options(cls, implementation=implementation, test_name=test_name,
-                       repeat=1)
+                       repeat=1, bag=get_bag())
         pl = []
         if cls.PREREQUISITES:
             for prereq in cls.PREREQUISITES:
@@ -109,6 +126,10 @@ class TestCase:
                 else:
                     raise ValueError("Bad prerequisite value.")
         cls.OPTIONS.prerequisites = pl
+
+    @property
+    def bag(self):
+        return self.OPTIONS.bag
 
     @property
     def prerequisites(self):
@@ -735,7 +756,7 @@ class TestSuite:
         if not _auto:
             self._tests.append(entry)
         elif testcaseid not in self._testset:
-                self._tests.append(entry)
+            self._tests.append(entry)
         self._testset.add(testcaseid)
 
     def add_test(self, _testclass, args=None, kwargs=None, name=None):
