@@ -70,6 +70,7 @@ class Analyzer:
     def __init__(self, testcase, config):
         self.test_name = testcase.OPTIONS.test_name
         self.config = config
+        self.resultslocation = os.path.expandvars(config.resultsdir)
         self.options = self.optionslist.pop(0) if self.optionslist else {}
 
     @classmethod
@@ -148,6 +149,7 @@ class Analyzer:
                         latest_mtime = st.st_mtime
                         latest = fpath
         if latest is not None:
+            self.resultslocation = os.path.dirname(latest)
             return json.from_file(latest)
         else:
             return None
@@ -169,7 +171,9 @@ class Analyzer:
     def latest_result(self):
         """Fetch latest test result from database for this test case."""
         controllers.connect()
-        return controllers.TestResultsController.latest_result_for(self.test_name)
+        result = controllers.TestResultsController.latest_result_for(self.test_name)
+        self.set_resultslocation_from_testresult(result)
+        return result
 
     def get_latest_data(self, use_local: bool = None):
         """Get most recent data object from local store (resultsdir) or database
@@ -236,19 +240,24 @@ class Analyzer:
         origresultsdir, subdir = os.path.split(dirname)
         return os.path.join(resultsdir, subdir, fname)
 
-    def make_filename(self, testresult, extension="png"):
-        """Make a new file name from test case name and timestamp,
-        and a path in the same location as the data.
+    def make_filename(self, name, extension="png"):
+        """Make a new file name from test case name, and supplied name.
+        Adds a path in the same location as the data.
+
+        Returns:
+            Fully qualified path to a new file with test name, given name, and
+            extension. The path is located in the original results location.
         """
+        filename = "{}-{}.{}".format(self.test_name.replace(".", "_"), name, extension)
+        return self.fix_path(os.path.join(self.resultslocation, filename))
+
+    def set_resultslocation_from_testresult(self, testresult):
         # only root result (runner) has location
         tr = testresult
         resultslocation = testresult.resultslocation
         while resultslocation is None and tr is not None:
             tr = tr.parent
             resultslocation = tr.resultslocation
-        filename = "{}-{:%Y%m%d%H%M%S.%f}.{}".format(
-            testresult.testcase.name.replace(".", "_"),
-            testresult.starttime, extension)
-        return self.fix_path(os.path.join(resultslocation, filename))
+        self.resultslocation
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
