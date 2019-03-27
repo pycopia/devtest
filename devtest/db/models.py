@@ -713,7 +713,7 @@ class Scenario(BaseModel):
 class TestResults(BaseModel):
     result = EnumField(constants.TestResult)
     resulttype = EnumField(constants.TestResultType)
-    rdb_uuid = UUIDField(null=True)  # Map to RDB
+    rdb_uuid = UUIDField(null=True)
 
     # Troubleshooting and data gathering
     diagnostic = TextField(null=True)
@@ -803,6 +803,7 @@ class TestResults(BaseModel):
                 (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &
                 (cls.testcase == testcase))).get()
         return r
+
 
 def _attribute_get(inst, attrname, default=None):
     if inst.attributes is None:

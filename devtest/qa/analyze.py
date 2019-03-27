@@ -49,6 +49,7 @@ def to_cpuinfo(analyzer, data=None, config=None):
             data["cpuinfo"] = convert_cpuinfo(ci)
         return data
 
+
 # Connect the general memory usage and CPU usage data to converters for
 # everything.
 signals.data_convert.connect(to_memusage)
@@ -70,7 +71,7 @@ class Analyzer:
     def __init__(self, testcase, config):
         self.test_name = testcase.OPTIONS.test_name
         self.config = config
-        self.resultslocation = os.path.expandvars(config.resultsdir)
+        self.resultslocation = os.path.expandvars(config.resultsdir)  # temporary
         self.options = self.optionslist.pop(0) if self.optionslist else {}
 
     @classmethod
@@ -154,6 +155,18 @@ class Analyzer:
         else:
             return None
 
+    def all_latest_results(self):
+        """Return all latest result records for the test case.
+
+        Returns:
+            List of TestResults records for this test case related to the most
+            recent test run.
+        """
+        controllers.connect()
+        runres = controllers.TestResultsController.latest_run_for_testcase(self.test_name)
+        self.resultslocation = runres.resultslocation
+        return controllers.TestResultsController.all_results_for_run(runres, self.test_name)
+
     def find_test_results(self):
         """Find test result records for a test case.
 
@@ -188,8 +201,7 @@ class Analyzer:
         if use_local:
             return self.find_latest_data()
         else:
-            result = self.latest_result()
-            return result.data
+            return [result.data for result in self.all_latest_results()]
 
     def load_data(self, data, _dataobjects=None):
         """Convert data records to registered data objects, or use as-is if not
@@ -258,6 +270,6 @@ class Analyzer:
         while resultslocation is None and tr is not None:
             tr = tr.parent
             resultslocation = tr.resultslocation
-        self.resultslocation
+        self.resultslocation = resultslocation
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

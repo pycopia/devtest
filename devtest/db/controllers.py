@@ -763,6 +763,31 @@ class TestResultsController(Controller):
             q = q.where(models.TestResults.result != constants.TestResult.PASSED)
         return q
 
+    @staticmethod
+    def latest_run_for_testcase(testcasename):
+        res = TestResultsController.latest_result_for(testcasename)
+        while res.resulttype != constants.TestResultType.TestRunSummary:
+            res = res.parent
+        return res
+
+    @staticmethod
+    def all_results_for_run(runresult, testcase, _results=None):
+        if _results is None:
+            _results = []
+        if isinstance(testcase, str):
+            testcase = TestCasesController.get(testcase)
+        if not testcase:
+            raise ValueError("TestCase {} not found.".format(testcase))
+        # Recurse down into result tree to find Test results for desired test.
+        for res in runresult.subresults:
+            if res.resulttype != constants.TestResultType.Test:
+                TestResultsController.all_results_for_run(res, testcase,
+                                                          _results)
+            else:
+                if res.testcase == testcase:
+                    _results.append(res)
+        return _results
+
 
 def _eval_value(attrvalue):
     try:
