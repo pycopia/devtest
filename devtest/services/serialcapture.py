@@ -75,6 +75,7 @@ class SerialCaptureService(Service):
             self._server = SerialCaptureServer()
             self._server.start()
             time.sleep(1)
+            self.set_logdir(self._logdir)
 
     def provide_for(self, device, **kwargs):
         self._start_server()
@@ -114,7 +115,8 @@ class SerialCaptureService(Service):
 
     def set_logdir(self, path):
         """Set the directory where log files will be created."""
-        return _send_message(SET_LOGDIR, path)
+        if self._server is not None:
+            return _send_message(SET_LOGDIR, path)
 
     def add_channel(self, name, devicenode, setup):
         """Add a serial capture channel.
@@ -152,7 +154,7 @@ async def _send_message_coro(tag, data):
         sock = await socket.open_unix_connection(CONTROL_SOCKET)
         await sock.sendall(msg)
     except Exception as ex:
-        logging.exception_error("_send_message_coro send", ex)
+        logging.exception_error("_send_message_coro send: {}".format(tag), ex)
         return ERROR, str(ex)
     try:
         head = await sock.recv(PACKER.size, socket.MSG_WAITALL)
