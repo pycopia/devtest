@@ -29,13 +29,14 @@ class MemoryMonitorService(Service):
         pid = kwargs.get("pid")
         interval = kwargs.get("interval", 1)
         if not pid:
-            return
+            return False
         if (needer.serno, pid) in self._inuse:
-            return
+            return True
         pm = process.get_manager()
         coproc = pm.coprocess()
         coproc.start(make_memory_monitor, needer.serno, pid, interval)
         self._inuse[(needer.serno, pid)] = coproc
+        return True
 
     def release_for(self, needer, **kwargs):
         pid = kwargs.get("pid")
@@ -44,8 +45,9 @@ class MemoryMonitorService(Service):
         result = None
         coproc = self._inuse.pop((needer.serno, pid), None)
         if coproc is not None:
-            coproc.interrupt()
+            coproc.terminate()
             result = coproc.wait()
+            coproc.close()
         return result
 
     def close(self):

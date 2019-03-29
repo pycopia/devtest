@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Monitor memory usage of a process on Android.
+"""Monitor CPU usage of a process on Android.
 """
 
 from devtest.os import process
@@ -31,10 +31,10 @@ class CPUMonitorService(Service):
         if not pid:
             return False
         if (needer.serno, pid) in self._inuse:
-            return False
+            return True
         pm = process.get_manager()
         coproc = pm.coprocess()
-        coproc.start(make_memory_monitor, needer.serno, pid, interval)
+        coproc.start(make_cpu_monitor, needer.serno, pid, interval)
         self._inuse[(needer.serno, pid)] = coproc
         return True
 
@@ -45,8 +45,9 @@ class CPUMonitorService(Service):
         result = None
         coproc = self._inuse.pop((needer.serno, pid), None)
         if coproc is not None:
-            coproc.interrupt()
+            coproc.terminate()
             result = coproc.wait()
+            coproc.close()
         return result
 
     def close(self):
@@ -57,7 +58,7 @@ class CPUMonitorService(Service):
 
 
 # Runs from coprocess server
-def make_memory_monitor(serialno, pid, interval):
+def make_cpu_monitor(serialno, pid, interval):
     import io
     import signal
     from devtest.os import cpuinfo
