@@ -62,7 +62,7 @@ class JupyterInterface:
                                                                      height="120px"))
 
         self._run_button = widgets.Button(description="Run", tooltip="Run",
-                                          icon="running", button_style="primary")
+                                          icon="play", button_style="primary")
         self._run_button.on_click(self._on_run)
         self._persist_cb = widgets.Checkbox(value=False,
                                             description="Record Results",

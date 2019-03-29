@@ -137,9 +137,12 @@ class JupyterReport(BaseReport):
 
     def on_logdir_location(self, runner, path=None):
         self._logdir = path
+        relpath = os.sep.join(path.split(os.sep)[-2:])
         self._display_html(
             'Results location: '
-            '<a href="file://{path}/" target="_blank">{path}/</a>'.format(path=path))
+            '<a href="{path}/" target="_blank">{path}/</a>'.format(path=relpath))
+        # Note that this doesn't actually work in the browser. It's just for
+        # display purposes for now.
 
     def on_test_data(self, testcase, data=None):
         # If the same test is run multiple times, add new data to top-level
