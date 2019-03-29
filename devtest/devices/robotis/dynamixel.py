@@ -275,7 +275,7 @@ class Protocol1(Protocol):
     def read_response(self):
         resp = self._dev.read(4)
         h1, h2, mid, length = struct.unpack("BBBB", resp)
-        assert h1 == 0xFF and h2 == 0xFF
+        assert h1 == 0xFF and h2 == 0xFF, "Dynamixel: Protocol1: read_response: bad magic"
         rest = self._dev.read(length)
         ck = (mid + length + sum(rest[:-1]) & 0xFF) ^ 0xFF
         if ck != rest[-1]:
