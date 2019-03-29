@@ -65,6 +65,7 @@ class ProgramNotFound(ManagerError):
 class Process(psutil.Process):
 
     def interrupt(self):
+        logging.debug("Process: interrupt: {}".format(self.pid))
         try:
             self._send_signal(signal.SIGINT)
         except psutil.NoSuchProcess:
@@ -218,11 +219,17 @@ class CoProcess(Process):
     def poll(self):
         """Wait on, and return the status of the coprocess.
         """
-        pid, sts = os.waitpid(self.pid, os.WNOHANG)
+        try:
+            pid, sts = os.waitpid(self.pid, os.WNOHANG)
+        except ChildProcessError:
+            return 0
         if pid == self.pid:
             return sts
+        else:
+            return 0
 
     def wait(self):
+        logging.debug("CoProcess: waiting on: {}".format(self.pid))
         return get_kernel().run(self.a_wait)
 
     async def a_wait(self):
@@ -448,16 +455,18 @@ class ProcessManager:
     def _sigchild(self, sig, frame):
         # need a real list for loop since dict will be mutated.
         for pid in list(self._procs):
-            proc = self._procs[pid]
+            proc = self._procs.get(pid)
+            if proc is None:
+                continue
             try:
                 sts = proc.status()
             except psutil.NoSuchProcess:
-                del self._procs[pid]
+                self._procs.pop(pid, None)
                 # Already waited on somewhere else...
                 logging.notice("SIGCHLD no such process: {}({})".format(proc.progname, proc.pid))
                 return
             if sts == psutil.STATUS_ZOMBIE:
-                del self._procs[pid]
+                self._procs.pop(pid, None)
                 self._zombies[pid] = proc
                 try:
                     es = proc.poll()
