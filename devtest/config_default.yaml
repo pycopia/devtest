@@ -11,11 +11,6 @@ flags:
     repeat: 1
 
 uiautomator:
-    google:
-        runner: "com.github.uiautomator.test/androidx.test.runner.AndroidJUnitRunner"
-        apks:
-            - "apks/app_uiautomator.apk"
-            - "apks/app_uiautomator_test.apk"
     upstream:
         runner: "com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner"
         apks:
