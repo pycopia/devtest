@@ -15,8 +15,6 @@ This is a multi-device, multi-interface, multi-role framework. It can manage
 small scale testing of one device, up to large and complex test scenarios with
 many heterogeneous devices and servers.
 
-NOTE: This is not an officially supported Google product.
-
 
 ## Basic Installation
 
@@ -126,9 +124,6 @@ cloning it with git.
 ```console
 # If you have access to private github repo:
 $ git clone https://github.com/kdart/devtest.git
-
-# If you are inside Google:
-$ git clone sso://user/dart/devtest
 ```
 
 Now change into the new directory.
@@ -234,11 +229,10 @@ dreaming stage.
 
 ```console
 # Create an equipment model, which is a type of equipment.
-devtestadmin eqmodel create "Pixel 2" Google
-devtestadmin eqmodel create "Pixel 2 XL" Google
+devtestadmin eqmodel create "Pixel XL" Google
 
 # Create a specific equipment instance.
-devtestadmin eq create Google "Pixel 2 XL" my_pixel2xl
+devtestadmin eq create Google "Pixel XL" my_pixel2xl
 
 # Oops, forgot the serial number. Update the equipment.
 devtestadmin eq update Google my_pixel2xl  --serno=$ANDROID_SERIAL
