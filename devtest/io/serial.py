@@ -29,8 +29,6 @@ from termios import *
 from io import RawIOBase
 
 
-from devtest.os.ioccom import _IO, _IOW, ULONG, INT
-
 # Indexes for termios list.
 IFLAG = 0
 OFLAG = 1
@@ -62,6 +60,7 @@ CCHARS = ["VINTR", "VQUIT", "VERASE", "VKILL", "VEOF", "VSTART", "VSTOP",
 
 # Extra ioctls for Darwin
 if sys.platform == "darwin":
+    from devtest.os.ioccom import _IO, _IOW, ULONG, INT
 
     TIOCDRAIN = _IO('t', 94)  # wait till output drained
 
@@ -166,7 +165,7 @@ def set_min_time(fd, vmin, vtime, when=TCSANOW):
     old = mode[:]
     mode[CC][VMIN] = int(vmin)
     mode[CC][VTIME] = int(vtime)
-    tcsetattr(fd, when | TCSASOFT, mode)
+    tcsetattr(fd, when, mode)
     return old
 
 
@@ -245,6 +244,12 @@ def rawstdin(meth):
     return wrapcleantty
 
 
+def enumerate_serial_ports():
+    return [f"/dev/{name}" for name in os.listdir("/dev") if (name.startswith("ttyS") or
+                                                              name.startswith("ttyUSB") or
+                                                              name.startswith("ttyACM"))]
+
+
 class SerialPort(RawIOBase):
     """Simple and fast interface to a serial/tty.
     Sets the "exclusive" flag on the tty port so that only one process may open
@@ -255,12 +260,13 @@ class SerialPort(RawIOBase):
     Implements a basic file-like IO to the serial port (read, write, fileno,
     close, and closed attribute).
     """
-    def __init__(self, fname=None, mode="w+b", setup="115200 8N1", config=None):
+    def __init__(self, fname=None, mode="w+b", setup="115200 8N1", config=None,
+                 dsrdtr=False, rtscts=None, inter_byte_timeout=None):
         # In case of exception here, so the close method will still work.
         self._fd = None
         self.name = "unknown"
         if fname:
-            self.open(fname, mode, setup, config)
+            self.open(fname, mode, setup, config, dsrdtr, rtscts, inter_byte_timeout)
 
     def __repr__(self):
         return "{}(fname={!r})".format(self.__class__.__name__, self.name)
@@ -281,7 +287,8 @@ class SerialPort(RawIOBase):
     def closed(self):
         return self._fd is None
 
-    def open(self, fname, mode="w+b", setup="115200 8N1", config=None):
+    def open(self, fname, mode="w+b", setup="115200 8N1", config=None, dsrdtr=False, rtscts=False,
+             inter_byte_timeout=None):
         self.close()
         st = os.stat(fname).st_mode
         if not stat.S_ISCHR(stat.S_IFMT(st)):
@@ -295,17 +302,35 @@ class SerialPort(RawIOBase):
         ioctl(fd, FIOCLEX)
         # set raw mode
         setraw(fd)
-        # set no flow control
-        modembits = array("I", [0])
-        ioctl(fd, TIOCMGET, modembits, True)
-        modembits[0] &= ~(TIOCM_DTR | TIOCM_RTS)
-        ioctl(fd, TIOCMSET, modembits)
-        tcflush(fd, TCIOFLUSH)
+
+        if dsrdtr:
+            modembits = array("I", [0])
+            ioctl(fd, TIOCMGET, modembits, True)
+            modembits[0] |= (TIOCM_DTR | TIOCM_RTS)
+            ioctl(fd, TIOCMSET, modembits)
+        else:  # set no flow control
+            modembits = array("I", [0])
+            ioctl(fd, TIOCMGET, modembits, True)
+            modembits[0] &= ~(TIOCM_DTR | TIOCM_RTS)
+            ioctl(fd, TIOCMSET, modembits)
+
         if config:
             self.config(config)
         else:
             self.set_serial(setup)
+
+        attrs = tcgetattr(fd)
+        cflag = attrs[CFLAG]
+        if rtscts:
+            cflag |= CRTSCTS
+        else:
+            cflag &= ~CRTSCTS
+        attrs[CFLAG] = cflag
+        tcsetattr(self._fd, TCSANOW, attrs)
+        if inter_byte_timeout:
+            self.set_timing(1, inter_byte_timeout)
         self.name = fname
+        self.discard()
 
     def close(self):
         if self._fd is not None:
@@ -322,8 +347,8 @@ class SerialPort(RawIOBase):
     def set_baud(self, baud):
         set_baud(self._fd, baud)
 
-    def set_min_time(self, vmin, vtime, when=TCSANOW):
-        set_min_time(self._fd, vmin, vtime, when=when)
+    def set_timing(self, vmin, vtime, when=TCSANOW):
+        set_min_time(self._fd, vmin, vtime * 10.0, when=when)
 
     def set_serial(self, spec):
         """Quick and easy way to setup the serial port.
@@ -358,14 +383,35 @@ class SerialPort(RawIOBase):
     def send_break(self):
         tcsendbreak(self._fd, 0)
 
+    def flush(self):
+        tcdrain(self._fd)
+
     def discard(self):
-        """Discard IO queue."""
+        """Discard all in IO buffer."""
         tcflush(self._fd, TCIOFLUSH)
 
-    def get_outqueue(self):
+    def discard_input(self):
+        """Discard all in input buffer."""
+        tcflush(self._fd, TCIFLUSH)
+
+    def discard_output(self):
+        """Discard all in output buffer."""
+        tcflush(self._fd, TCOFLUSH)
+
+    reset_input_buffer = discard_input  # pyserial compatibility names
+    reset_output_buffer = discard_output
+
+    @property
+    def out_waiting(self):
         "Return number of bytes in output queue."""
         v = ioctl(self._fd, TIOCOUTQ, b'\x00\x00\x00\x00')
-        return unpack("i", v)[0]
+        return unpack("I", v)[0]
+
+    @property
+    def in_waiting(self):
+        "Return number of bytes in input queue."""
+        v = ioctl(self._fd, TIOCINQ, b'\x00\x00\x00\x00')
+        return unpack("I", v)[0]
 
     def readinto(self, buf):
         data = os.read(self._fd, len(buf))
@@ -373,6 +419,7 @@ class SerialPort(RawIOBase):
         if ld:
             buf[:ld] = data
         return ld
+    #  The read and readline are implemented in base class.
 
     def write(self, data):
         return os.write(self._fd, data)
