@@ -33,7 +33,7 @@ from curio import (Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout,
 _default_kernel = None
 
 
-def get_kernel(selector=None):
+def get_kernel(selector=None, with_monitor=False):
     """Return an curio.Kernel object with our selector.
 
     This is a singleton object.
@@ -41,7 +41,15 @@ def get_kernel(selector=None):
     global _default_kernel
     if _default_kernel is None:
         _get_kernel(selector=selector)
+        if with_monitor or 'CURIOMONITOR' in os.environ:
+            from curio.monitor import Monitor
+            m = Monitor(_default_kernel)
+            _default_kernel._call_at_shutdown(m.close)
     return _default_kernel
+
+
+def shutdown_kernel():
+    _shutdown_kernel()
 
 
 def _get_kernel(selector=None):
