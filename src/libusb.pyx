@@ -1,4 +1,4 @@
-# cython
+# cython: language_level=3
 #
 # Fast, Pythonic interface to libusb, and its asynchronous API.
 
@@ -577,6 +577,7 @@ cdef extern from "libusb.h" nogil:
     void libusb_free_container_id_descriptor(libusb_container_id_descriptor *container_id)
     uint8_t libusb_get_bus_number(libusb_device *dev)
     uint8_t libusb_get_port_number(libusb_device *dev)
+    int libusb_get_device_speed(libusb_device *dev)
 
     libusb_transfer *libusb_alloc_transfer(int iso_packets)
     int libusb_submit_transfer(libusb_transfer *transfer)
@@ -809,6 +810,13 @@ cpdef enum TransferType:
     Interrupt = LIBUSB_TRANSFER_TYPE_INTERRUPT
     BulkStream = LIBUSB_TRANSFER_TYPE_BULK_STREAM
 
+cpdef enum Speed:
+    Unknown = LIBUSB_SPEED_UNKNOWN  # The OS doesn't report or know the device speed.
+    Low = LIBUSB_SPEED_LOW  # The device is operating at low speed (1.5MBit/s).
+    Full = LIBUSB_SPEED_FULL # The device is operating at full speed (12MBit/s).
+    High = LIBUSB_SPEED_HIGH  # The device is operating at high speed (480MBit/s).
+    Super = LIBUSB_SPEED_SUPER  # The device is operating at super speed (5000MBit/s).
+
 
 class UsbError(Exception):
     pass
@@ -880,6 +888,12 @@ cdef class UsbSession:
             self._ctx = NULL
 
     @property
+    def version(self):
+        cdef libusb_version *ver
+        ver = libusb_get_version()
+        return "{:d}.{:d}.{:d}".format(ver.major, ver.minor, ver.micro)
+
+    @property
     def device_count(self):
         cdef ssize_t device_count
         cdef libusb_device **usb_devices
@@ -916,10 +930,14 @@ cdef class UsbSession:
             for i in range(device_count):
                 check = usb_devices[i]
                 err = libusb_get_device_descriptor(check, &desc)
+                if err:
+                    libusb_free_device_list(usb_devices, 1)
+                    raise LibusbError(<int>err)
                 if (desc.idProduct == pid and desc.idVendor == vid):
                     if serial and desc.iSerialNumber:
                         err = libusb_open(check, &handle)
                         if err:
+                            libusb_free_device_list(usb_devices, 1)
                             raise LibusbError(<int>err)
                         langid = get_langid(handle)
                         if langid:
@@ -938,13 +956,38 @@ cdef class UsbSession:
                     else:
                         device = check
                         break
-        libusb_free_device_list(usb_devices, 1)
         if device:
             usbdev = UsbDevice(self)
-            usbdev._device = device
+            usbdev._device = libusb_ref_device(device)
+            libusb_free_device_list(usb_devices, 1)
             return usbdev
         else:
+            libusb_free_device_list(usb_devices, 1)
             return None
+
+    def findall(self, int vid, int pid):
+        cdef ssize_t device_count
+        cdef libusb_device **usb_devices
+        cdef libusb_device *device = NULL
+        cdef libusb_device_descriptor desc
+
+        devs = []
+        device_count = libusb_get_device_list(self._ctx, &usb_devices)
+        if device_count < 0:
+            raise LibusbError(<int>device_count)
+        if device_count > 0:
+            for i in range(device_count):
+                device = usb_devices[i]
+                err = libusb_get_device_descriptor(device, &desc)
+                if err:
+                    libusb_free_device_list(usb_devices, 1)
+                    raise LibusbError(<int>err)
+                if (desc.idProduct == pid and desc.idVendor == vid):
+                    usbdev = UsbDevice(self)
+                    usbdev._device = libusb_ref_device(device)
+                    devs.append(usbdev)
+        libusb_free_device_list(usb_devices, 1)
+        return devs
 
 
 cdef class UsbDevice:
@@ -1077,6 +1120,7 @@ cdef class UsbDevice:
                                                 "UTF-16LE", "strict")
                         self._serial = s
                         return s
+            return None  # Some devices have no serial
         raise UsbUsageError("Operation on closed device.")
 
     @property
@@ -1098,6 +1142,11 @@ cdef class UsbDevice:
     @property
     def port_number(self):
         return <int> libusb_get_port_number(self._device)
+
+    @property
+    def speed(self):
+        ispeed = libusb_get_device_speed(self._device)
+        return Speed(ispeed)
 
     @property
     def Class(self):
