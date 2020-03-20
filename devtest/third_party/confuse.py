@@ -1,4 +1,3 @@
-# This file is part of Confit.
 # Copyright 2015, Adrian Sampson.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -12,19 +11,15 @@
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
 
-# Modified to make it pure Python 3 and remove Windows support. Also clean up
-# some of the code. Factor out exceptions.
-
 """Worry-free YAML configuration files.
 """
 
-import sys
 import os
 import platform
-import pkgutil
 from collections import abc, OrderedDict
 import re
 
+import pkg_resources
 import yaml
 
 from devtest.core import exceptions
@@ -33,6 +28,8 @@ from devtest.core import exceptions
 UNIX_DIR_VAR = 'XDG_CONFIG_HOME'
 UNIX_DIR_FALLBACK = '~/.config'
 MAC_DIR = '~/Library/Application Support'
+WINDOWS_DIR_VAR = 'APPDATA'
+WINDOWS_DIR_FALLBACK = r'~\AppData\Roaming'
 
 CONFIG_FILENAME = 'config.yaml'
 DEFAULT_FILENAME = 'config_default.yaml'
@@ -466,26 +463,6 @@ class Subview(ConfigView):
 # Config file paths, including platform-specific paths and in-package
 # defaults.
 
-# Based on get_root_path from Flask by Armin Ronacher.
-def _package_path(name):
-    """Returns the path to the package containing the named module or
-    None if the path could not be identified (e.g., if
-    ``name == "__main__"``).
-    """
-    loader = pkgutil.get_loader(name)
-    if loader is None or name == b'__main__':
-        return None
-
-    if hasattr(loader, 'get_filename'):
-        filepath = loader.get_filename(name)
-    else:
-        # Fall back to importing the specified module.
-        __import__(name)
-        filepath = sys.modules[name].__file__
-
-    return os.path.dirname(os.path.abspath(filepath))
-
-
 def config_dirs():
     """Return a platform-specific list of candidates for user
     configuration directories on the system.
@@ -501,6 +478,11 @@ def config_dirs():
         paths.append(UNIX_DIR_FALLBACK)
         if UNIX_DIR_VAR in os.environ:
             paths.append(os.environ[UNIX_DIR_VAR])
+
+    elif platform.system() == 'Windows':
+        if WINDOWS_DIR_VAR in os.environ:
+            paths.append(os.environ[WINDOWS_DIR_VAR])
+        paths.append(WINDOWS_DIR_FALLBACK)
 
     else:
         # Assume Unix.
@@ -728,11 +710,9 @@ class Configuration(RootView):
         `modname` if it was given.
         """
         if self.modname:
-            pkg_path = _package_path(self.modname)
-            if pkg_path:
-                filename = os.path.join(pkg_path, DEFAULT_FILENAME)
-                if os.path.isfile(filename):
-                    self.add(ConfigSource(load_yaml(filename), filename, True))
+            filename = pkg_resources.resource_filename(self.modname, DEFAULT_FILENAME)
+            if os.path.isfile(filename):
+                self.add(ConfigSource(load_yaml(filename), filename, True))
 
     def read(self, user=True, defaults=True):
         """Find and read the files for this configuration and set them
@@ -871,9 +851,6 @@ class LazyConfig(Configuration):
         self._lazy_prefix = []
 
 
-# "Validated" configuration views: experimental!
-
-
 REQUIRED = object()
 """A sentinel indicating that there is no default value and an exception
 should be raised when the value is missing.
@@ -883,7 +860,7 @@ should be raised when the value is missing.
 class Template(object):
     """A value template for configuration fields.
 
-    The template works like a type and instructs Confit about how to
+    The template works like a type and instructs Confuse about how to
     interpret a deserialized YAML value. This includes type conversions,
     providing a default value, and validating for errors. For example, a
     filepath type might expand tildes and check that the file exists.

@@ -1,56 +1,37 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """
-Unit tests for devtest.settings module.
+Unit tests for devtest.config module.
 """
 
-import unittest
+import pytest
 
 from devtest import config
 
 
-class ConfigTests(unittest.TestCase):
+@pytest.fixture
+def cf():
+    return config.get_config()
 
 
-    def setUp(self):
-        cf = config.get_config()
-        self._cf = cf
+class TestConfig:
 
-    def test_1get(self):
-        cf = self._cf
-        self.assertTrue(bool(cf))
+    def test_is_singleton(self, cf):
+        newcf = config.get_config()
+        assert id(newcf) == id(cf)
 
-    def test_2same(self):
-        cf = config.get_config()
-        self.assertEqual(id(cf), id(self._cf))
+    def test_read_default(self, cf):
+        assert cf["flags"]["debug"] == 0
+        assert cf["flags"]["verbose"] == 0
 
-    def test_3read_default(self):
-        cf = self._cf
-        self.assertTrue(cf["database"]["url"].startswith("postgres"))
-
-    def test_1flags(self):
-        cf = self._cf
-        cf.flags.debug
+    def test_attribute_access(self, cf):
+        cf.flags.debug = 1
+        assert cf.flags.debug == 1
 
 
-class ConfigUpdateTests(unittest.TestCase):
+class TestConfigUpdate:
 
     def test_with_initdict(self):
         config._CONFIG = None
         cf = config.get_config(initdict={"base.tree": "value"})
         assert cf.base.tree == "value"
-
-
-def test_module():
-    config._test([])
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

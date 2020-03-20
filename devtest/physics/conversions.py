@@ -46,4 +46,10 @@ def dBmToWatts(dbm):
 def WattsTodBm(w):
     return 10.0 * math.log10(w / 0.001)
 
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
+
+def degCToDegF(t):
+    return (t * 9) / 5 + 32
+
+
+def degFToDegC(t):
+    return (t - 32) * 5 / 9

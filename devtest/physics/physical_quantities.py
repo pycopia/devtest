@@ -42,7 +42,7 @@ from functools import reduce
 
 from numpy.core import umath
 
-from devtest.physics import numberdict
+from . import numberdict
 
 
 class PhysicalQuantity:
@@ -51,12 +51,12 @@ class PhysicalQuantity:
 
     Constructor:
 
-    - PhysicalQuantity(value, unit), where `value is a number of
-        arbitrary type and `unit` is a string containing the unit name.
+    - PhysicalQuantity(value, unit), where `value` is a number of
+      arbitrary type and `unit` is a string containing the unit name.
 
     - PhysicalQuantity(string), where `string` contains both the value
-        and the unit. This form is provided to make interactive use more
-        convenient.
+      and the unit. This form is provided to make interactive use more
+      convenient.
 
     PhysicalQuantity instances allow addition, subtraction,
     multiplication, and division with each other as well as
@@ -78,22 +78,22 @@ class PhysicalQuantity:
         self._space = space
         if unit is not None:
             self.value = float(value)
-            self.unit = _findUnit(unit)
+            self.unit = _find_unit(unit)
         else:
             if isinstance(value, str):
                 match = PhysicalQuantity._NUMBER_RE.match(value)
                 if match is None:
-                    raise TypeError('Not a number or number with unit')
+                    raise TypeError(f'Not a number or number with unit: {value!r}')
                 self.value = float(match.group(1))
                 self._space = match.group(2)
-                self.unit = _findUnit(match.group(3))
+                self.unit = _find_unit(match.group(3))
             elif isinstance(value, PhysicalQuantity):
                 self.value = value.value
                 self.unit = value.unit
                 self._space = value._space
             elif isinstance(value, tuple):
                 self.value = float(value[0])
-                self.unit = _findUnit(value[1])
+                self.unit = _find_unit(value[1])
                 try:
                     self._space = value[2]
                 except IndexError:
@@ -102,11 +102,11 @@ class PhysicalQuantity:
                 raise ValueError("PhysicalQuantity can't use {!r}".format(value))
 
     def __str__(self):
-        return "{}{}{}".format(str(self.value), self._space, self.unit.name())
+        return "{}{}{}".format(str(self.value), self._space, self.unit.name)
 
     def __repr__(self):
         return "%s(%r, %r, %r)" % (self.__class__.__name__,
-                                   self.value, self.unit.name(), self._space)
+                                   self.value, self.unit.name, self._space)
 
     # sometimes we need space printed, and sometimes we dont.
     def nospace(self):
@@ -122,7 +122,7 @@ class PhysicalQuantity:
         if not isPhysicalQuantity(other):
             raise TypeError('Incompatible types')
         new_value = (sign1 * self.value + sign2 * other.value *
-                     other.unit.conversionFactorTo(self.unit))
+                     other.unit.conversion_factor_to(self.unit))
         return self.__class__(new_value, self.unit, self._space)
 
     def __add__(self, other):
@@ -137,29 +137,29 @@ class PhysicalQuantity:
         return self._sum(other, -1, 1)
 
     def __eq__(self, other):
-        return self.value == other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value == other.value * other.unit.conversion_factor_to(self.unit)
 
     def __ne__(self, other):
-        return self.value != other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value != other.value * other.unit.conversion_factor_to(self.unit)
 
     def __lt__(self, other):
-        return self.value < other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value < other.value * other.unit.conversion_factor_to(self.unit)
 
     def __le__(self, other):
-        return self.value <= other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value <= other.value * other.unit.conversion_factor_to(self.unit)
 
     def __gt__(self, other):
-        return self.value > other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value > other.value * other.unit.conversion_factor_to(self.unit)
 
     def __ge__(self, other):
-        return self.value >= other.value * other.unit.conversionFactorTo(self.unit)
+        return self.value >= other.value * other.unit.conversion_factor_to(self.unit)
 
     def __mul__(self, other):
         if not isPhysicalQuantity(other):
             return self.__class__(self.value * other, self.unit, self._space)
         value = self.value * other.value
         unit = self.unit * other.unit
-        if unit.isDimensionless():
+        if unit.is_dimensionless():
             return value * unit.factor
         else:
             return self.__class__(value, unit, self._space)
@@ -171,7 +171,7 @@ class PhysicalQuantity:
             return self.__class__(self.value / other, self.unit, self._space)
         value = self.value / other.value
         unit = self.unit / other.unit
-        if unit.isDimensionless():
+        if unit.is_dimensionless():
             return value * unit.factor
         else:
             return self.__class__(value, unit, self._space)
@@ -183,7 +183,7 @@ class PhysicalQuantity:
             return self.__class__(float(other) / self.value, pow(self.unit, -1), self._space)
         value = other.value / self.value
         unit = other.unit / self.unit
-        if unit.isDimensionless():
+        if unit.is_dimensionless():
             return value * unit.factor
         else:
             return self.__class__(value, unit, self._space)
@@ -209,16 +209,16 @@ class PhysicalQuantity:
     def __bool__(self):
         return self.value != 0
 
-    def convertToUnit(self, unit):
+    def to_unit(self, unit):
         """Changes the unit to `unit` and adjusts the value such that
         the combination is equivalent. The new unit is by a string containing
         its name. The new unit must be compatible with the previous unit
         of the object."""
-        unit = _findUnit(unit)
-        self.value = _convertValue(self.value, self.unit, unit)
+        unit = _find_unit(unit)
+        self.value = _convert_value(self.value, self.unit, unit)
         self.unit = unit
 
-    def inUnitsOf(self, *units):
+    def in_units_of(self, *units):
         """Returns one or more PhysicalQuantity objects that express
         the same physical quantity in different units. The units are
         specified by strings containing their names. The units must be
@@ -232,10 +232,10 @@ class PhysicalQuantity:
         systems like hour/minute/second. The original object will not
         be changed.
         """
-        units = list(map(_findUnit, units))
+        units = list(map(_find_unit, units))
         if len(units) == 1:
             unit = units[0]
-            value = _convertValue(self.value, self.unit, unit)
+            value = _convert_value(self.value, self.unit, unit)
             return self.__class__(value, unit, self._space)
         else:
             units.sort()
@@ -243,7 +243,7 @@ class PhysicalQuantity:
             value = self.value
             unit = self.unit
             for i in range(len(units) - 1, -1, -1):
-                value = value * unit.conversionFactorTo(units[i])
+                value = value * unit.conversion_factor_to(units[i])
                 if i == 0:
                     rounded = value
                 else:
@@ -254,7 +254,7 @@ class PhysicalQuantity:
             return tuple(result)
 
     # Contributed by Berthold Hoellmann
-    def inBaseUnits(self):
+    def in_base_units(self):
         new_value = self.value * self.unit.factor
         num = ''
         denom = ''
@@ -275,28 +275,28 @@ class PhysicalQuantity:
             num = num[1:]
         return self.__class__(new_value, num + denom, self._space)
 
-    def isCompatible(self, unit):
-        unit = _findUnit(unit)
-        return self.unit.isCompatible(unit)
+    def is_compatible(self, unit):
+        unit = _find_unit(unit)
+        return self.unit.is_compatible(unit)
 
     def sqrt(self):
         return pow(self, 0.5)
 
     def sin(self):
-        if self.unit.isAngle():
-            return umath.sin(self.value * self.unit.conversionFactorTo(_unit_table['rad']))
+        if self.unit.is_angle():
+            return umath.sin(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of sin must be an angle')
 
     def cos(self):
-        if self.unit.isAngle():
-            return umath.cos(self.value * self.unit.conversionFactorTo(_unit_table['rad']))
+        if self.unit.is_angle():
+            return umath.cos(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of cos must be an angle')
 
     def tan(self):
-        if self.unit.isAngle():
-            return umath.tan(self.value * self.unit.conversionFactorTo(_unit_table['rad']))
+        if self.unit.is_angle():
+            return umath.tan(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of tan must be an angle')
 
@@ -314,7 +314,7 @@ class PhysicalUnit:
         self.powers = powers
 
     def __str__(self):
-        return '<PhysicalUnit ' + self.name() + '>'
+        return '<PhysicalUnit ' + self.name + '>'
 
     def _check(self, other):
         if self.powers != other.powers:
@@ -411,15 +411,15 @@ class PhysicalUnit:
                     raise TypeError('Illegal exponent')
         raise TypeError('Only integer and inverse integer exponents allowed')
 
-    def conversionFactorTo(self, other):
+    def conversion_factor_to(self, other):
         if self.powers != other.powers:
             raise TypeError('Incompatible units')
         if self.offset != other.offset and self.factor != other.factor:
             raise TypeError('Unit conversion (%s to %s) cannot be expressed '
-                            'as a simple multiplicative factor' % (self.name(), other.name()))
+                            'as a simple multiplicative factor' % (self.name, other.name))
         return self.factor / other.factor
 
-    def conversionTupleTo(self, other):  # added 1998/09/29 GPW
+    def conversion_tuple_to(self, other):  # added 1998/09/29 GPW
         if self.powers != other.powers:
             raise TypeError('Incompatible units')
 
@@ -442,19 +442,16 @@ class PhysicalUnit:
         offset = self.offset - (other.offset * other.factor / self.factor)
         return (factor, offset)
 
-    def isCompatible(self, other):  # added 1998/10/01 GPW
+    def is_compatible(self, other):  # added 1998/10/01 GPW
         return self.powers == other.powers
 
-    def isDimensionless(self):
+    def is_dimensionless(self):
         return not reduce(lambda a, b: a or b, self.powers)
 
-    def isAngle(self):
+    def is_angle(self):
         return self.powers[7] == 1 and reduce(lambda a, b: a + b, self.powers) == 1
 
-    def setName(self, name):
-        self.names = numberdict.NumberDict(default=0)
-        self.names[name] = 1
-
+    @property
     def name(self):
         num = ''
         denom = ''
@@ -474,6 +471,11 @@ class PhysicalUnit:
             num = num[1:]
         return num + denom
 
+    @name.setter
+    def name(self, name):
+        self.names = numberdict.NumberDict(default=0)
+        self.names[name] = 1
+
 
 # Type checks
 
@@ -488,15 +490,9 @@ def isPhysicalQuantity(x):
 
 # Helper functions
 
-def _findUnit(unit):
-    if isinstance(unit, str):
+def _find_unit(unit):
+    if isinstance(unit, (str, bytes)):
         unit = eval(unit, _unit_table)
-        for cruft in ['__builtins__', '__args__']:
-            try:
-                del _unit_table[cruft]
-            except KeyError:
-                pass
-
     if not isPhysicalUnit(unit):
         raise TypeError(str(unit) + ' is not a unit')
     return unit
@@ -509,8 +505,8 @@ def _round(x):
         return umath.ceil(x)
 
 
-def _convertValue(value, src_unit, target_unit):
-    (factor, offset) = src_unit.conversionTupleTo(target_unit)
+def _convert_value(value, src_unit, target_unit):
+    (factor, offset) = src_unit.conversion_tuple_to(target_unit)
     return (value + offset) * factor
 
 
@@ -561,7 +557,7 @@ for unit in _base_units:
     _unit_table[unit[0]] = unit[1]
 
 
-def _addUnit(name, unit):
+def _add_unit(name, unit):
     if name in _unit_table:
         raise KeyError('Unit ' + name + ' already defined')
     if isinstance(unit, str):
@@ -571,144 +567,149 @@ def _addUnit(name, unit):
                 del _unit_table[cruft]
             except KeyError:
                 pass
-    unit.setName(name)
+    unit.name = name
     _unit_table[name] = unit
 
 
-def _addPrefixed(unit):
+def _add_prefixed(unit):
     for prefix in _prefixes:
         name = prefix[0] + unit
-        _addUnit(name, prefix[1] * _unit_table[unit])
+        _add_unit(name, prefix[1] * _unit_table[unit])
 
 
 # SI derived units; these automatically get prefixes
 
 _unit_table['kg'] = PhysicalUnit('kg', 1., [0, 1, 0, 0, 0, 0, 0, 0, 0])
 
-_addUnit('Hz', '1./s')  # Hertz
-_addUnit('N', 'm*kg/s**2')  # Newton
-_addUnit('Pa', 'N/m**2')  # Pascal
-_addUnit('J', 'N*m')  # Joule
-_addUnit('W', 'J/s')  # Watt
-_addUnit('C', 's*A')  # Coulomb
-_addUnit('V', 'W/A')  # Volt
-_addUnit('F', 'C/V')  # Farad
-_addUnit('ohm', 'V/A')  # Ohm
-_addUnit('S', 'A/V')  # Siemens
-_addUnit('Wb', 'V*s')  # Weber
-_addUnit('T', 'Wb/m**2')  # Tesla
-_addUnit('H', 'Wb/A')  # Henry
-_addUnit('lm', 'cd*sr')  # Lumen
-_addUnit('lx', 'lm/m**2')  # Lux
-_addUnit('Bq', '1./s')  # Becquerel
-_addUnit('Gy', 'J/kg')  # Gray
-_addUnit('Sv', 'J/kg')  # Sievert
+_add_unit('Hz', '1./s')  # Hertz
+_add_unit('N', 'm*kg/s**2')  # Newton
+_add_unit('Pa', 'N/m**2')  # Pascal
+_add_unit('J', 'N*m')  # Joule
+_add_unit('W', 'J/s')  # Watt
+_add_unit('C', 's*A')  # Coulomb
+_add_unit('V', 'W/A')  # Volt
+_add_unit('F', 'C/V')  # Farad
+_add_unit('ohm', 'V/A')  # Ohm
+_add_unit('S', 'A/V')  # Siemens
+_add_unit('Wb', 'V*s')  # Weber
+_add_unit('T', 'Wb/m**2')  # Tesla
+_add_unit('H', 'Wb/A')  # Henry
+_add_unit('lm', 'cd*sr')  # Lumen
+_add_unit('lx', 'lm/m**2')  # Lux
+_add_unit('Bq', '1./s')  # Becquerel
+_add_unit('Gy', 'J/kg')  # Gray
+_add_unit('Sv', 'J/kg')  # Sievert
 
 del _unit_table['kg']
 
 for unit in list(_unit_table.keys()):
-    _addPrefixed(unit)
+    _add_prefixed(unit)
 
 # Fundamental constants
 
 _unit_table['pi'] = umath.pi
-_addUnit('c', '299792458.*m/s')  # speed of light
-_addUnit('mu0', '4.e-7*pi*N/A**2')  # permeability of vacuum
-_addUnit('eps0', '1/mu0/c**2')  # permittivity of vacuum
-_addUnit('Grav', '6.67259e-11*m**3/kg/s**2')  # gravitational constant
-_addUnit('hplanck', '6.6260755e-34*J*s')  # Planck constant
-_addUnit('hbar', 'hplanck/(2*pi)')  # Planck constant / 2pi
-_addUnit('e', '1.60217733e-19*C')  # elementary charge
-_addUnit('me', '9.1093897e-31*kg')  # electron mass
-_addUnit('mp', '1.6726231e-27*kg')  # proton mass
-_addUnit('Nav', '6.0221367e23/mol')  # Avogadro number
-_addUnit('k', '1.380658e-23*J/K')  # Boltzmann constant
+_add_unit('c', '299792458.*m/s')  # speed of light
+_add_unit('mu0', '4.e-7*pi*N/A**2')  # permeability of vacuum
+_add_unit('eps0', '1/mu0/c**2')  # permittivity of vacuum
+_add_unit('Grav', '6.67259e-11*m**3/kg/s**2')  # gravitational constant
+_add_unit('hplanck', '6.6260755e-34*J*s')  # Planck constant
+_add_unit('hbar', 'hplanck/(2*pi)')  # Planck constant / 2pi
+_add_unit('e', '1.60217733e-19*C')  # elementary charge
+_add_unit('me', '9.1093897e-31*kg')  # electron mass
+_add_unit('mp', '1.6726231e-27*kg')  # proton mass
+_add_unit('Nav', '6.0221367e23/mol')  # Avogadro number
+_add_unit('k', '1.380658e-23*J/K')  # Boltzmann constant
 
 # Time units
 
-_addUnit('min', '60*s')  # minute
-_addUnit('h', '60*min')  # hour
-_addUnit('d', '24*h')  # day
-_addUnit('wk', '7*d')  # week
-_addUnit('yr', '365.25*d')  # year
+_add_unit('min', '60*s')  # minute
+_add_unit('h', '60*min')  # hour
+_add_unit('d', '24*h')  # day
+_add_unit('wk', '7*d')  # week
+_add_unit('yr', '365.25*d')  # year
 
 # Length units
 
-_addUnit('inch', '2.54*cm')  # inch
-_addUnit('ft', '12*inch')  # foot
-_addUnit('yd', '3*ft')  # yard
-_addUnit('mi', '5280.*ft')  # (British) mile
-_addUnit('nmi', '1852.*m')  # Nautical mile
-_addUnit('Ang', '1.e-10*m')  # Angstrom
-_addUnit('lyr', 'c*yr')  # light year
-_addUnit('Bohr', '4*pi*eps0*hbar**2/me/e**2')  # Bohr radius
+_add_unit('inch', '2.54*cm')  # inch
+_add_unit('in', '2.54*cm')  # inch alias
+_add_unit('ft', '12*inch')  # foot
+_add_unit('yd', '3*ft')  # yard
+_add_unit('mi', '5280.*ft')  # (British) mile
+_add_unit('nmi', '1852.*m')  # Nautical mile
+_add_unit('Ang', '1.e-10*m')  # Angstrom
+_add_unit('lyr', 'c*yr')  # light year
+_add_unit('Bohr', '4*pi*eps0*hbar**2/me/e**2')  # Bohr radius
 
 # Area units
 
-_addUnit('ha', '10000*m**2')  # hectare
-_addUnit('acres', 'mi**2/640')  # acre
+_add_unit('ha', '10000*m**2')  # hectare
+_add_unit('acres', 'mi**2/640')  # acre
 
 # Volume units
 
-_addUnit('l', 'dm**3')  # liter
-_addUnit('dl', '0.1*l')
-_addUnit('cl', '0.01*l')
-_addUnit('ml', '0.001*l')
-_addUnit('tsp', '4.92892159375*ml')  # teaspoon
-_addUnit('tbsp', '3*tsp')  # tablespoon
-_addUnit('floz', '2*tbsp')  # fluid ounce
-_addUnit('cup', '8*floz')  # cup
-_addUnit('pt', '16*floz')  # pint
-_addUnit('qt', '2*pt')  # quart
-_addUnit('galUS', '4*qt')  # US gallon
-_addUnit('galUK', '4.54609*l')  # British gallon
+_add_unit('l', 'dm**3')  # liter
+_add_unit('dl', '0.1*l')
+_add_unit('cl', '0.01*l')
+_add_unit('ml', '0.001*l')
+_add_unit('tsp', '4.92892159375*ml')  # teaspoon
+_add_unit('tbsp', '3*tsp')  # tablespoon
+_add_unit('floz', '2*tbsp')  # fluid ounce
+_add_unit('cup', '8*floz')  # cup
+_add_unit('pt', '16*floz')  # pint
+_add_unit('qt', '2*pt')  # quart
+_add_unit('galUS', '4*qt')  # US gallon
+_add_unit('galUK', '4.54609*l')  # British gallon
 
 # Mass units
 
-_addUnit('amu', '1.6605402e-27*kg')  # atomic mass units
-_addUnit('oz', '28.349523125*g')  # ounce
-_addUnit('lb', '16*oz')  # pound
-_addUnit('ton', '2000*lb')  # ton
+_add_unit('amu', '1.6605402e-27*kg')  # atomic mass units
+_add_unit('oz', '28.349523125*g')  # ounce
+_add_unit('lb', '16*oz')  # pound
+_add_unit('ton', '2000*lb')  # ton
 
 # Force units
 
-_addUnit('dyn', '1.e-5*N')  # dyne (cgs unit)
+_add_unit('dyn', '1.e-5*N')  # dyne (cgs unit)
+_add_unit('lbF', 'lb*32.17405*ft/s**2')  # pound-force
+_add_unit('ozF', 'lbF*0.0625')  # ounce-force
+_add_unit('kgF', '9.80665*N')  # kilogram-force
+_add_unit('gF', '0.00980665*N')  # gram-force
 
 # Energy units
 
-_addUnit('erg', '1.e-7*J')  # erg (cgs unit)
-_addUnit('eV', 'e*V')  # electron volt
-_addPrefixed('eV')
-_addUnit('Hartree', 'me*e**4/16/pi**2/eps0**2/hbar**2')
-_addUnit('invcm', 'hplanck*c/cm')  # Wavenumbers/inverse cm
-_addUnit('Ken', 'k*K')  # Kelvin as energy unit
-_addUnit('cal', '4.184*J')  # thermochemical calorie
-_addUnit('kcal', '1000*cal')  # thermochemical kilocalorie
-_addUnit('cali', '4.1868*J')  # international calorie
-_addUnit('kcali', '1000*cali')  # international kilocalorie
-_addUnit('Btu', '1055.05585262*J')  # British thermal unit
+_add_unit('erg', '1.e-7*J')  # erg (cgs unit)
+_add_unit('eV', 'e*V')  # electron volt
+_add_prefixed('eV')
+_add_unit('Hartree', 'me*e**4/16/pi**2/eps0**2/hbar**2')
+_add_unit('invcm', 'hplanck*c/cm')  # Wavenumbers/inverse cm
+_add_unit('Ken', 'k*K')  # Kelvin as energy unit
+_add_unit('cal', '4.184*J')  # thermochemical calorie
+_add_unit('kcal', '1000*cal')  # thermochemical kilocalorie
+_add_unit('cali', '4.1868*J')  # international calorie
+_add_unit('kcali', '1000*cali')  # international kilocalorie
+_add_unit('Btu', '1055.05585262*J')  # British thermal unit
 
 # Power units
 
-_addUnit('hp', '745.7*W')  # horsepower
+_add_unit('hp', '745.7*W')  # horsepower
 
 # Pressure units
 
-_addUnit('bar', '1.e5*Pa')  # bar (cgs unit)
-_addUnit('atm', '101325.*Pa')  # standard atmosphere
-_addUnit('torr', 'atm/760')  # torr = mm of mercury
-_addUnit('psi', '6894.75729317*Pa')  # pounds per square inch
+_add_unit('bar', '1.e5*Pa')  # bar (cgs unit)
+_add_unit('atm', '101325.*Pa')  # standard atmosphere
+_add_unit('torr', 'atm/760')  # torr = mm of mercury
+_add_unit('psi', '6894.75729317*Pa')  # pounds per square inch
 
 # Angle units
 
-_addUnit('deg', 'pi*rad/180')  # degrees
+_add_unit('deg', 'pi*rad/180')  # degrees
 
-# Temperature units -- can't use the 'eval' trick that _addUnit provides
+# Temperature units -- can't use the 'eval' trick that _add_unit provides
 # for degC and degF because you can't add units
-kelvin = _findUnit('K')
-_addUnit('degR', '(5./9.)*K')  # degrees Rankine
-_addUnit('degC', PhysicalUnit(None, 1.0, kelvin.powers, 273.15))
-_addUnit('degF', PhysicalUnit(None, 5. / 9., kelvin.powers, 459.67))
+kelvin = _find_unit('K')
+_add_unit('degR', '(5./9.)*K')  # degrees Rankine
+_add_unit('degC', PhysicalUnit(None, 1.0, kelvin.powers, 273.15))
+_add_unit('degF', PhysicalUnit(None, 5. / 9., kelvin.powers, 459.67))
 del kelvin
 
 # binary prefixes
@@ -721,11 +722,11 @@ _prefixes.extend([
 ])
 
 # counted objects used in technology
-_addUnit('n', '1.*mol')  # An N count of anything unitless (packets, etc.)
-_addUnit('b', 'mol')  # bit
-_addUnit('B', '8*b')  # Byte
-_addPrefixed('b')
-_addPrefixed('B')
+_add_unit('n', '1.*mol')  # An N count of anything unitless (packets, etc.)
+_add_unit('b', 'mol')  # bit
+_add_unit('B', '8*b')  # Byte
+_add_prefixed('b')
+_add_prefixed('B')
 
 
 if __name__ == '__main__':
@@ -733,31 +734,31 @@ if __name__ == '__main__':
     big_l = PhysicalQuantity(10., 'km')
     print(big_l + small_l)
     t = PhysicalQuantity(314159., 's')
-    print(t.inUnitsOf('d', 'h', 'min', 's'))
+    print(t.in_units_of('d', 'h', 'min', 's'))
 
     p = PhysicalQuantity  # just a shorthand...
 
     print("add us:", p("1.0", "us") + p("1.0", "us"))  # "µs") )
     e = p('2.7 Hartree*Nav')
-    e.convertToUnit('kcal/mol')
+    e.to_unit('kcal/mol')
     print(e)
-    print(e.inBaseUnits())
+    print(e.in_base_units())
 
     freeze = p('0 degC')
-    print(freeze.inUnitsOf('degF'))
+    print(freeze.in_units_of('degF'))
 
     kb = p(1000, "b")
     r = kb / p(1.0, "s")
     print(r)
-    print(r.inUnitsOf("B/s"))
+    print(r.in_units_of("B/s"))
 
     Kibit = p(1.0, "Kib")
     print(Kibit)
-    print(Kibit.inUnitsOf("B"))
-    assert Kibit.inUnitsOf("B").value == 1024 / 8
+    print(Kibit.in_units_of("B"))
+    assert Kibit.in_units_of("B").value == 1024 / 8
     # 100 kB = 97.65625 KiB
-    print(p(100, "kB").inUnitsOf("KiB"))
-    assert p(100, "kB").inUnitsOf("Kib").value == 97.65625 * 8
+    print(p(100, "kB").in_units_of("KiB"))
+    assert p(100, "kB").in_units_of("Kib").value == 97.65625 * 8
 
     PACKET = p(1.0, "n")
 
@@ -765,8 +766,8 @@ if __name__ == '__main__':
     print(packets / p(1., "s"))
     avgpack = p(40., "B") / PACKET
     avgrate = (packets * avgpack) / p(1., "s")
-    print(avgrate.inUnitsOf("B/s"))
-    assert avgrate.inUnitsOf("b/s").value == (12.0 * 40.0 * 8)
+    print(avgrate.in_units_of("B/s"))
+    assert avgrate.in_units_of("b/s").value == (12.0 * 40.0 * 8)
     print(PhysicalQuantity((10., "m")))
     assert PhysicalQuantity(avgrate) == avgrate
     assert str(PhysicalQuantity("10ms")) == "10.0ms"

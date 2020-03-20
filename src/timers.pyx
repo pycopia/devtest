@@ -1,5 +1,5 @@
 # python wrapper for interruptable sleepers, and timerfd interface.
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
+# cython: language_level=3
 #
 #    Copyright (C) 2014-  Keith Dart <keith@kdart.com>
 #

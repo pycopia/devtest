@@ -25,12 +25,37 @@ import atexit
 from devtest import logging  # This must be first
 from devtest.os import eventloop
 
-from curio import (Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout, # noqa
-                   Event, SignalEvent, timeout_after, TaskGroup, run_in_thread,
-                   block_in_thread)
+# Re-exported curio objects.
+from curio import (Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout, Queue, # noqa
+                   UniversalEvent, Event, Lock, RLock, timeout_after, TaskGroup,
+                   run_in_thread, block_in_thread)
 
+
+__all__ = ["get_kernel", "get_new_kernel", "Kernel", "sleep", "spawn", "CancelledError",
+           "TaskError", "TaskTimeout", "Queue", "Event", "SignalEvent", "Lock", "RLock",
+           "timeout_after", "TaskGroup", "run_in_thread", "block_in_thread"]
 
 _default_kernel = None
+
+
+class SignalEvent(UniversalEvent):
+    def __init__(self, *signos):
+        super().__init__()
+        self._old = old = {}
+        for signo in signos:
+            orig = signal.signal(signo, self._handler)
+            old[signo] = orig
+
+    def _handler(self, signo, frame):
+        self.set()
+
+    def __del__(self):
+        while self._old:
+            signo, handler = self._old.popitem()
+            try:
+                signal.signal(signo, handler)
+            except TypeError:  # spurious TypeError happens during shutdown.
+                pass
 
 
 def get_kernel(selector=None, with_monitor=False):

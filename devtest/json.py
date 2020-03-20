@@ -38,6 +38,7 @@ class Encoder(json.JSONEncoder):
     """Encodes Python objects into JSON, and provides means to encode other
     Python objects.
     """
+
     def __init__(self):
         super(Encoder, self).__init__(ensure_ascii=False)
 
@@ -52,6 +53,7 @@ class Decoder(json.JSONDecoder):
     """Decodes JSON into Python objects, and reconstitutes additional Python
     objects that were encoded by the encoder in this module.
     """
+
     def __init__(self):
         super(Decoder, self).__init__(object_hook=self._object_hook)
 

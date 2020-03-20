@@ -18,9 +18,23 @@ adds some new ones.
 
 from __future__ import generator_stop
 
-from curio.io import _Fd, StreamBase, FileStream, SocketStream, Socket  # noqa
-from curio.channel import Connection, Channel
-from curio.file import aopen, AsyncFile
+from curio.traps import _read_wait  # noqa
+from curio.io import StreamBase, FileStream, SocketStream, Socket, WantRead, WantWrite  # noqa
+from curio.channel import Connection, Channel  # noqa
+
+
+__all__ = ["TimerStream", "FileStream", "SocketStream", "Connection", "Channel"]
+
+
+class TimerStream(StreamBase):
+    """Stream wrapper for an FDTimer.
+    """
+    async def _read(self, maxbytes=-1):
+        while True:
+            try:
+                return self._file.read()
+            except WantRead:
+                await _read_wait(self._fileno)
 
 
 def _test(argv):

@@ -1,4 +1,5 @@
 # Fast ring buffer for Python
+# cython: language_level=3
 
 from libc cimport stdint
 from libc.stddef cimport size_t

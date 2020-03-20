@@ -1,7 +1,9 @@
 resultsdir: "$HOME/tmp/resultsdir"
 
 database:
-    url: "postgresql://devtest@localhost/devtest"
+    select: "local"
+    local:
+        url: "postgresql://devtest@localhost/devtest"
 
 flags:
     debug: 0

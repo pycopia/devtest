@@ -10,37 +10,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Configuration object and factory function.
+r"""Configuration object and factory function.
 
-Based on the confit YAML configuration module.
-
-http://confit.readthedocs.org/en/latest/
+Based on the confuse YAML configuration module.
 
 Config files are merged together from various sources. The default values are
 embedded here in the file config_default.yaml. User's may override, or set
-additional values, by placing a "config.yaml" file in one of the following
-directoryies.
+additional values, by placing a "config.yaml" file in the user configuration directory.
 
-- ~/.config/devtest/
+The user configuration directory would be:
+
+Linux:
+    `~/.config/devtest/`
+
+MacOS:
+    `~/.config/devtest/`
+    or
+    `~/Library/Application Support/devtest/`
+
+Windows:
+    `~\\AppData\\Roaming\\devtest\\`
 """
 
-import sys
-import os
 from copy import deepcopy
 from collections import ChainMap
 
-from devtest.third_party import confit
+from devtest.third_party import confuse
 
 
 _CONFIG = None  # singleton instance.
 
 
-class AttributeChainMap(ChainMap):
+class Config(ChainMap):
     """Top-level configuration object.
 
-    Used by most of the rest of the framework.
-    A subclass of ChainMap, it allows chaining other configurations later.
+    A Singleton configuration object.
+    A subclass of :py:class:`collections.ChainMap`, it allows chaining other configurations later.
     """
+
     def __init__(self, *maps):
         self.__dict__["maps"] = list(maps) or [{}]
 
@@ -49,7 +56,7 @@ class AttributeChainMap(ChainMap):
             return self.__getitem__(name)
         except KeyError:
             raise AttributeError(
-                "AttributeChainMap: No attribute or key {!r}".format(name)) from None
+                "Config: No attribute or key {!r}".format(name)) from None
 
     def __setattr__(self, name, val):
         self.__setitem__(name, val)
@@ -57,7 +64,7 @@ class AttributeChainMap(ChainMap):
     def __delattr__(self, name):
         self.__delitem__(name)
 
-    # Behave like defaultdict, returning empty ConfigDict by default.
+    # Behaves like defaultdict, returning empty ConfigDict by default.
     def __missing__(self, key):
         value = ConfigDict()
         self.__setitem__(key, value)
@@ -73,12 +80,13 @@ class ConfigDict(dict):
     Also features "reaching into" sub-containers using a dot-delimited syntax
     for the key:
 
-        Python3> cf = config.get_config()
-        Python3> print(cf.flags.debug)
+        >>> cf = config.get_config()
+        >>> print(cf.flags.debug)
         0
-        Python3> cf["flags.debug"]
+        >>> cf["flags.debug"]
         0
     """
+
     def __init__(self, *args, **kwargs):
         self.__dict__["_depth"] = kwargs.pop("_depth", 0)
         dict.__init__(self, *args, **kwargs)
@@ -145,16 +153,22 @@ def get_config(initdict=None, _filename=None, **kwargs):
     Returns a Configuration instance containing configuration parameters. An
     extra dictionary may be merged in with the 'initdict' parameter.  And
     finally, extra options may also be added with keyword parameters.
+
+    There is only one Config object in the program, and this will return it. This is the primary
+    interface to obtain it.
+
+    Returns:
+        A :class:`Config` instance.
     """
     global _CONFIG
     if _CONFIG is None:
-        cf = confit.Configuration("devtest", "devtest")
+        cf = confuse.Configuration("devtest", "devtest.config")
         if _filename:
             cf.set_file(_filename)
         if isinstance(initdict, dict):
             cf.add(initdict)
         cf.add(kwargs)
-        _CONFIG = AttributeChainMap(cf.flatten(dclass=ConfigDict))
+        _CONFIG = Config(cf.flatten(dclass=ConfigDict))
     return _CONFIG
 
 
@@ -173,52 +187,24 @@ def show_config(cf, _path=None):
         path.pop(-1)
 
 
-def get_testcase_config(testclass):
-    """Add configuration specific to a class.
-
-    Will load YAML files that are specific to a test case class. If there is a
-    YAML file in the same directory as the test case, with the same name as the
-    test case, it will get a configuration with that data merged in.
-
-    If there is a file named "config_default.yaml" in the directory then that is
-    also merged in, for all tests contained there. The `confit` module handles
-    that part.
-
-    Arguments:
-        testclass: a test class object (not instance).
-
-    Returns:
-        New AttributeChainMap with added configuration.
-    """
-    modname = testclass.__module__
-    newcf = confit.Configuration(modname.split(".")[0], modname)
-    mod = sys.modules[modname]
-    filename = os.path.join(os.path.dirname(mod.__file__),
-                            testclass.__name__ + ".yaml")
-    if os.path.exists(filename):
-        newcf.set_file(filename)
-    cf = get_config()
-    return cf.new_child(newcf.flatten(dclass=ConfigDict))
-
-
 def get_package_config(packagename):
     """Add configuration specific to a package.
 
     Arguments:
         packagename: name of a package. If the package directory contains a file named
-        "config_default.yaml" the content will be loaded.
+                     "config_default.yaml" the content will be loaded.
 
     Returns:
-        New AttributeChainMap with added configuration.
+        New :class:`Config` with added configuration.
     """
-    newcf = confit.Configuration(packagename, packagename)
+    newcf = confuse.Configuration("devtest", packagename)
     cf = get_config()
     return cf.new_child(newcf.flatten(dclass=ConfigDict))
 
 
-def _test(argv):
-    global _CONFIG
+if __name__ == "__main__":
     # Simple test gets and shows config.
+    _CONFIG = None
     cf = get_config()
     cf.flags.debug = 1
     cf.flags.verbose = 1
@@ -226,9 +212,3 @@ def _test(argv):
     _CONFIG = None
     cf = get_config(initdict={"initkey": "initvalue"})
     assert cf.get("initkey", "") == "initvalue"
-
-
-if __name__ == "__main__":
-    _test([])
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

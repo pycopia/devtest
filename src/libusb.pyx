@@ -1360,12 +1360,13 @@ cdef class UsbDevice:
             PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
         else:
             raise UsbUsageError("Invalid direction")
-        err = libusb_bulk_transfer(self._handle,
-                                   bEndpointAddress,
-                                   <unsigned char *> bdata,
-                                   bdata_length,
-                                   &transferred,
-                                   <unsigned int> timeout)
+        with nogil:
+            err = libusb_bulk_transfer(self._handle,
+                                       bEndpointAddress,
+                                       <unsigned char *> bdata,
+                                       bdata_length,
+                                       &transferred,
+                                       <unsigned int> timeout)
         if err < 0:
             raise LibusbError(<int>err)
         if direction == EndpointDirection.In:
@@ -1416,12 +1417,13 @@ cdef class UsbDevice:
             PyBytes_AsStringAndSize(data_or_length, &bdata, &bdata_length)
         else:
             raise UsbUsageError("Invalid direction")
-        err =  libusb_interrupt_transfer(self._handle,
-                                         bEndpointAddress,
-                                         <unsigned char *> bdata,
-                                         bdata_length,
-                                         &transferred,
-                                         <unsigned int> timeout)
+        with nogil:
+            err =  libusb_interrupt_transfer(self._handle,
+                                             bEndpointAddress,
+                                             <unsigned char *> bdata,
+                                             bdata_length,
+                                             &transferred,
+                                             <unsigned int> timeout)
         if err < 0:
             raise LibusbError(<int>err)
         if direction == EndpointDirection.In:
