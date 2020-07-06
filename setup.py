@@ -63,8 +63,8 @@ setup(
     tests_require=['pytest'],
     ext_modules=EXTENSIONS,
     cmdclass={"build_ext": build_ext},
-    # setup_requires=['setuptools_scm'],
-    # use_scm_version=True,
+    setup_requires=['setuptools_scm'],
+    use_scm_version=True,
 
     license='Apache 2.0',
     description='General purpose device and system test framework.',
