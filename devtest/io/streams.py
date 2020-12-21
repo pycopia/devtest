@@ -23,16 +23,16 @@ from curio.io import StreamBase, FileStream, SocketStream, Socket, WantRead, Wan
 from curio.channel import Connection, Channel  # noqa
 
 
-__all__ = ["TimerStream", "FileStream", "SocketStream", "Connection", "Channel"]
+__all__ = ["ReadableStream", "FileStream", "SocketStream", "Connection", "Channel"]
 
 
-class TimerStream(StreamBase):
-    """Stream wrapper for an FDTimer.
+class ReadableStream(StreamBase):
+    """Stream wrapper for an object with read-only file descriptor.
     """
     async def _read(self, maxbytes=-1):
         while True:
             try:
-                return self._file.read()
+                return self._file.read(maxbytes)
             except WantRead:
                 await _read_wait(self._fileno)
 

@@ -36,6 +36,8 @@ if sys.platform == "darwin":
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx']))
 elif sys.platform.startswith("linux"):
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx'], libraries=["rt"]))
+    EXTENSIONS.append(Extension('devtest.signals', ['src/signals.pyx'],
+                                extra_compile_args=["-pthread"], libraries=["pthread"]))
 
 # Build USB module if we can.
 # need: "brew install libusb" on MacOS
@@ -56,7 +58,7 @@ if subprocess.run(['pkg-config', LIBUSB_PKG, '--exists']).returncode == 0:
 setup(
     name=NAME,
     version=VERSION,
-    packages=find_packages(),
+    packages=find_packages(exclude=("tests.*", "tests")),
     package_data={"devtest": ["*.yaml"]},
     scripts=SCRIPTS,
     test_suite="tests",
@@ -82,8 +84,7 @@ setup(
         'pygments',
         'pyyaml',
         'numpy',
-        'h5py',
-        'elicit>=1.5',
+        'elicit>=1.7',
     ],
     author='Keith Dart',
     author_email='keith@dartworks.biz',

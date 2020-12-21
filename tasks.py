@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3.9
 """Tasks file used by the *invoke* command.
 
 This simplifies some common development tasks.
