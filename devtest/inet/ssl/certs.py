@@ -27,18 +27,14 @@ from cryptography.x509.oid import NameOID
 
 def generate_private_key(filename, passphrase, _backend=None):
     backend = _backend or default_backend()
-    key = rsa.generate_private_key(public_exponent=65537,
-                                   key_size=2048,
-                                   backend=backend)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=backend)
     if passphrase is None:
         algo = serialization.NoEncryption()
     else:
-        algo = serialization.BestAvailableEncryption(
-            passphrase.encode("ascii"))
-    key_bytes = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=algo)
+        algo = serialization.BestAvailableEncryption(passphrase.encode("ascii"))
+    key_bytes = key.private_bytes(encoding=serialization.Encoding.PEM,
+                                  format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                  encryption_algorithm=algo)
     with open(filename, "wb") as f:
         f.write(key_bytes)
     return key
@@ -81,10 +77,15 @@ def _convert_attributes(subject_dict: dict) -> list:
     return converted
 
 
-def generate_certificate_request(common_name, country=None, state=None,
-                                 locality=None, organization=None,
-                                 organization_unit=None, email=None,
-                                 passphrase=None, _backend=None):
+def generate_certificate_request(common_name,
+                                 country=None,
+                                 state=None,
+                                 locality=None,
+                                 organization=None,
+                                 organization_unit=None,
+                                 email=None,
+                                 passphrase=None,
+                                 _backend=None):
     attribs = {
         "common_name": common_name,
         "country": country,
@@ -96,18 +97,15 @@ def generate_certificate_request(common_name, country=None, state=None,
     }
     backend = _backend or default_backend()
 
-    private_key = generate_private_key(common_name + ".key",
-                                       passphrase, backend)
+    private_key = generate_private_key(common_name + ".key", passphrase, backend)
 
     builder = x509.CertificateSigningRequestBuilder()
 
     builder = builder.subject_name(x509.Name(_convert_attributes(attribs)))
-    builder = builder.add_extension(
-        x509.BasicConstraints(ca=False, path_length=None),
-        critical=True)
-    builder = builder.add_extension(
-        x509.SubjectAlternativeName([x509.DNSName(common_name)]),
-        critical=True)
+    builder = builder.add_extension(x509.BasicConstraints(ca=False, path_length=None),
+                                    critical=True)
+    builder = builder.add_extension(x509.SubjectAlternativeName([x509.DNSName(common_name)]),
+                                    critical=True)
 
     request = builder.sign(private_key, hashes.SHA256(), backend)
 
@@ -116,28 +114,35 @@ def generate_certificate_request(common_name, country=None, state=None,
     return private_key, request
 
 
-def generate_self_signed_certificate(common_name, country=None, state=None,
-                                     locality=None, organization=None,
-                                     organization_unit=None, email=None,
+def generate_self_signed_certificate(common_name,
+                                     country=None,
+                                     state=None,
+                                     locality=None,
+                                     organization=None,
+                                     organization_unit=None,
+                                     email=None,
                                      passphrase=None):
     backend = default_backend()
-    key, csr = generate_certificate_request(
-        common_name, country=country, state=state,
-        locality=locality, organization=organization,
-        organization_unit=organization_unit,
-        email=email, passphrase=passphrase, _backend=backend)
+    key, csr = generate_certificate_request(common_name,
+                                            country=country,
+                                            state=state,
+                                            locality=locality,
+                                            organization=organization,
+                                            organization_unit=organization_unit,
+                                            email=email,
+                                            passphrase=passphrase,
+                                            _backend=backend)
 
     issuer = subject = csr.subject
     not_before = datetime.now()
     not_after = not_before + timedelta(days=365)
-    builder = x509.CertificateBuilder(
-        issuer_name=issuer,
-        subject_name=subject,
-        public_key=csr.public_key(),
-        serial_number=1,
-        not_valid_before=not_before,
-        not_valid_after=not_after,
-        extensions=csr.extensions)
+    builder = x509.CertificateBuilder(issuer_name=issuer,
+                                      subject_name=subject,
+                                      public_key=csr.public_key(),
+                                      serial_number=1,
+                                      not_valid_before=not_before,
+                                      not_valid_after=not_after,
+                                      extensions=csr.extensions)
 
     cert = builder.sign(key, hashes.SHA256(), backend)
     with open(common_name + ".crt.pem", "wb") as fo:
@@ -146,17 +151,19 @@ def generate_self_signed_certificate(common_name, country=None, state=None,
 
 
 def cert_exists(host):
-    return (os.path.exists("{}.crt.pem".format(host)) and
-            os.path.exists("{}.key".format(host)))
+    return (os.path.exists("{}.crt.pem".format(host)) and os.path.exists("{}.key".format(host)))
 
 
 if __name__ == "__main__":
     import sys
     CN = sys.argv[1] if len(sys.argv) > 1 else "localhost"
-    cert = generate_self_signed_certificate(
-        CN, country="US", state="California", locality="Santa Clara",
-        organization="Acme", organization_unit="Eng",
-        passphrase=None)
+    cert = generate_self_signed_certificate(CN,
+                                            country="US",
+                                            state="California",
+                                            locality="Santa Clara",
+                                            organization="Acme",
+                                            organization_unit="Eng",
+                                            passphrase=None)
     print("See: {}.crt.pem".format(CN))
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

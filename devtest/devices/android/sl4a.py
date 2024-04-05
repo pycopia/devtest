@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """An interface to SL4A on an Android device.
 
 Supports original and a new protocol.
@@ -149,7 +148,6 @@ class _SL4AProtocol:
         return NotImplemented
 
 
-
 class SL4AInterface:
     """Interface to SL4A server running on device."""
 
@@ -189,9 +187,7 @@ class SL4AInterface:
         _get_kernel().run(self._connect, newprotocol, sessionid)
 
     async def _connect(self, newprotocol, sessionid):
-        sock = socket.socket(socket.AF_INET,
-                             socket.SOCK_STREAM,
-                             socket.IPPROTO_TCP)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         await reactor.sleep(3)  # Time for sl4a server to initialize
         await sock.connect(("localhost", self.host_port))
         if newprotocol:
@@ -201,8 +197,11 @@ class SL4AInterface:
         await self._proto.connect(sessionid)
 
     def __getattr__(self, name):
+
         def _fun(*args, **kwargs):
             return self._proto.rpc(name, args, kwargs)
+
         return _fun
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

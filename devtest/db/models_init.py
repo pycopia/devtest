@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Create and initialize the equipment models database.
 """
 
@@ -29,32 +28,31 @@ def do_default_testbed(database):
 # Some typical functions
 def do_function(database):
     for name, desc in (
-            ("DUT", "Device Under Test."),
-            ("SUT", "Software Under Test."),
-            ("router", "Provides IP routing service."),
-            ("bridge", "Provides layer 2 bridging."),
-            ("proxy", "A type of network protocol proxy."),
-            ("browser", "Can render web content."),
-            ("httpserver", "Serves web pages and content."),
-            ("dnsserver", "Responds to DNS queries."),
-            ("database", "A database server."),
-            ("tftpserver", "Provides TFTP server"),
-            ("nfsserver", "An NFS server."),
-            ("ntpserver", "Provides network time sync service."),):
+        ("DUT", "Device Under Test."),
+        ("SUT", "Software Under Test."),
+        ("router", "Provides IP routing service."),
+        ("bridge", "Provides layer 2 bridging."),
+        ("proxy", "A type of network protocol proxy."),
+        ("browser", "Can render web content."),
+        ("httpserver", "Serves web pages and content."),
+        ("dnsserver", "Responds to DNS queries."),
+        ("database", "A database server."),
+        ("tftpserver", "Provides TFTP server"),
+        ("nfsserver", "An NFS server."),
+        ("ntpserver", "Provides network time sync service."),
+    ):
         models.Function.create(name=name, description=desc)
     database.commit()
 
     for name, desc, impl in ():
-        models.Function.create(name=name, description=desc,
-                               role_implementation=impl)
+        models.Function.create(name=name, description=desc, role_implementation=impl)
     database.commit()
 
 
 def do_equipment_models(database):
     manufacturer = "Acme Inc."
     for name, attribs in ():
-        models.EquipmentModel.create(name=name, manufacturer=manufacturer,
-                                     attributes=attribs)
+        models.EquipmentModel.create(name=name, manufacturer=manufacturer, attributes=attribs)
     database.commit()
 
 

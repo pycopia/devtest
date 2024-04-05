@@ -15,7 +15,6 @@ Support for iterating of combinations of sets.
 
 from __future__ import generator_stop
 
-
 from functools import reduce
 
 
@@ -31,6 +30,7 @@ def prune_end(n, l):
 
 class ListCounter:
     """An iterator that counts through its list of lists."""
+
     def __init__(self, lists):
         self._lists = lists
         self._lengths = [len(l) for l in lists]
@@ -52,8 +52,7 @@ class ListCounter:
         return self.fetch()
 
     def _increment(self, place):
-        carry, self._counters[place] = divmod(self._counters[place] + 1,
-                                              self._lengths[place])
+        carry, self._counters[place] = divmod(self._counters[place] + 1, self._lengths[place])
         if carry:
             if place + 1 < self._places:
                 return self._increment(place + 1)
@@ -69,6 +68,7 @@ class ListCounter:
 
 
 class KeywordCounter:
+
     def __init__(self, **kwargs):
         self._names = list(kwargs.keys())
         values = list(kwargs.values())  # All values should be sequences

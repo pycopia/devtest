@@ -20,7 +20,6 @@ from urllib.parse import *  # noqa
 import functools
 import re
 
-
 # Well known service ports.
 # Using getservbyname is unreliable across hosts (some say port 80 is "www")
 SERVICES = {
@@ -46,7 +45,6 @@ SERVICES = {
 }
 
 SERVICES_REVERSE = dict((v, k) for k, v in list(SERVICES.items()))
-
 
 # from rfc2396 appendix B:
 URI_RE_STRICT = r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
@@ -153,6 +151,7 @@ class URLQuery(dict):
 
     This can handle multiple values for the same key.
     """
+
     def __init__(self, init=()):
         if isinstance(init, str):
             init = queryparse(init)
@@ -233,6 +232,7 @@ class UniversalResourceLocator:
     """A general purpose URL object. Parse and generate URLs.
     Provided for read-parse-modify-write operations on URL strings.
     """
+
     def __init__(self, url=None, strict=True):
         if url:
             self.set(url, strict)
@@ -288,8 +288,7 @@ class UniversalResourceLocator:
         self._badurl = True
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__, self.__str__(),
-                               self._strict)
+        return "%s(%r, %r)" % (self.__class__.__name__, self.__str__(), self._strict)
 
     def __str__(self):
         if not self._badurl:
@@ -437,26 +436,16 @@ class UniversalResourceLocator:
         """Return address suitable for a socket."""
         return (self._host, self._port)
 
-    URL   =    property(__str__, _set_URL, None,
-                        "Full URL")
-    scheme   = property(lambda s: s._scheme, set_scheme, None,
-                        "Scheme part")
-    user     = property(lambda s: s._user, set_user, del_user,
-                        "User part")
-    password = property(lambda s: s._password, set_password, del_password,
-                        "Password part")
-    host     = property(lambda s: s._host, set_host, del_host,
-                        "Host part ")
-    port     = property(lambda s: s._port, set_port, del_port,
-                        "Port part ")
-    path     = property(lambda s: s._path, set_path, del_path,
-                        "Path part ")
-    params   = property(lambda s: s._params, set_params, del_params,
-                        "Params part")
-    query    = property(get_query, set_query, del_query,
-                        "URLQuery object")
-    fragment = property(lambda s: s._fragment, set_fragment, del_fragment,
-                        "Fragment part")
+    URL = property(__str__, _set_URL, None, "Full URL")
+    scheme = property(lambda s: s._scheme, set_scheme, None, "Scheme part")
+    user = property(lambda s: s._user, set_user, del_user, "User part")
+    password = property(lambda s: s._password, set_password, del_password, "Password part")
+    host = property(lambda s: s._host, set_host, del_host, "Host part ")
+    port = property(lambda s: s._port, set_port, del_port, "Port part ")
+    path = property(lambda s: s._path, set_path, del_path, "Path part ")
+    params = property(lambda s: s._params, set_params, del_params, "Params part")
+    query = property(get_query, set_query, del_query, "URLQuery object")
+    fragment = property(lambda s: s._fragment, set_fragment, del_fragment, "Fragment part")
     address = property(get_address)
 
 
@@ -485,6 +474,5 @@ if __name__ == "__main__":
     del url.query
     del url2.query
     assert str(url2) == str(url)
-
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

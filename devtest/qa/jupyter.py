@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runner for use with Jupyter notebooks.
 """
 
@@ -25,7 +24,6 @@ from devtest.qa import scanner
 
 import ipywidgets as widgets
 from IPython import display
-
 
 ModuleType = type(config)
 
@@ -58,11 +56,12 @@ class JupyterInterface:
         self._tbselect = widgets.Select(options=tblist, description="Testbed:")
         self._rselect = widgets.SelectMultiple(options=runnables,
                                                description="Runnable Objects:",
-                                               layout=widgets.Layout(width="60%",
-                                                                     height="120px"))
+                                               layout=widgets.Layout(width="60%", height="120px"))
 
-        self._run_button = widgets.Button(description="Run", tooltip="Run",
-                                          icon="play", button_style="primary")
+        self._run_button = widgets.Button(description="Run",
+                                          tooltip="Run",
+                                          icon="play",
+                                          button_style="primary")
         self._run_button.on_click(self._on_run)
         self._persist_cb = widgets.Checkbox(value=False,
                                             description="Record Results",

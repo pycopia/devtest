@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Run programs with elevated privileges using sudo.
 """
@@ -19,7 +18,6 @@ from __future__ import generator_stop
 from devtest.os import procutils
 
 from . import process
-
 
 SUDO = procutils.which("sudo")
 if SUDO is None:

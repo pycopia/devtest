@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Collection of framework synchronous signals.
 
 Based on the blinker package. Most testing framework activity is handled by a
@@ -17,7 +16,6 @@ simple publish-subscribe designed using these signals.
 """
 
 from blinker import Namespace
-
 
 _signals = Namespace()
 
@@ -72,6 +70,7 @@ data_convert = _signals.signal('data-convert')
 
 
 def _test(argv):
+
     def listener(obj, msg=None):
         print(obj, msg)
 

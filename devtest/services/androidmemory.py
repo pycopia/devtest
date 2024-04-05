@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Monitor memory usage of a process on Android.
 """
 
@@ -115,5 +114,6 @@ def initialize(manager):
 def finalize(manager):
     srv = manager.unregister("androidmemory")
     srv.close()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

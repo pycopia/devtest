@@ -1,15 +1,3 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Extend the stock importlib module with extra functions.
 
 Consolidates general purpose module finding and loading functions.
@@ -17,17 +5,20 @@ Consolidates general purpose module finding and loading functions.
 Only export the newest importlib API here.
 """
 
-from __future__ import generator_stop
+from __future__ import annotations
 
-import os
 from importlib import import_module
-from importlib.util import (find_spec, module_from_spec, spec_from_loader,
-                            spec_from_file_location, decode_source)
+from importlib import resources
+from importlib.util import (find_spec, module_from_spec, spec_from_loader, spec_from_file_location,
+                            decode_source)
 import importlib.abc
+from typing import Optional, Any, Callable
+# mypy: disable_error_code=attr-defined
 
-
-__all__ = ["get_object", "get_class", "import_module", "find_spec",
-           "module_from_spec", "spec_from_loader", "spec_from_file_location"]
+__all__ = [
+    "get_object", "get_class", "import_module", "find_spec", "module_from_spec", "spec_from_loader",
+    "spec_from_file_location"
+]
 
 
 class ModuleInspector(importlib.abc.InspectLoader):
@@ -35,13 +26,13 @@ class ModuleInspector(importlib.abc.InspectLoader):
 
     This allows only source inspection without execution.
     """
+
     def get_source(self, fullname):
         path = self.get_filename(fullname)
         try:
             source_bytes = self.get_data(path)
         except OSError as exc:
-            raise ImportError('source not available through get_data()',
-                              name=fullname) from exc
+            raise ImportError('source not available through get_data()', name=fullname) from exc
         return decode_source(source_bytes)
 
 
@@ -63,7 +54,21 @@ def _get_obj(modulepath, package):
     return getattr(mod, classname)
 
 
-def get_class(modulepath, package=None):
+def get_resource(basepackage: str, name: str) -> bytes:
+    """Get contents of a resource file.
+
+    The resource file must be in a subpackage named "resources" inside the named package.
+
+    Args:
+        basepackage: path name of a package namespace.
+        name: name of resource inside the "resources" subpackage.
+    """
+    pkgname_parts = basepackage.split(".")
+    pkgname_parts.append("resources")
+    return resources.read_binary(".".join(pkgname_parts), name)
+
+
+def get_class(modulepath: str, package: Optional[str] = None) -> Any:
     """Get a class object given a full Python path name.
     """
     obj = _get_obj(modulepath, package)
@@ -72,7 +77,7 @@ def get_class(modulepath, package=None):
     return obj
 
 
-def get_callable(modulepath, package=None):
+def get_callable(modulepath: str, package: Optional[str] = None) -> Callable:
     """Get a callable object given a full path name.
     """
     obj = _get_obj(modulepath, package)
@@ -81,51 +86,16 @@ def get_callable(modulepath, package=None):
     return obj
 
 
-def find_package_paths(pkgname):
+def find_package_paths(pkgname: str):
     """Yield all the source base paths for a package. The package may be a
     namespace package. This will reveal all the file-system locations of a
     namespace package.
     """
-    try:
-        spec = find_spec(pkgname)
-    except ValueError:  # Work around bug here.
-        mod = sys.modules[pkgname]
-        for p in mod.__path__:
-            yield p
-        return
+    spec = find_spec(pkgname)
     if spec:
         if spec.has_location:
+            assert spec.loader is not None
             if spec.loader.is_package(pkgname):
                 mod = import_module(spec.name)
                 for p in mod.__path__:
                     yield p
-
-
-def find_package_path(pkgname):
-    """Find the directory path to the package with the given package name.
-
-    May raise ImportError if the package can not be found.
-    """
-    spec = find_spec(pkgname)
-    if spec:
-        if spec.has_location:
-            if spec.loader.is_package(pkgname):
-                return os.path.dirname(spec.origin)
-            else:
-                raise ImportError("{!r} is not a package.".format(pkgname))
-        else:
-            raise ImportError("pkg {!r} not found.".format(pkgname))
-    else:
-        raise ImportError("No module or package name {!r}.".format(pkgname))
-
-
-def _test(argv):
-    scls = get_class("socket.socket")
-    print(scls, type(scls))
-
-
-if __name__ == "__main__":
-    import sys
-    _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

@@ -41,11 +41,9 @@ View log output in a shell like this:
     # log stream --predicate 'senderImagePath contains "Python"' --level debug
 """
 
-
 import sys
 import os
 import syslog
-
 
 # also import and configure standard logging here. Avoid using the logging
 # module in other code.
@@ -55,9 +53,7 @@ FACILITY = os.environ.get("DEVTEST_LOG_FACILITY", "USER")
 LEVEL = os.environ.get("DEVTEST_LOG_LEVEL", "NOTICE")
 USESTDERR = bool(os.environ.get("DEVTEST_LOG_STDERR"))
 
-
-_oldloglevel = syslog.setlogmask(syslog.LOG_UPTO(
-    getattr(syslog, "LOG_" + LEVEL)))
+_oldloglevel = syslog.setlogmask(syslog.LOG_UPTO(getattr(syslog, "LOG_" + LEVEL)))
 
 
 def DEBUG(*args, **kwargs):
@@ -66,8 +62,7 @@ def DEBUG(*args, **kwargs):
     parts = []
     for name, value in list(kwargs.items()):
         parts.append("{}: {!r}".format(name, value))
-    print("DEBUG", " ".join(str(o) for o in args), ", ".join(parts),
-          file=sys.stderr)
+    print("DEBUG", " ".join(str(o) for o in args), ", ".join(parts), file=sys.stderr)
 
 
 def openlog(ident=None, usestderr=USESTDERR, facility=FACILITY):
@@ -133,9 +128,8 @@ def loglevel(level):
 
 def get_loglevel():
     mask = syslog.setlogmask(0)
-    for level in (syslog.LOG_DEBUG, syslog.LOG_INFO, syslog.LOG_NOTICE,
-                  syslog.LOG_WARNING, syslog.LOG_ERR, syslog.LOG_CRIT,
-                  syslog.LOG_ALERT, syslog.LOG_EMERG):
+    for level in (syslog.LOG_DEBUG, syslog.LOG_INFO, syslog.LOG_NOTICE, syslog.LOG_WARNING,
+                  syslog.LOG_ERR, syslog.LOG_CRIT, syslog.LOG_ALERT, syslog.LOG_EMERG):
         if syslog.LOG_MASK(level) & mask:
             return level
 
@@ -234,8 +228,8 @@ _LEVEL_MAP = {
 
 class Logger:
     """Simple logger using only syslog."""
-    def __init__(self, name=None, usestderr=False, facility=FACILITY,
-                 level=LEVEL):
+
+    def __init__(self, name=None, usestderr=False, facility=FACILITY, level=LEVEL):
         self.name = name or sys.argv[0].split("/")[-1]
         close()
         openlog(name, usestderr, facility)
@@ -249,6 +243,7 @@ class Logger:
 
     def info(self, msg):
         info(msg)
+
     log = info
 
     def notice(self, msg):
@@ -319,6 +314,7 @@ class LogLevel:
 
     Supply the level name as a string.
     """
+
     def __init__(self, level):
         self._level = LEVELS[level.upper()]
 
@@ -367,7 +363,6 @@ class SyslogHandler(logging.Handler):
 
 logging.root.addHandler(SyslogHandler())
 logging.root.level = _LOGGING_LEVELS[LEVEL]
-
 
 # Monkey patch the stock logging module to use this logger.
 logging.getLogger = getLogger

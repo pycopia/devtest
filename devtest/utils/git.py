@@ -17,7 +17,6 @@ import os
 import re
 import subprocess
 
-
 BLAME_CMD = "git -C {cwd} blame -L {lineno},{lineno} -tp {fname}"
 
 
@@ -32,5 +31,6 @@ def git_blame(filename, lineno):
     cmd = BLAME_CMD.format(lineno=lineno, fname=filename, cwd=os.path.dirname(filename))
     text = subprocess.check_output(cmd.split(), shell=False)
     return re.search(r"^author (.*)$\s*^author-mail (.*)$", text.decode("utf-8"), re.M).groups()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

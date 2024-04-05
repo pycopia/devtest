@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Provide Expect-like functionality over a file-like object.
 """
 
@@ -22,10 +21,9 @@ from devtest import ringbuffer
 from devtest.os import time
 from devtest.textutils.stringmatch import compile_exact
 
-
 # matching types
 EXACT = 1  # string match (fastest)
-GLOB = 2   # POSIX shell style match
+GLOB = 2  # POSIX shell style match
 REGEX = 3  # Slower but featureful RE match
 
 
@@ -109,8 +107,7 @@ class Expect:
 
     def send(self, text, timeout=None, encoding="utf-8"):
         timeout = timeout or self.default_timeout
-        return time.iotimeout(partial(self._fo.write, text.encode(encoding)),
-                                      timeout=timeout)
+        return time.iotimeout(partial(self._fo.write, text.encode(encoding)), timeout=timeout)
 
     def send_slow(self, data, encoding="utf-8"):
         if isinstance(data, str):
@@ -209,6 +206,7 @@ class TimeoutMatch:
     Returns a TimeoutMatchObject when a call to the search method happens
     `timeout` seconds after the first time it was called.
     """
+
     def __init__(self, timeout: float):
         self._timeout = timeout
         self._starttime = None
@@ -230,6 +228,7 @@ class TimeoutMatch:
 
 
 class TimeoutMatchObject:
+
     def __init__(self, string):
         self.string = string
 
@@ -240,6 +239,7 @@ class TimeoutMatchObject:
 class UnifiedIO:
     """Combine stdin and stdout into one object.
     """
+
     def __init__(self, stdin, stdout):
         self._fd = stdout.fileno()
         self.write = stdout.write
@@ -266,7 +266,8 @@ def _test(argv):
     import subprocess
     from devtest.textutils.stringmatch import StringMatchObject
     # With process
-    proc = subprocess.Popen(["/bin/cat", "-u", "-"], bufsize=0,
+    proc = subprocess.Popen(["/bin/cat", "-u", "-"],
+                            bufsize=0,
                             stdout=subprocess.PIPE,
                             stdin=subprocess.PIPE)
     exp = Expect(UnifiedIO(proc.stdout, proc.stdin))
@@ -291,11 +292,9 @@ def _test(argv):
     exp.close()
     proc.terminate()
     proc.wait()
-    
+
     # Test timeouts
-    proc = subprocess.Popen(["/bin/sleep", "30"],
-                            stdin=subprocess.PIPE,
-                            stdout=subprocess.PIPE)
+    proc = subprocess.Popen(["/bin/sleep", "30"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     exp = Expect(UnifiedIO(proc.stdout, proc.stdin))
     try:
         exp.expect(["zzz", TimeoutMatch(3.0)], timeout=2.0)

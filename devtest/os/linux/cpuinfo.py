@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """CPU information and monitors.
 """
 
 import re
 import time
 import typing
-
 
 _ALLNUMBERS_RE = re.compile(rb'(\d+)(?(1)[ \n]|\(.*\))')
 
@@ -96,6 +94,7 @@ class ProcStat(typing.NamedTuple):
 
 class CPUUtilizationMonitor:
     """Helper to measure CPU utilization of a process."""
+
     def __init__(self, pid: int):
         self.pid = int(pid)
         self._starttime = None
@@ -146,7 +145,7 @@ if __name__ == "__main__":
     mon.start()
     time.sleep(2.9)
     for i in range(10000000):
-        x = i ** 2
+        x = i**2
     print(mon.current())
     mon.end()
     del mon

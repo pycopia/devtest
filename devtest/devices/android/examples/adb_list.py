@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Demonstrate using the async remote list.
 
@@ -28,6 +27,7 @@ from devtest.io import reactor
 from devtest.io import streams
 
 out = streams.FileStream(sys.stdout.buffer)
+
 
 async def printer(stat, name):
     await out.write(("{} {}\n".format(stat, name)).encode("utf-8"))

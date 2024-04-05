@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Useful method decorators.
 """
 
@@ -19,6 +18,7 @@ from functools import wraps
 
 def debugthis(meth):
     """Decorator for making methods enter the debugger on an exception."""
+
     @wraps(meth)
     def _lambda(*iargs, **ikwargs):
         try:
@@ -27,6 +27,7 @@ def debugthis(meth):
             ex, val, tb = sys.exc_info()
             from devtest import debugger
             debugger.post_mortem(tb)
+
     return _lambda
 
 

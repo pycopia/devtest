@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Basic support for analysis of data produced by test cases.
 """
 
@@ -177,9 +176,10 @@ class Analyzer:
             have data attached.
         """
         controllers.connect()
-        return [result for result in
-                controllers.TestResultsController.results_for(self.test_name)
-                if result.data is not None]
+        return [
+            result for result in controllers.TestResultsController.results_for(self.test_name)
+            if result.data is not None
+        ]
 
     def latest_result(self):
         """Fetch latest test result from database for this test case."""
@@ -222,8 +222,7 @@ class Analyzer:
             for section in data:
                 self.load_data(section, _dataobjects)
         else:
-            for receiver, response in signals.data_convert.send(self,
-                                                                data=data,
+            for receiver, response in signals.data_convert.send(self, data=data,
                                                                 config=self.config):
                 if response is not None:
                     _dataobjects.append(response)
@@ -271,5 +270,6 @@ class Analyzer:
             tr = tr.parent
             resultslocation = tr.resultslocation
         self.resultslocation = resultslocation
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

@@ -19,7 +19,6 @@ from devtest.io import terminal
 from devtest.io import expect
 from devtest.core import exceptions
 
-
 AUTOMATION_PROMPT = "OxO# "  # Simple, unique and unchanging prompt.
 
 
@@ -40,7 +39,8 @@ def _console_login(term, account, password):
     while True:
         mo, index = exp.expect(
             ["\rlogin:", "assword:", exp.prompt, AUTOMATION_PROMPT, "\r] ",
-             exp.timeoutmatch(10.0)], timeout=30.0)
+             exp.timeoutmatch(10.0)],
+            timeout=30.0)
         if mo:
             if index == 0:
                 exp.send(account + "\r")
@@ -69,6 +69,7 @@ def _console_login(term, account, password):
 
 
 class SerialConsole:
+
     def __init__(self, term):
         self._term = term
 

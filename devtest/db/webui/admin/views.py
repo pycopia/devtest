@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Devtest web admin views.
 """
 
@@ -37,6 +36,7 @@ from . import fields as formfields
 
 
 class QueryAjaxModelLoader(AjaxModelLoader):
+
     def __init__(self, name, model, **options):
         super().__init__(name, options)
 
@@ -44,9 +44,8 @@ class QueryAjaxModelLoader(AjaxModelLoader):
         self.fields = options.get('fields')
 
         if not self.fields:
-            raise ValueError(
-                'AJAX loading requires `fields` '
-                'to be specified for {}.{}'.format(model, self.name))
+            raise ValueError('AJAX loading requires `fields` '
+                             'to be specified for {}.{}'.format(model, self.name))
 
         self._cached_fields = self._process_fields()
 
@@ -82,7 +81,7 @@ class QueryAjaxModelLoader(AjaxModelLoader):
 
         stmt = None
         for field in self._cached_fields:
-            q = field ** ('%%{}%%'.format(term))
+            q = field**('%%{}%%'.format(term))
 
             if stmt is None:
                 stmt = q
@@ -139,9 +138,8 @@ class ModelView(BaseModelView):
                 field_type = type(p)
                 # Check type
                 if (field_type != fields.CharField and field_type != fields.TextField):
-                    raise ValueError(
-                        'Can only search on text columns. '
-                        'Failed to setup search for "{}"'.format(p))
+                    raise ValueError('Can only search on text columns. '
+                                     'Failed to setup search for "{}"'.format(p))
                 self._search_fields.append(p)
 
         return bool(self._search_fields)
@@ -159,8 +157,8 @@ class ModelView(BaseModelView):
 
         # Check if field is in different model
         if attr.model != self.model:
-            visible_name = '%s / %s' % (self.get_column_name(attr.model.__name__),
-                                        self.get_column_name(attr.name))
+            visible_name = '%s / %s' % (self.get_column_name(
+                attr.model.__name__), self.get_column_name(attr.name))
         else:
             if not isinstance(name, str):
                 visible_name = self.get_column_name(attr.name)
@@ -168,18 +166,19 @@ class ModelView(BaseModelView):
                 visible_name = self.get_column_name(name)
 
         type_name = type(attr).__name__
-        flt = self.filter_converter.convert(type_name,
-                                            attr,
-                                            visible_name)
+        flt = self.filter_converter.convert(type_name, attr, visible_name)
         return flt
 
     def scaffold_form(self):
         form_class = model_form(self.model,
-                                base_class=BaseForm, allow_pk=False,
-                                only=None, exclude=self.form_exclude,
+                                base_class=BaseForm,
+                                allow_pk=False,
+                                only=None,
+                                exclude=self.form_exclude,
                                 field_args=self.field_args,
                                 converter=ModelConverter(overrides=self.form_overrides))
         return form_class
+
 
 #    def scaffold_list_form(self, widget=None, validators=None):
 #        pass # TODO
@@ -203,8 +202,7 @@ class ModelView(BaseModelView):
             query = query.order_by(sort_field.desc() if sort_desc else sort_field.asc())
         return query, joins
 
-    def get_list(self, page, sort_field, sort_desc, search, filters,
-                 page_size=20):
+    def get_list(self, page, sort_field, sort_desc, search, filters, page_size=20):
         """
             Return a paginated and sorted list of models from the data source.
 
@@ -243,7 +241,7 @@ class ModelView(BaseModelView):
                 for field in self._search_fields:
                     query = self._handle_join(query, field, joins)
 
-                    q = field ** term
+                    q = field**term
 
                     if stmt is None:
                         stmt = q
@@ -337,8 +335,7 @@ class EquipmentModelView(ModelView):
     column_list = ("manufacturer", "name")
     form_overrides = dict(attributes=formfields.JSONField)
     can_view_details = True
-    column_details_list = column_list + ("note", "specs", "radar_component",
-                                         "attributes")
+    column_details_list = column_list + ("note", "specs", "radar_component", "attributes")
 
     def __init__(self):
         super().__init__(models.EquipmentModel, category="Testbeds")
@@ -349,8 +346,8 @@ class EquipmentView(ModelView):
     form_overrides = dict(attributes=formfields.JSONField)
     inline_models = (models.Interfaces,)
     can_view_details = True
-    column_details_list = column_list + ("account", "user", "location", "notes",
-                                         "partof", "attributes", "active")
+    column_details_list = column_list + ("account", "user", "location", "notes", "partof",
+                                         "attributes", "active")
     # column_editable_list = ("location", "active")
     form_ajax_refs = {
         'account': {
@@ -370,8 +367,8 @@ class EquipmentView(ModelView):
 class InterfacesView(ModelView):
     column_list = ("name", "macaddr", "ipaddr", "ipaddr6")
     can_view_details = True
-    column_details_list = column_list + ("alias", "status", "vlan",
-                                         "parent", "equipment", "network")
+    column_details_list = column_list + ("alias", "status", "vlan", "parent", "equipment",
+                                         "network")
     form_overrides = dict(ipaddr=formfields.IPv4Field,
                           ipaddr6=formfields.IPv6Field,
                           macaddr=formfields.MACField)
@@ -383,13 +380,13 @@ class InterfacesView(ModelView):
 class NetworksView(ModelView):
     column_list = ("name", "type", "ipnetwork", "ip6network")
     can_view_details = True
-    column_details_list = column_list + ("layer", "vlanid", "lower", "notes",
-                                         "attributes")
-    form_overrides = dict(ipnetwork=formfields.CIDRField,
-                          ip6network=formfields.CIDRField,
-                          attributes=formfields.JSONField,
-                          type=formfields.EnumField,
-                          )
+    column_details_list = column_list + ("layer", "vlanid", "lower", "notes", "attributes")
+    form_overrides = dict(
+        ipnetwork=formfields.CIDRField,
+        ip6network=formfields.CIDRField,
+        attributes=formfields.JSONField,
+        type=formfields.EnumField,
+    )
     field_args = dict(type={"choices": models.Networks.type.choices})
 
     def __init__(self):
@@ -451,27 +448,27 @@ class ProjectBuildView(ModelView):
 class TestCaseView(ModelView):
     column_list = ("name", "purpose", "testimplementation")
     form_exclude = ("owners", "related_problems")
-    column_details_list = (column_list +
-                           ("passcriteria", "startcondition", "endcondition",
-                            "procedure", "attributes", "comments", "type",
-                            "priority", "status", "interactive", "automated",
-                            "target_software", "target_component",
-                            "radar_component", "time_estimate", "lastchange",
-                            "valid"))
+    column_details_list = (
+        column_list +
+        ("passcriteria", "startcondition", "endcondition", "procedure", "attributes", "comments",
+         "type", "priority", "status", "interactive", "automated", "target_software",
+         "target_component", "radar_component", "time_estimate", "lastchange", "valid"))
 
-    form_overrides = dict(purpose=formfields.HTMLField,
-                          attributes=formfields.JSONField,
-                          type=formfields.EnumField,
-                          priority=formfields.EnumField,
-                          status=formfields.EnumField,
-                          time_estimate=formfields.IntervalField,
-                          # owners=formfields.ArrayField,
-                          # related_problems=formfields.ArrayField,
-                          )
-    field_args = dict(type={"choices": models.TestCases.type.choices},
-                      priority={"choices": models.TestCases.priority.choices},
-                      status={"choices": models.TestCases.status.choices},
-                      )
+    form_overrides = dict(
+        purpose=formfields.HTMLField,
+        attributes=formfields.JSONField,
+        type=formfields.EnumField,
+        priority=formfields.EnumField,
+        status=formfields.EnumField,
+        time_estimate=formfields.IntervalField,
+        # owners=formfields.ArrayField,
+        # related_problems=formfields.ArrayField,
+    )
+    field_args = dict(
+        type={"choices": models.TestCases.type.choices},
+        priority={"choices": models.TestCases.priority.choices},
+        status={"choices": models.TestCases.status.choices},
+    )
     can_view_details = True
 
     def __init__(self):
@@ -496,12 +493,13 @@ class TestSuiteView(ModelView):
 class ScenarioView(ModelView):
     column_list = ("name", "purpose", "implementation")
     form_exclude = ("owners",)
-    column_details_list = column_list + ("parameters", "reportname", "notes",
-                                         "testbed", "testsuite")
-    form_overrides = dict(purpose=formfields.HTMLField,
-                          parameters=formfields.JSONField,
-                          # owners=formfields.ArrayField,
-                          )
+    column_details_list = column_list + ("parameters", "reportname", "notes", "testbed",
+                                         "testsuite")
+    form_overrides = dict(
+        purpose=formfields.HTMLField,
+        parameters=formfields.JSONField,
+        # owners=formfields.ArrayField,
+    )
     can_edit = False
     can_view_details = True
 
@@ -512,19 +510,19 @@ class ScenarioView(ModelView):
 class TestResultsView(ModelView):
     column_list = ("testcase", "testsuite", "resulttype", "result")
     form_exclude = ("owners",)
-    column_details_list = column_list + ("arguments", "parent",
-                                         "starttime", "endtime", "diagnostic",
-                                         "rdb_uuid", "resultslocation", "testversion",
-                                         "target", "dutbuild",
-                                         "note", "valid")
-    form_overrides = dict(data=formfields.JSONField,
-                          result=formfields.EnumField,
-                          resulttype=formfields.EnumField,
-                          rdb_uuid=formfields.UUIDField,
-                          )
-    field_args = dict(result={"choices": models.TestResults.result.choices},
-                      resulttype={"choices": models.TestResults.resulttype.choices},
-                      )
+    column_details_list = column_list + ("arguments", "parent", "starttime", "endtime",
+                                         "diagnostic", "rdb_uuid", "resultslocation", "testversion",
+                                         "target", "dutbuild", "note", "valid")
+    form_overrides = dict(
+        data=formfields.JSONField,
+        result=formfields.EnumField,
+        resulttype=formfields.EnumField,
+        rdb_uuid=formfields.UUIDField,
+    )
+    field_args = dict(
+        result={"choices": models.TestResults.result.choices},
+        resulttype={"choices": models.TestResults.resulttype.choices},
+    )
     can_edit = False
     can_create = False
     can_view_details = True
@@ -551,21 +549,10 @@ def initialize_app(app, home_endpoint=None):
     if home_endpoint:
         admin.add_link(MenuLink("Devtest Main", url="/", endpoint=home_endpoint))
 
-    admin.add_views(TestBedView(),
-                    EquipmentModelView(),
-                    EquipmentView(),
-                    NetworksView(),
-                    InterfacesView(),
-                    ConnectionView(),
-                    AccountIdsView(),
-                    TestequipmentView())
-    admin.add_views(SoftwareView(),
-                    SoftwareVariantView(),
-                    FunctionView())
-    admin.add_views(ScenarioView(),
-                    TestSuiteView(),
-                    TestCaseView(),
-                    TestResultsView())
+    admin.add_views(TestBedView(), EquipmentModelView(), EquipmentView(), NetworksView(),
+                    InterfacesView(), ConnectionView(), AccountIdsView(), TestequipmentView())
+    admin.add_views(SoftwareView(), SoftwareVariantView(), FunctionView())
+    admin.add_views(ScenarioView(), TestSuiteView(), TestCaseView(), TestResultsView())
     admin.add_view(RadarComponentView())
 
 

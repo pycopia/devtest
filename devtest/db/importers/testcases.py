@@ -9,14 +9,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Import all currently installed test cases from the "testcases" namespace
 package into the database.
 """
 
 import pkgutil
 import inspect
-
 
 from docutils import core as docutils_core
 from docutils import utils
@@ -33,15 +31,16 @@ from .. import models
 
 def find_testcase_modules():
     tcmod = importlib.import_module("testcases")
-    for finder, name, ispkg in pkgutil.walk_packages(tcmod.__path__,
-                                                     prefix="testcases."):
+    for finder, name, ispkg in pkgutil.walk_packages(tcmod.__path__, prefix="testcases."):
         mod = importlib.import_module(name)
         yield mod
 
 
 def parts_from_doctree(document):
     reader = doctree.Reader(parser_name='null')
-    pub = docutils_core.Publisher(reader, None, None,
+    pub = docutils_core.Publisher(reader,
+                                  None,
+                                  None,
                                   source=io.DocTreeInput(document),
                                   destination_class=io.StringOutput)
     pub.set_writer("html4css1")
@@ -66,17 +65,19 @@ def get_rendered_sections(doctree):
 
 
 def plain_doc(input_string):
-    overrides = {'doctitle_xform': False,
-                 'initial_header_level': 2}
-    parts = docutils_core.publish_parts(
-        source=input_string, source_path=None, destination_path=None,
-        writer_name="html4css1", settings_overrides=overrides)
+    overrides = {'doctitle_xform': False, 'initial_header_level': 2}
+    parts = docutils_core.publish_parts(source=input_string,
+                                        source_path=None,
+                                        destination_path=None,
+                                        writer_name="html4css1",
+                                        settings_overrides=overrides)
     return parts["body"]
 
 
 class TestcasesImporter:
     """Imports the entire set of currently installed test cases.
     """
+
     def __init__(self, force=False):
         self.force = force
 
@@ -115,11 +116,9 @@ class TestcasesImporter:
         kwargs = {}
         doctree = docutils_core.publish_doctree(doc)
         parts = get_rendered_sections(doctree)
-        for section_id, colname in (("purpose", "purpose"),
-                                    ("pass-criteria", "passcriteria"),
+        for section_id, colname in (("purpose", "purpose"), ("pass-criteria", "passcriteria"),
                                     ("start-condition", "startcondition"),
-                                    ("end-condition", "endcondition"),
-                                    ("procedure", "procedure")):
+                                    ("end-condition", "endcondition"), ("procedure", "procedure")):
             kwargs[colname] = parts.get(section_id)
         # handle non-template simple docstrings. They are assumed to be the
         # purpose.

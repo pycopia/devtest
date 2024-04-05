@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Asynchronous process spawner and manager.
 
 Manages all subprocesses and coprocesses.
@@ -31,21 +30,16 @@ import inspect
 import psutil
 
 from subprocess import (  # noqa
-    CompletedProcess,
-    SubprocessError,
-    CalledProcessError,
-    PIPE,
-    STDOUT,
-    DEVNULL,
-    )
+    CompletedProcess, SubprocessError, CalledProcessError, PIPE, STDOUT, DEVNULL,
+)
 
 from devtest import logging
 from devtest.textutils import shparser
 from devtest.io import subprocess
 from devtest.io import streams
 from devtest.io import socket
-from devtest.io.reactor import (get_kernel, sleep, spawn,
-                                timeout_after, CancelledError, TaskTimeout)
+from devtest.io.reactor import (get_kernel, sleep, spawn, timeout_after, CancelledError,
+                                TaskTimeout)
 from devtest.os import procutils
 from devtest.os import exitstatus
 
@@ -199,6 +193,7 @@ class CoProcess(Process):
 
     Contains both synchronous and asychronous methods.
     """
+
     def __init__(self, pid, conn):
         self._init(pid, _ignore_nsp=True)
         self._conn = conn
@@ -246,7 +241,7 @@ class CoProcess(Process):
         get_kernel().run(self.aclose)
 
     async def aclose(self):
-        msg = (CMD_EXIT, )
+        msg = (CMD_EXIT,)
         await self._conn.send(msg)
         await self._conn.close()
 
@@ -351,7 +346,8 @@ def _close_stdin():
 
 
 def _redirect(fd, name):
-    newfd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
+    newfd = os.open(name,
+                    os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
                     mode=0o644)
     orig_fd = os.dup(fd)
     os.dup2(newfd, fd)
@@ -392,8 +388,13 @@ class ProcessManager:
     def processes(self):
         return self._procs.values()
 
-    def start(self, commandline, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-              directory=None, exit_handler=None):
+    def start(self,
+              commandline,
+              stdin=PIPE,
+              stdout=PIPE,
+              stderr=PIPE,
+              directory=None,
+              exit_handler=None):
         """Start a subprocess using pipes."""
         if isinstance(commandline, str):
             argv = self.splitter(commandline)
@@ -530,8 +531,7 @@ class ProcessManager:
 
         Returns an ExitStatus instance from command.
         """
-        proc = self.start(cmd, stdin=None, stdout=None, stderr=None,
-                          directory=directory)
+        proc = self.start(cmd, stdin=None, stdout=None, stderr=None, directory=directory)
         retcode = get_kernel().run(_call_proc(proc))
         return exitstatus.ExitStatus(0, name=proc.progname, returncode=retcode)
 
@@ -613,8 +613,7 @@ def run_command(cmd, timeout=None, input=None, directory=None):
     return get_manager().run_command(cmd, timeout=timeout, input=input, directory=directory)
 
 
-def check_output(cmd, shell=False, timeout=None, input=None, cwd=None,
-                 encoding=None):
+def check_output(cmd, shell=False, timeout=None, input=None, cwd=None, encoding=None):
     if shell:
         cmd = ["/bin/sh", "-c"] + ([" ".join(cmd)] if isinstance(cmd, list) else [cmd])
         if encoding is None:  # for backwards compatibility
@@ -678,6 +677,5 @@ if __name__ == "__main__":
     print(resp)
     assert resp == b"echo me"
     proc.close()
-
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

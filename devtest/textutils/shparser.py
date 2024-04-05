@@ -111,8 +111,7 @@ class ShellParser:
         fsm.arg += os.environ.get(fsm.varname[2:-1], "")
 
     def _error(self, input_symbol, fsm):
-        print('Syntax error: {}\n{!r}'.format(input_symbol, fsm.stack),
-              file=sys.stderr)
+        print('Syntax error: {}\n{!r}'.format(input_symbol, fsm.stack), file=sys.stderr)
         fsm.reset()
 
     def _addtext(self, c, fsm):
@@ -144,6 +143,7 @@ class ShellParser:
 
 class CommandSplitter:
     """Adapt the feed parser to a string splitter."""
+
     def __init__(self):
         self._argv = None
         self._cmd_parser = ShellParser(self._cb)

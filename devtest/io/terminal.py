@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Minimal terminal responder implemented as a filter.
 """
 
@@ -43,7 +42,6 @@ DS_WAITSTART = 10
 DS_READING = 11
 DS_ESCAPED = 12
 
-
 byte = struct.Struct("B").pack
 
 
@@ -65,8 +63,8 @@ class Terminal:
         self.reset()
 
     def __repr__(self):
-        return "{}({!r}, prompt={!r}, timeout={!r})".format(
-            self.__class__.__name__, self._fo, self.prompt, self._timeout)
+        return "{}({!r}, prompt={!r}, timeout={!r})".format(self.__class__.__name__, self._fo,
+                                                            self.prompt, self._timeout)
 
     def fileno(self):
         return self._fo.fileno()

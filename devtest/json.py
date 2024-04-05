@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Implementation of JSON codec for general test framework.
 
 Basically, just pre-instantiates an encoder and decoder with options that is
@@ -23,8 +22,10 @@ It can encode most Python objects as an embedded pickle string. Any other JSON
 reader can read it, but it won't be able to decode the pickle.
 """
 
-__all__ = ['JSONSettingsError', 'Encoder', 'Decoder', 'decode_bytes', 'decode',
-           'encode_bytes', 'encode', 'dump', 'dumps', 'load', 'loads']
+__all__ = [
+    'JSONSettingsError', 'Encoder', 'Decoder', 'decode_bytes', 'decode', 'encode_bytes', 'encode',
+    'dump', 'dumps', 'load', 'loads'
+]
 
 import json
 import pickle
@@ -105,6 +106,7 @@ def from_file(filename):
 
 # Compatibility functions.
 
+
 def dump(obj, fp):
     iterable = _encoder.iterencode(obj)
     for chunk in iterable:
@@ -121,5 +123,6 @@ def load(fp):
 
 def loads(s):
     return _decoder.decode(s)
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

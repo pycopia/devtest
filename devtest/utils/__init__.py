@@ -9,13 +9,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Utils module for miscellaneous general functions.
 
 Small functions can go right in here. Larger collections are found in modules
 contained in the package.
 """
-
 
 ViewType = type({}.keys())
 

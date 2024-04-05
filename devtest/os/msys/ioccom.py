@@ -1,8 +1,8 @@
-
 """MSYS ioctl macros. Adapted from /usr/include/sys/ioctl.h
 """
 
 import struct
+
 sizeof = struct.calcsize
 
 INT = sizeof("i")
@@ -29,7 +29,6 @@ _IOC_TYPESHIFT = (_IOC_NRSHIFT + _IOC_NRBITS)
 _IOC_SIZESHIFT = (_IOC_TYPESHIFT + _IOC_TYPEBITS)
 _IOC_DIRSHIFT = (_IOC_SIZESHIFT + _IOC_SIZEBITS)
 
-
 ###
 # direction bits
 _IOC_NONE = 0
@@ -38,10 +37,8 @@ _IOC_READ = 2
 
 
 def _IOC(dir, type, nr, size):
-        return int((((dir)  << _IOC_DIRSHIFT) |
-                   ((type) << _IOC_TYPESHIFT) |
-                   ((nr)   << _IOC_NRSHIFT) |
-                   ((size) << _IOC_SIZESHIFT)) & 0xffffffff)
+    return int((((dir) << _IOC_DIRSHIFT) | ((type) << _IOC_TYPESHIFT) | ((nr) << _IOC_NRSHIFT) |
+                ((size) << _IOC_SIZESHIFT)) & 0xffffffff)
 
 
 # used to create numbers

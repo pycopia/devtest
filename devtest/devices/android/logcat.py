@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Logcat utilities.
 
 This framework interfaces to logcat in binary mode. These are tools to read binary logcat files.
@@ -65,6 +64,7 @@ class LogcatMessage:
         lid: (int) The log ID.
         uid: (int) The user ID of the process that sent this message.
     """
+
     def __init__(self, pid, tid, sec, nsec, lid, uid, msg):
         self.pid = pid
         self.tid = tid
@@ -84,9 +84,8 @@ class LogcatMessage:
             self.message = msg.decode("utf8")
 
     def __str__(self):
-        return "{:11.6f} {}:{} {}|{}¦{}".format(self.timestamp, self.pid, self.tid,
-                                                self.tag, self.priority.name,
-                                                self.message)
+        return "{:11.6f} {}:{} {}|{}¦{}".format(self.timestamp, self.pid, self.tid, self.tag,
+                                                self.priority.name, self.message)
 
 
 class LogcatFileReader:
@@ -215,7 +214,6 @@ def to_logcat_filereader(analyzer, data=None, config=None):
 
 
 signals.data_convert.connect(to_logcat_filereader)
-
 
 if __name__ == "__main__":
     fname = sys.argv[1] if len(sys.argv) > 1 else None

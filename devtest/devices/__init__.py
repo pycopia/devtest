@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Where device controllers live.
 
@@ -23,10 +22,12 @@ import abc
 
 
 class Controller(metaclass=abc.ABCMeta):
+
     def __init__(self, equipment):
         self._equipment = equipment
 
 
 class Software(metaclass=abc.ABCMeta):
+
     def __init__(self, software):
         self._software = software

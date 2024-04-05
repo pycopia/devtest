@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Information about process memory usage.
 """
 
@@ -22,6 +21,7 @@ from collections import namedtuple
 
 
 class VmFlags:
+
     def __init__(self, flags):
         self._flags = flags  # TODO break out flags to attributes
 
@@ -37,13 +37,11 @@ class VmFlags:
         return cls(bytestring.decode("ascii"))
 
 
-MemUsage = namedtuple("MemUsage",
-                      ["Size", "KernelPageSize", "MMUPageSize", "Rss", "Pss",
-                       "Uss", "Shared_Clean", "Shared_Dirty", "Private_Clean",
-                       "Private_Dirty", "Referenced", "Anonymous", "LazyFree",
-                       "AnonHugePages", "ShmemPmdMapped", "Shared_Hugetlb",
-                       "Private_Hugetlb", "Swap", "SwapPss", "Locked",
-                       "VmFlags"])
+MemUsage = namedtuple("MemUsage", [
+    "Size", "KernelPageSize", "MMUPageSize", "Rss", "Pss", "Uss", "Shared_Clean", "Shared_Dirty",
+    "Private_Clean", "Private_Dirty", "Referenced", "Anonymous", "LazyFree", "AnonHugePages",
+    "ShmemPmdMapped", "Shared_Hugetlb", "Private_Hugetlb", "Swap", "SwapPss", "Locked", "VmFlags"
+])
 
 
 # Not using Python 3.7 defaults to keep compatible with Python 3.6
@@ -74,8 +72,15 @@ class VirtualMemoryArea:
         p = private (copy on write)
     """
 
-    def __init__(self, name: str, start: int, end: int, offset: int, perms: str,
-                 device: str, inode: int, usage: MemUsage = None):
+    def __init__(self,
+                 name: str,
+                 start: int,
+                 end: int,
+                 offset: int,
+                 perms: str,
+                 device: str,
+                 inode: int,
+                 usage: MemUsage = None):
         self.name = name
         self.start = start
         self.end = end
@@ -86,10 +91,9 @@ class VirtualMemoryArea:
         self._usage = usage
 
     def __str__(self):
-        return "{:16x}-{:16x} {} {:16x} {} {} {}".format(
-            self.start, self.end, self.perms, self.offset,
-            self.device, self.inode,
-            self.name if self.name is not None else "")
+        return "{:16x}-{:16x} {} {:16x} {} {} {}".format(self.start, self.end, self.perms,
+                                                         self.offset, self.device, self.inode,
+                                                         self.name if self.name is not None else "")
 
     @property
     def usage(self):
@@ -115,8 +119,7 @@ class VirtualMemoryArea:
             else:
                 name = name.decode("ascii")
         return cls(name, int(start_s, 16), int(end_s, 16), int(parts[2], 16),
-                   (parts[1]).decode("ascii"),
-                   (parts[3]).decode("ascii"), int(parts[4]))
+                   (parts[1]).decode("ascii"), (parts[3]).decode("ascii"), int(parts[4]))
 
 
 class Maps(list):
@@ -154,8 +157,7 @@ class Maps(list):
                     val = int(val) * units[unit]
                     currentusage[name.decode("ascii")] = val
         if currentvma is not None:
-            currentusage["Uss"] = (currentusage["Private_Clean"] +
-                                   currentusage["Private_Dirty"])
+            currentusage["Uss"] = (currentusage["Private_Clean"] + currentusage["Private_Dirty"])
             currentvma.usage = MemUsage(**currentusage)
         return me
 

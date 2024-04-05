@@ -1,36 +1,26 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Main test runner for running any runnable target.
 """
 
 import sys
 import os
+import signal
 from datetime import datetime, timezone
 
 import pytz
+from devtest import logging
 
-from .. import logging
+from .. import importlib
 from .. import services
 from .. import debugger
-from ..ui import simpleui
+from ..ui import ptui
 from ..core.constants import TestResult
 
 from . import bases
 from . import reports
 from ..db import testbeds
-from ..core.exceptions import TestRunnerError, ReportFindError
-from .signals import (run_start, run_end, run_error, report_testbed,
-                      report_comment, report_final, logdir_location)
+from ..core.exceptions import TestRunnerError, ReportFindError, TestRunAbort
+from .signals import (run_start, run_end, run_error, report_testbed, report_comment, report_final,
+                      logdir_location)
 
 ModuleType = type(os)
 
@@ -41,33 +31,45 @@ class TestRunner:
     Handled running objects, initializing reports, testbeds, services, etc.
     then runs tests and cleans up afterwards.
     """
+
     def __init__(self, cfg):
         self.config = cfg
         self._testbed = None
         self._origfd = None
+        if tmpsuitename := cfg.get("suite"):
+            self._tempsuite = importlib.get_object(tmpsuitename)
+            if not issubclass(self._tempsuite, bases.TestSuite):
+                raise ValueError("The suite config option must be a TestSuite.")
+        else:
+            self._tempsuite = bases.TestSuite
 
     @property
     def testbed(self):
         if self._testbed is None:
             cf = self.config
-            self._testbed = testbeds.get_testbed(cf.get("testbed", "default"),
-                                                 debug=cf.flags.debug)
-            report_testbed.send(self, testbed=self._testbed._testbed)
+            testbed = testbeds.get_testbed(cf.get("testbed", "default"), debug=cf.flags.debug)
+            testbed.claim(cf)  # may raise TestRunAbort
+            report_testbed.send(self, testbed=testbed._testbed)
+            self._testbed = testbed
         return self._testbed
 
     @testbed.deleter
     def testbed(self):
         if self._testbed is not None:
             self._testbed.finalize()
+            self._testbed.release(self.config)
             self._testbed = None
 
     def runall(self, objects):
         """Main entry to run a list of runnable objects."""
         rl = []
-        self._ui = simpleui.SimpleUserInterface()
         self.initialize()
         try:
             rl = [self.run_objects(objects) for i in range(self.config.flags.repeat)]
+        except TestRunAbort as err:
+            logging.exception_error("TestRunner.runall:", err)
+            run_error.send(self, exc=err)
+            return TestResult.ABORTED
         finally:
             self.finalize()
         return _aggregate_returned_results(rl)
@@ -102,7 +104,7 @@ class TestRunner:
             elif objecttype is ModuleType and hasattr(obj, "run"):
                 results.append(self._run_module(obj))
             else:
-                logging.warn("{!r} is not a runnable object.".format(obj))
+                logging.warning("{!r} is not a runnable object.".format(obj))
         # Run any accumulated bare test classes.
         if testcases:
             if len(testcases) > 1:
@@ -143,7 +145,9 @@ class TestRunner:
             INCOMPLETE, or ABORT.
         """
 
-        suite = bases.TestSuite(self.config, self.testbed, self._ui,
+        suite = self._tempsuite(self.config,
+                                self.testbed,
+                                self._ui,
                                 name="{}Suite".format(testclass.__name__))
         suite.add_test(testclass, *args, **kwargs)
         suite.run()
@@ -163,37 +167,38 @@ class TestRunner:
             The return value of the temporary TestSuite instance.
         """
 
-        suite = bases.TestSuite(self.config, self.testbed, self._ui,
-                                name="RunTestsTempSuite")
+        suite = self._tempsuite(self.config, self.testbed, self._ui, name="RunTestsTempSuite")
         suite.add_tests(testclasses)
         suite.run()
         return suite.result
 
     def initialize(self):
         """Perform any initialization needed by the test runner.
-
         """
+        signal.signal(signal.SIGTERM, _exitingsignal)
+        signal.signal(signal.SIGHUP, _exitingsignal)
         cf = self.config
         cf.timezone = get_local_timezone()
         cf.resultsdir = os.path.expandvars(os.path.expanduser(cf.resultsdir))
         cf.username = os.environ["USER"]
-        logging.openlog(ident="Devtest", usestderr=cf.flags.stderr)
+        self._ui = ptui.PromptToolkitUserInterface()
+        self.logger = logging.Logger("devtest", usestderr=cf.flags.stderr)
         self.initialize_report()
-        start_time = datetime.now(timezone.utc)
-        ts = start_time.strftime("%Y%m%d_%H%M%S")
+        cf.start_time = datetime.now(timezone.utc)
+        ts = cf.start_time.strftime("%Y%m%d_%H%M%S")
         cf.logdir = os.path.join(cf.resultsdir, ts)
         if not os.path.exists(cf.logdir):
             os.makedirs(cf.logdir)
         # Initialize all service modules
         services.initialize()
-        run_start.send(self, time=start_time)
+        run_start.send(self, time=cf.start_time)
         comment = cf.get("comment")
         if comment:
             report_comment.send(self, message=comment)
         logdir_location.send(self, path=cf.logdir)
         # Direct our stderr to a file if stderr option (see stderr) is not set.
         if not cf.flags.stderr:
-            fname = os.path.join(cf.logdir, "runner.stderr")
+            fname = os.path.join(cf.logdir, "runner-stderr.txt")
             self._origfd = _redirect_stderr(fname)
 
     def initialize_report(self):
@@ -206,10 +211,10 @@ class TestRunner:
             try:
                 rpt = reports.get_report(reportname)
             except ReportFindError as err:
-                logging.error(str(err))
+                self.logger.error(str(err))
                 raise TestRunnerError("Cannot continue without report.") from err
-        assert isinstance(rpt, reports.BaseReport), \
-            "A report needs to be instance of reports.BaseReport"
+        if not isinstance(rpt, reports.BaseReport):
+            raise TestRunnerError("A report needs to be instance of reports.BaseReport")
         rpt.initialize(config=cf)
         self.report = rpt
 
@@ -217,32 +222,44 @@ class TestRunner:
         """Perform any finalization needed by the test runner.
         Sends runner end messages to report. Finalizes report.
         """
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        signal.signal(signal.SIGHUP, signal.SIG_DFL)
         run_end.send(self, time=datetime.now(timezone.utc))
         if self._origfd is not None:
             _restore_stderr(self._origfd)
             self._origfd = None
-        self.testbed.finalize()
         self.report.finalize()
         services.finalize()
         report_final.send(self.report)
+        self.logger.close()
+        del self._ui
         del self.testbed
         del self.config
         del self.report
+        del self.logger
 
 
 def _aggregate_returned_results(resultlist):
-    resultset = {TestResult.PASSED: 0, TestResult.FAILED: 0,
-                 TestResult.EXPECTED_FAIL: 0, TestResult.INCOMPLETE: 0,
-                 TestResult.NA: 0, None: 0}
+    resultset = {
+        TestResult.PASSED: 0,
+        TestResult.FAILED: 0,
+        TestResult.EXPECTED_FAIL: 0,
+        TestResult.INCOMPLETE: 0,
+        TestResult.ABORTED: 0,
+        TestResult.NA: 0,
+        None: 0
+    }
     for res in resultlist:
         resultset[res] += 1
-    # Fail if any fail, else incomplete if any incomplete, pass if all pass.
+    # Fail if any fail, else incomplete if any incomplete, pass only if all passed.
     if resultset[TestResult.FAILED] > 0:
         return TestResult.FAILED
     elif resultset[TestResult.INCOMPLETE] > 0:
         return TestResult.INCOMPLETE
     elif resultset[None] > 0:
         return TestResult.NA
+    elif resultset[TestResult.ABORTED] > 0:
+        return TestResult.ABORTED
     elif resultset[TestResult.PASSED] > 0:
         return TestResult.PASSED
     else:
@@ -250,7 +267,8 @@ def _aggregate_returned_results(resultlist):
 
 
 def _redirect_stderr(name):
-    fd = os.open(name, os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
+    fd = os.open(name,
+                 os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_NOFOLLOW | os.O_SYNC,
                  mode=0o644)
     stderr_orig = os.dup(2)
     os.dup2(fd, 2)
@@ -264,6 +282,11 @@ def _restore_stderr(oldfd):
     os.close(oldfd)
 
 
+def _exitingsignal(sig, stack):
+    name = signal.strsignal(sig)
+    raise SystemExit(f"Caught signal {name}({sig}), exiting.")
+
+
 def get_local_timezone():
     try:
         link = os.readlink("/etc/localtime")
@@ -271,5 +294,3 @@ def get_local_timezone():
     except OSError:
         tzname = open("/etc/timezone").read().strip()
     return pytz.timezone(tzname)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

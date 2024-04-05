@@ -20,7 +20,6 @@ ascii_uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 ascii_letters = ascii_lowercase + ascii_uppercase
 digits = '0123456789'
 
-
 tbl = ["_"] * 256
 for c in ascii_letters:
     tbl[ord(c)] = c
@@ -28,7 +27,6 @@ for c in digits:
     tbl[ord(c)] = c
 _IDENTTABLE = "".join(tbl)
 del tbl, c
-
 
 _KEYWORDS = {}
 for kw in keyword.kwlist:

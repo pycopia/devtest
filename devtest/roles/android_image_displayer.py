@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Controller role that displays images on an Android device screen.
 """
@@ -45,12 +44,10 @@ class ImageDisplayer(BaseRole):
 
     def initialize(self):
         self._controller = controller.AndroidController(self._equipment)
-        self.destdir = self.config.get("destdir",
-                                       ImageDisplayer.DESTINATION_DEFAULT)
+        self.destdir = self.config.get("destdir", ImageDisplayer.DESTINATION_DEFAULT)
         # turn off auto brightness and dim screen so target doesn't get washed
         # out.
-        brightness = self.config.get("brightness",
-                                     ImageDisplayer.BRIGHTNESS_DEFAULT)
+        brightness = self.config.get("brightness", ImageDisplayer.BRIGHTNESS_DEFAULT)
         self._controller.settings.put("system", "screen_brightness_mode", False)
         self._controller.settings.put("system", "screen_brightness", brightness)
 
@@ -88,6 +85,7 @@ if __name__ == "__main__":
     SERNO = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("ANDROID_SERIAL")
 
     class MockEquipment:
+
         def __init__(self, serno):
             self.serno = serno
             self._attribs = {

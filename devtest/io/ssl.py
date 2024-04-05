@@ -9,13 +9,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Async SSL socket support.
 """
 
 from __future__ import generator_stop
 
 from curio.ssl import *  # noqa
-
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

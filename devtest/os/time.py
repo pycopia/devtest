@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Timing related functions that also work with the asynchronous core framework.
 """
@@ -21,7 +20,6 @@ import signal
 from functools import wraps
 
 from devtest.io.reactor import get_kernel, sleep
-
 
 __all__ = ['delay', 'delay_before', 'delay_after', 'now', 'iotimeout']
 
@@ -35,29 +33,38 @@ def delay(secs):
 def delay_before(seconds):
     """Decorator that delays <value> seconds before code in method actually runs.
     """
+
     def _wrapper(f):
+
         @wraps(f)
         def _lambda(*iargs, **ikwargs):
             delay(seconds)
             return f(*iargs, **ikwargs)
+
         return _lambda
+
     return _wrapper
 
 
 def delay_after(seconds):
     """Decorator that delays <value> seconds after code in method actually runs before returning.
     """
+
     def _wrapper(f):
+
         @wraps(f)
         def _lambda(*iargs, **ikwargs):
             rv = f(*iargs, **ikwargs)
             delay(seconds)
             return rv
+
         return _lambda
+
     return _wrapper
 
 
 def iotimeout(function, *args, timeout=5.0):
+
     def _timeout(sig, st):
         raise TimeoutError("IO operation timed out for {!r}.".format(function.__name__))
 

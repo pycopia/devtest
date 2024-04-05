@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Monitor CPU usage of a process on Android.
 """
 
@@ -104,7 +103,6 @@ def make_cpu_monitor(serialno, pid, interval):
                 timestamp, utilization = await self.get_current()
                 accumulator.append((timestamp - self._starttime, utilization))
 
-
     async def docpumonitor(serialno, pid, interval):
         cpudata = []
         aadc = await adb.AsyncAndroidDeviceClient(serialno)
@@ -134,5 +132,6 @@ def initialize(manager):
 def finalize(manager):
     srv = manager.unregister("androidcpu")
     srv.close()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

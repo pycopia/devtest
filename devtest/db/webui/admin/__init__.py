@@ -18,7 +18,6 @@ from devtest import logging
 from flask import Flask
 from flask_basicauth import BasicAuth
 
-
 app = Flask(__name__)
 app._logger = logging.Logger(app.logger_name)
 app.secret_key = 'sKlSXXStEstbdlKD94$$kldspcwldkKDAld'

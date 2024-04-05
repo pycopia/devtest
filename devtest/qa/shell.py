@@ -1,15 +1,3 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Shell UI (command) for test framework.
 
 Collects options and arguments from the command line, then invokes the
@@ -36,12 +24,11 @@ import sys
 from .. import config
 from .. import options
 from .. import debugger
-from ..textutils import colors
+from ..utils import colors
 from . import loader
 from . import runner
 from . import scanner
 from . import bases
-
 
 ModuleType = type(sys)
 
@@ -49,43 +36,49 @@ ModuleType = type(sys)
 USAGE = r"""devtester [options] [-c <configfile>]
     [<globalconfig>...] [<testname> [<testconfig>]] ...
 
-Select and run tests or test suites from the command line.
+Select and run tests or test scenarios from the command line.
 
 The globalconfig and testconfig arguments are in long option format
-(e.g. --arg1=val1).
+(e.g. --arg1=val1). The test runner options are all in the short, `-X`, form.
 
 Options:
 
     -h  - This help.
     -l  - List available tests.
-    -v  - Be more verbose, if possible.
+    -v  - Be more verbose, if possible. Increase verbosity for each occurence.
+    -r <x> - Repeat targeted test object this many times. Default 1.
     -c  - Additional YAML config file to merge into configuration.
-    -C  - Show configuration, after overrides applied.
-    -S  - Show information about selected test case (source) and exit.
-    -L  - List available testbeds.
-    -R  - List available reports that may be used to direct output to.
     -d  - Debug mode. Enter a debugger if a test has an error other
           than a failure condition.
     -D  - Debug framework mode. Enter a debugger on uncaught exception within runner.
     -E  - Show stderr during run. By default stderr is redirected to a file.
           Also enables logging to stderr.
+    -I  - Do NOT run any tests marked INTERACTIVE. Default is to run them.
     -K  - Keep any temporary files or directories that modules might create.
     -P  - Interactively pick a test to run.
     -T  - Interactively pick a testbed to run on.
-    -r <x> - Repeat targeted test object this many times. Default 1.
+    -C  - Show configuration, after overrides applied.
+    -S  - Show information about selected test case (source) and exit.
+    -L  - List available testbeds.
+    -R  - List available reports that may be used to direct output to.
+    -s  - Enter a REPL (shell) in the context of a test case procedure. Specified tests are ignored.
 
 Example:
 
-  devtester -d --reportname=default --testbed=mytestbed --global1=globalarg \
-          testcases.mytest --mytestopt=arg
+    devtester -d --reportname=default --testbed=mytestbed --global1=globalarg \
+        testcases.system.MyTest --mytestoption=arg
 
-That will run a test in debug mode (-d), select the report named "default",
-select the (pre-defined) test bed named "mytestbed", set global option "global1"
-to "globalarg, and select the testcase "testcases.mytest. That test will get its
-own option in the `options` attribute with key "mytestopt", and argument "arg".
+    That will run a test in debug mode (-d), select the report named "default", select the
+    (pre-defined) test bed named "mytestbed", set global option "global1" to "globalarg, and select
+    the testcase "testcases.system.MyTest. That test will get its own option in the `options`
+    attribute with key "mytestoption", and argument "arg".
 
-Use the `-l` option to print a list of runnable objects there are found when
-scanned.
+
+    devtester --testbed=mytestbed testcases.dev.CheckMyDevFlubber --args=procedurearg1,procedurearg2
+
+    If a test case procedure takes arguments, you can specify them with the `--args` option.
+
+Use the `-l` option to print a list of runnable objects there are found when scanned.
 """  # noqa
 
 
@@ -104,6 +97,7 @@ class ShellInterface:
         repeat = 1
         extra_config = None
         do_list = False
+        do_repl = False
         do_list_testbeds = False
         do_pick_testbed = False
         do_list_reports = False
@@ -111,8 +105,9 @@ class ShellInterface:
         do_show_testcase = False
         show_stderr = False
         keep = False
+        run_interactive = True
         try:
-            opts, self.arguments = options.getopt(argv, "h?dDEKvlLRSCc:r:PT")
+            opts, self.arguments = options.getopt(argv, "h?dDEKvlLRSCc:r:sPTI")
         except options.GetoptError as geo:
             _usage(geo)
         for opt, optarg in opts:
@@ -126,6 +121,8 @@ class ShellInterface:
                 verbose += 1
             elif opt == "l":
                 do_list = True
+            elif opt == "s":
+                do_repl = True
             elif opt == "c":
                 extra_config = optarg
             elif opt == "r":
@@ -146,20 +143,23 @@ class ShellInterface:
                 keep = True
             elif opt == "P":
                 self.pick_tests = True
+            elif opt == "I":
+                run_interactive = False
 
         globalargs = self.arguments.pop(0)
-        self.config = cf = config.get_config(initdict=globalargs.options,
-                                             _filename=extra_config)
+        self.config = cf = config.get_config(initdict=globalargs.options, _filename=extra_config)
         # Adjust the configuration with the commandline options.
         cf.flags.debug = debug
         cf.flags.verbose = verbose
         cf.flags.do_list = do_list
+        cf.flags.do_repl = do_repl
         cf.flags.do_list_testbeds = do_list_testbeds
         cf.flags.do_list_reports = do_list_reports
         cf.flags.do_show_config = do_show_config
         cf.flags.do_show_testcase = do_show_testcase
         cf.flags.stderr = show_stderr
         cf.flags.keep = keep
+        cf.flags.interactive = run_interactive
         cf.flags.repeat = max(repeat, 1)
         if do_pick_testbed:
             cf["testbed"] = pick_testbed()
@@ -167,6 +167,8 @@ class ShellInterface:
     def run(self):
         if self.config.flags.do_list:
             return do_list()
+        if self.config.flags.do_repl:
+            return run_shell(self.config)
         if self.config.flags.do_show_config:
             config.show_config(self.config)
             return
@@ -178,6 +180,7 @@ class ShellInterface:
             return
         if not self.arguments and self.pick_tests:
             pick_tests(self.arguments)
+            print(" ".join(str(opt) for opt in self.arguments))
         testlist = errlist = None
         try:
             testlist, errlist = loader.load_selections(self.arguments)
@@ -217,16 +220,13 @@ def do_list():
         errlist.append(err)
 
     print(colors.white("Runnable objects:"))
-    for obj in scanner.iter_all_runnables(onerror=_onerror,
-                                          exclude="analyze"):
+    for obj in scanner.iter_all_runnables(onerror=_onerror, exclude=["analyze", "resources"]):
         if type(obj) is ModuleType:
             print("    module", colors.cyan("{}".format(obj.__name__)))
         elif issubclass(obj, bases.TestCase):
-            print("      test", colors.green("{}.{}".format(
-                obj.__module__, obj.__name__)))
+            print("      test", colors.green("{}.{}".format(obj.__module__, obj.__name__)))
         elif issubclass(obj, bases.Scenario):
-            print("  scenario", colors.yellow("{}.{}".format(
-                obj.__module__, obj.__name__)))
+            print("  scenario", colors.yellow("{}.{}".format(obj.__module__, obj.__name__)))
         else:
             print(colors.red("  Unknown: {!r}".format(obj)))
     if errlist:
@@ -249,7 +249,7 @@ def list_testbeds(verbose):
     models.connect()
     print("Available testbeds:")
     if verbose:
-        for tb in models.TestBed.select():
+        for tb in models.TestBed.select().order_by(models.TestBed.name).execute():
             print(" ", colors.green(tb.name))
             for te in tb.testequipment:
                 print("   ", te.equipment.name, "role:", te.function.name)
@@ -259,31 +259,71 @@ def list_testbeds(verbose):
 
 
 def pick_testbed():
-    from devtest.ui import simpleui
+    """Present a radio-button list to choose a test bed.
+    """
+    from devtest.ui import ptui
     from devtest.db import models
+
+    ui = ptui.PromptToolkitUserInterface()
     models.connect()
     tblist = models.TestBed.get_list()
-    return simpleui.choose(tblist, defidx=tblist.index("default"),
-                           prompt="Choose testbed")
+    return ui.choose(tblist, defidx=tblist.index("default"), prompt="Choose testbed")
 
 
 def pick_tests(argumentlist):
-    from devtest.ui import simpleui
-    testlist = ["-done-"]
-    for obj in scanner.iter_all_runnables(exclude="analyze"):
+    """Present a checkbox list with scenarios grouped up front, and colored differently.
+    """
+    from devtest.ui import ptui
+
+    ui = ptui.PromptToolkitUserInterface()
+    modlist = []
+    scenariolist = []
+    testlist = []
+    for obj in scanner.iter_all_runnables(exclude=["analyze", "resources"]):
         if type(obj) is ModuleType:
-            testlist.append(obj.__name__)
+            modlist.append(obj.__name__)
         elif issubclass(obj, bases.TestCase):
-            testlist.append("{}.{}".format(obj.__module__, obj.__name__))
+            tcname = "{}.{}".format(obj.__module__, obj.__name__)
+            display = [("fg:ansigreen", tcname.replace("testcases.", ""))]
+            testlist.append((tcname, display))
         elif issubclass(obj, bases.Scenario):
-            testlist.append("{}.{}".format(obj.__module__, obj.__name__))
-    while 1:
-        sel = simpleui.choose(testlist,
-                              prompt="Choose testable (-done- value to end)")
-        if sel == "-done-":
-            break
+            tcname = "{}.{}".format(obj.__module__, obj.__name__)
+            display = [("fg:ansiyellow", tcname.replace("testcases.", ""))]
+            scenariolist.append((tcname, display))
+    testlist.sort(key=lambda s: s[0].replace("testcases.", ""))
+    scenariolist.sort(key=lambda s: s[0].replace("testcases.", ""))
+    choices = modlist + scenariolist + testlist
+    selected = ui.choose_multiple(choices, prompt="Choose Runnables")
+    if selected is None:
+        return
+    for sel in selected:
         optset = options.OptionSet(sel)
         argumentlist.append(optset)
+
+
+def run_shell(config):
+    """Run a Python shell in the context of a test case procedure.
+
+    Use this to try out all the framework APIs interactively. A history of activity is saved
+    in the ~/.devtester_history file.
+    """
+    from devtest.qa import repl
+    from devtest.core.exceptions import TestImplementationError
+
+    class InteractiveTestCase(bases.TestCase):
+
+        def procedure(self):
+            cons = repl.InteractiveConsole(namespace=locals(),
+                                           ps1="TestCase> ",
+                                           history="~/.devtester_history",
+                                           debug=self.config.flags.debug)
+            cons.interact(banner="Now try out the methods and other functions.")
+
+    rnr = runner.TestRunner(config)
+    try:
+        return rnr.runall([InteractiveTestCase])
+    except TestImplementationError:  # ignore this since interactive use often doesn't set outcome.
+        pass
 
 
 def _print_exception(ex, val):
@@ -316,5 +356,3 @@ def devtester(argv):
 
 if __name__ == "__main__":
     devtester(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

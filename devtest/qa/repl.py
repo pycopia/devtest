@@ -1,17 +1,4 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 # Likely, the original license is PSF.
-
 """Custom REPL copied from code module and modified.
 """
 
@@ -19,19 +6,29 @@ import sys
 import os
 import readline
 import traceback
-import rlcompleter  # noqa
 from codeop import CommandCompiler
 
+from jedi import Interpreter
+
+from devtest import debugger
 from devtest.ui.simpleui import ConsoleIO
-from devtest.textutils import colors
+from devtest.utils import colors
 
 
 class InteractiveConsole:
+    """A general purpose Python REPL with colorizing enhancements and namespace completion.
+    """
 
-    def __init__(self, namespace=None, io=None, ps1="Python> ", ps2="..more> ",
-                 history=None):
+    def __init__(self,
+                 namespace=None,
+                 io=None,
+                 ps1="Python> ",
+                 ps2="..more> ",
+                 history=None,
+                 debug=False):
         self._ns = namespace or globals()
         self._io = io or ConsoleIO()
+        self._debug = debug
         if history:
             self.history = os.path.expandvars(os.path.expanduser(history))
         else:
@@ -52,6 +49,9 @@ class InteractiveConsole:
             except FileNotFoundError:
                 pass
         self.compiler = CommandCompiler()
+        # set up completer
+        self._oldcompleter = readline.get_completer()
+        readline.set_completer(self.complete)
         self._reset()
 
     def _reset(self):
@@ -61,6 +61,20 @@ class InteractiveConsole:
         sys.ps1, sys.ps2 = self.saveps1, self.saveps2
         if self.history:
             readline.write_history_file(self.history)
+        if self._oldcompleter:
+            readline.set_completer(self._oldcompleter)
+
+    def complete(self, text, state):
+        if state == 0:
+            interpreter = Interpreter(text, [self._ns])
+            completions = interpreter.complete(fuzzy=False)
+            self._matches = [
+                text[:len(text) - c._like_name_length] + c.name_with_symbols for c in completions
+            ]
+        try:
+            return self._matches[state]
+        except IndexError:
+            return None
 
     def runsource(self, source, filename="<repl>", symbol="single"):
         try:
@@ -81,7 +95,12 @@ class InteractiveConsole:
         except SystemExit:
             raise
         except:  # noqa
-            self.showtraceback()
+            if self._debug:
+                ex, val, tb = sys.exc_info()
+                del tb
+                debugger.from_exception(val)
+            else:
+                self.showtraceback()
 
     def showsyntaxerror(self, filename=None):
         type, value, tb = sys.exc_info()
@@ -112,13 +131,14 @@ class InteractiveConsole:
             self.print_exc(" From: ", val)
 
     def showtraceback(self):
-        ex, val, tb = sys.exc_info()
+        _, val, tb = sys.exc_info()
         self.print_exc("", val)
         try:
             ss = traceback.extract_tb(tb)
             self._io.write("".join(ss.format()[2:]))
         finally:
-            ex = val = tb = None
+            # remove references to exception objects in case this is in traceback path.
+            _ = val = tb = None
 
     def interact(self, banner=None):
         if banner:
@@ -135,6 +155,8 @@ class InteractiveConsole:
                     line = self._io.input(prompt)
                 except EOFError:
                     self._io.write("\n")
+                    if self.history:
+                        readline.write_history_file(self.history)
                     break
                 else:
                     more = self.push(line)
@@ -155,5 +177,3 @@ class InteractiveConsole:
 if __name__ == "__main__":
     cons = InteractiveConsole()
     cons.interact("Test REPL banner.")
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

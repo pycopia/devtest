@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Universal constants and enumerations. These may be used in code, and are
 also translated to enumerations or integers in persistent storage.
 """
@@ -32,9 +31,8 @@ class TestResult(Enum):
         return self.value == TestResult.PASSED
 
     def not_passed(self):
-            return self.value in (TestResult.FAILED, TestResult.EXPECTED_FAIL,
-                                  TestResult.SKIPPED, TestResult.INCOMPLETE,
-                                  TestResult.ABORT)
+        return self.value in (TestResult.FAILED, TestResult.EXPECTED_FAIL, TestResult.SKIPPED,
+                              TestResult.INCOMPLETE, TestResult.ABORT)
 
     def is_failed(self):
         return self.value == TestResult.FAILED
@@ -121,5 +119,6 @@ class NetworkType(Enum):
     # BSD derived
     Dummy = 241
     Bluetooth = 248
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

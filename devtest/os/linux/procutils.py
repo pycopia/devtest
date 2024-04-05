@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Utilities for processes and programs.
 """
 
@@ -63,5 +62,6 @@ def which(basename):
         if os.access(testname, os.F_OK | os.X_OK):
             return testname
     return None
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

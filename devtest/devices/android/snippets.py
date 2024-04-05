@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """An interface to snippets on an Android device.
 
 Implemented as asynchronous coroutines.
@@ -23,7 +22,6 @@ from devtest import json
 from devtest import ringbuffer
 from devtest.io import socket
 from devtest.io import reactor
-
 
 _get_kernel = reactor.get_kernel
 
@@ -49,6 +47,7 @@ def counter():
 
 
 class _SnippetsProtocol:
+
     def __init__(self, adb, serial, package):
         self._adb = adb
         self._serial = serial
@@ -65,9 +64,7 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
         self._server_task = None
         host_port = portpicker.pick_unused_port()
         self.host_port = host_port
-        self._sock = socket.socket(socket.AF_INET,
-                                   socket.SOCK_STREAM,
-                                   socket.IPPROTO_TCP)
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         self._uid = _OldSnippetsProtocol.UNKNOWN_UID
         self._counter = counter()
 
@@ -76,8 +73,10 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
             return
         await self._rpc_close()
         await self._sock.close()
-        argv = ['am', 'instrument', '-w', '-e', 'action', 'stop',
-                '{package}/com.google.android.mobly.snippet.SnippetRunner'.format(package=self._package)]
+        argv = [
+            'am', 'instrument', '-w', '-e', 'action', 'stop',
+            '{package}/com.google.android.mobly.snippet.SnippetRunner'.format(package=self._package)
+        ]
         await self._adb.command(argv)
         await self._server_task.cancel()
         await self._server_task.join()
@@ -88,8 +87,10 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
         self._server_task = None
 
     async def connect(self):
-        argv = ['am', 'instrument', '-w', '-e', 'action', 'start',
-                '{package}/com.google.android.mobly.snippet.SnippetRunner'.format(package=self._package)]
+        argv = [
+            'am', 'instrument', '-w', '-e', 'action', 'start',
+            '{package}/com.google.android.mobly.snippet.SnippetRunner'.format(package=self._package)
+        ]
         stdout = ringbuffer.RingBuffer(4096)
         stderr = ringbuffer.RingBuffer(4096)
         task = await self._adb.start(argv, stdout, stderr)
@@ -113,8 +114,10 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
         await self._sock.connect(("localhost", self.host_port))
 
     def __getattr__(self, name):
+
         def _fun(*args, **kwargs):
             return self._rpc(name, args, kwargs)
+
         return _fun
 
     def _rpc(self, name, args, kwargs):
@@ -152,7 +155,13 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
         if self._uid == _OldSnippetsProtocol.UNKNOWN_UID:
             await self._proto_init()
         rpcid = next(self._counter)
-        data = {'cmd': 'continue', 'uid':self._uid, 'id': rpcid, 'method': methodname, 'params': args}
+        data = {
+            'cmd': 'continue',
+            'uid': self._uid,
+            'id': rpcid,
+            'method': methodname,
+            'params': args
+        }
         resp = await self._transact(data)
         if resp is not None:
             if resp["id"] != rpcid:
@@ -168,6 +177,8 @@ class _NewSnippetsProtocol(_SnippetsProtocol):
 
     def _init(self):
         pass
+
+
 #  TODO(dart)
 
 
@@ -213,7 +224,7 @@ if __name__ == "__main__":
 
     snippets = SnippetsInterface(os.environ["ANDROID_SERIAL"])
     print("loading")
-    snippets.load("mbs","com.google.android.mobly.snippet.bundled")
+    snippets.load("mbs", "com.google.android.mobly.snippet.bundled")
     print("waiting")
     time.sleep(5)
     print(snippets.mbs.getTelephonyCallState())

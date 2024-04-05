@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """TestBed runtime.
 
 This is the top-level run-time container for Testbed objects.  It also
@@ -33,6 +32,7 @@ class TestBedRuntime:
 
     Provides a mapping interface to the attributes defined in the database.
     """
+
     def __init__(self, testbedrow, debug=False):
         self._testbed = testbedrow
         self._debug = debug
@@ -59,15 +59,13 @@ class TestBedRuntime:
         s = ["TestBed {} with:".format(self._testbed.name)]
         for teq in self._testbed.testequipment:
             s.append("  {}".format(teq.equipment))
-        s.append("  With roles: {}".format(
-            ", ".join(self._testbed.get_supported_roles())))
+        s.append("  With roles: {}".format(", ".join(self._testbed.get_supported_roles())))
         return "\n".join(s)
 
     def get_equipment(self, name, role="unspecified"):
         """Get any equipment runtime from the configuration by name."""
         try:
-            eqrow = models.Equipment.select().where(
-                models.Equipment.name.contains(name)).get()
+            eqrow = models.Equipment.select().where(models.Equipment.name.contains(name)).get()
         except models.DoesNotExist as err:
             raise ConfigError("Bad equipment name {!r}: {!s}".format(name, err))
         return EquipmentRuntime(eqrow, role, debug=self._debug)
@@ -136,6 +134,7 @@ class TestBedRuntime:
 class EquipmentModelRuntime:
     """Runtime wrapper for equipment models.
     """
+
     def __init__(self, equipmentmodel):
         d = {}
         d["name"] = equipmentmodel.name
@@ -145,9 +144,7 @@ class EquipmentModelRuntime:
         self._attributes = d
 
     def __str__(self):
-        return "{} {}".format(
-            self._attributes["manufacturer"],
-            self._attributes["name"])
+        return "{} {}".format(self._attributes["manufacturer"], self._attributes["name"])
 
     def __getitem__(self, key):
         return self._attributes[key]
@@ -192,7 +189,7 @@ class EquipmentRuntime:
                 logging.warning("Equipment account not marked as admin.")
             d["login"] = equipmentrow.account.login
             d["password"] = equipmentrow.account.password
-        if equipmentrow.user:    # Alternate user account
+        if equipmentrow.user:  # Alternate user account
             if equipmentrow.user.admin:
                 logging.warning("Equipment user marked as admin.")
             d["user"] = equipmentrow.user.login
@@ -274,8 +271,7 @@ class EquipmentRuntime:
 
     @property
     def primary_interface(self):
-        return self._equipment.interfaces[
-            self._attributes.get("admin_interface", "en0")]
+        return self._equipment.interfaces[self._attributes.get("admin_interface", "en0")]
 
     @property
     def parent(self):
@@ -286,8 +282,7 @@ class EquipmentRuntime:
         if self._parent is None:
             eq = self._equipment.partof
             if eq is not None:
-                self._parent = EquipmentRuntime(eq, self._attributes["role"],
-                                                debug=self._debug)
+                self._parent = EquipmentRuntime(eq, self._attributes["role"], debug=self._debug)
         return self._parent
 
     @property
@@ -300,13 +295,11 @@ class EquipmentRuntime:
                 self._device = _get_controller(self, role)
             except:  # noqa
                 ex, err, tb = sys.exc_info()
-                logging.exception_error(
-                    "Error in device controller construction", err)
+                logging.exception_error("Error in device controller construction", err)
                 if self._debug:
                     debugger.post_mortem(tb)
                 tb = None
-                raise ConfigError(
-                    "controller for {!r} could not be created.".format(role)) from err
+                raise ConfigError("controller for {!r} could not be created.".format(role)) from err
         return self._device
 
     @device.deleter
@@ -327,8 +320,8 @@ class EquipmentRuntime:
         controller can function.
         """
         if self._initializer is None:
-            iobjname = self._attributes.get(
-                "initializer", self.model._attributes.get("initializer"))
+            iobjname = self._attributes.get("initializer",
+                                            self.model._attributes.get("initializer"))
             if iobjname is None:
                 msg = "'initializer' is not defined in properties."
                 logging.error(msg)
@@ -435,6 +428,7 @@ class EquipmentRuntime:
 
 class SoftwareRuntime:
     """Runtime container of information about software defined in the testbed."""
+
     def __init__(self, softwarerow, rolename):
         self._software = softwarerow
         self._controller = None
@@ -502,8 +496,7 @@ def get_testbed(name, storageurl=None, debug=False):
     """
     models.connect(storageurl)
     try:
-        testbed = models.TestBed.select().where(
-            models.TestBed.name == name).get()
+        testbed = models.TestBed.select().where(models.TestBed.name == name).get()
     except models.DoesNotExist as err:
         raise ConfigError("Bad TestBed name {!r}: {}".format(name, err)) from None
     return TestBedRuntime(testbed, debug=debug)

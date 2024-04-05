@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """All common exceptions."""
 
 
@@ -141,6 +140,7 @@ class ReportFindError(ReportError):
 
 # Errors related to interfacing the shells
 
+
 class ShellError(Exception):
     """Base error for shell related errors."""
 
@@ -163,6 +163,5 @@ if __name__ == '__main__':
         print(aberr)
     else:
         raise AssertionError("Didn't get our exception")
-
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

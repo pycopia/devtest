@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 A logcat service for Android devices.
 
@@ -69,8 +68,7 @@ def make_logcat_coroutine(serialno, logdir, logtags):
             signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
             try:
                 with open(logfilename, "ab", 0) as logfile:
-                    task = await spawn(aadc.logcat(logfile, logfile,
-                                                   logtags=logtags))
+                    task = await spawn(aadc.logcat(logfile, logfile, logtags=logtags))
                     await signalset.wait()
                     await task.cancel()
             finally:
@@ -89,5 +87,6 @@ def initialize(manager):
 def finalize(manager):
     srv = manager.unregister("logcat")
     srv.close()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

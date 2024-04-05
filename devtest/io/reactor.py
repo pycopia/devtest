@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Asynchronous core. Unify the asynchronous functions here.
 """
 
@@ -26,19 +25,34 @@ from devtest import logging  # This must be first
 from devtest.os import eventloop
 
 # Re-exported curio objects.
-from curio import (Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout, Queue, # noqa
-                   UniversalEvent, Event, Lock, RLock, timeout_after, TaskGroup,
-                   run_in_thread, block_in_thread)
+from curio import (
+    Kernel,
+    sleep,
+    spawn,
+    CancelledError,
+    TaskError,
+    TaskTimeout,
+    Queue,  # noqa
+    UniversalEvent,
+    Event,
+    Lock,
+    RLock,
+    timeout_after,
+    TaskGroup,
+    run_in_thread,
+    block_in_thread)
 
-
-__all__ = ["get_kernel", "get_new_kernel", "Kernel", "sleep", "spawn", "CancelledError",
-           "TaskError", "TaskTimeout", "Queue", "Event", "SignalEvent", "Lock", "RLock",
-           "timeout_after", "TaskGroup", "run_in_thread", "block_in_thread"]
+__all__ = [
+    "get_kernel", "get_new_kernel", "Kernel", "sleep", "spawn", "CancelledError", "TaskError",
+    "TaskTimeout", "Queue", "Event", "SignalEvent", "Lock", "RLock", "timeout_after", "TaskGroup",
+    "run_in_thread", "block_in_thread"
+]
 
 _default_kernel = None
 
 
 class SignalEvent(UniversalEvent):
+
     def __init__(self, *signos):
         super().__init__()
         self._old = old = {}
@@ -112,6 +126,7 @@ def set_asyncio(fd_or_obj):
 
 
 class SIGIOHandler:
+
     def __init__(self):
         self.on()
 

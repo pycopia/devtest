@@ -99,16 +99,16 @@ def build(ctx):
 def dev_requirements(ctx):
     """Install development requirements."""
     ctx.run(f"{PYTHONBIN} -m pip install --index-url {PYPI_INDEX} --trusted-host {PYPI_HOST} "
-            f"-r dev-requirements.txt --user")
+            f"-r dev-requirements.txt")
 
 
 @task(pre=[dev_requirements])
 def develop(ctx, uninstall=False):
     """Start developing in developer mode."""
     if uninstall:
-        ctx.run(f"{PYTHONBIN} setup.py develop --uninstall --user")
+        ctx.run(f"{PYTHONBIN} setup.py develop --uninstall")
     else:
-        ctx.run(f'{PYTHONBIN} setup.py develop --index-url "{PYPI_INDEX}" --user')
+        ctx.run(f'{PYTHONBIN} setup.py develop --index-url "{PYPI_INDEX}"')
 
 
 @task

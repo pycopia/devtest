@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Shell interface to Analyzer modules.
 """
 
@@ -25,13 +24,14 @@ from devtest.textutils import colors
 from . import scanner
 from . import loader
 
-
 ModuleType = type(sys)
 
 
 def iter_all_analyzers(package="testcases", onerror=None, include=None, exclude=None):
-    for mod in scanner.iter_modules(package=package, onerror=onerror,
-                                    include=include, exclude=exclude):
+    for mod in scanner.iter_modules(package=package,
+                                    onerror=onerror,
+                                    include=include,
+                                    exclude=exclude):
         if hasattr(mod, "run"):
             yield mod
 
@@ -76,8 +76,7 @@ class ShellInterface:
             elif opt == "c":
                 extra_config = optarg
         globalargs = self.arguments.pop(0)
-        self.config = cf = config.get_config(initdict=globalargs.options,
-                                             _filename=extra_config)
+        self.config = cf = config.get_config(initdict=globalargs.options, _filename=extra_config)
         cf.flags.debug = debug
         cf.flags.use_local = use_local
         cf.flags.do_list = do_list

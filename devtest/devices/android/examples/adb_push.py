@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Demonstrate using adb push.
 
@@ -38,7 +37,11 @@ def main(argv):
         localpaths = argv[1:-1]
         remotepath = argv[-1]
         kern = reactor.get_new_kernel(debug=True)
-        return kern.run(adb_push, os.environ["ANDROID_SERIAL"], localpaths, remotepath, shutdown=True)
+        return kern.run(adb_push,
+                        os.environ["ANDROID_SERIAL"],
+                        localpaths,
+                        remotepath,
+                        shutdown=True)
     else:
         print(__doc__)
         return 2

@@ -1,8 +1,8 @@
 setuptools
 cython
 flake8
+yapf
 pytest
-pytest-cov
 pytest-runner
 setuptools_scm
 wheel

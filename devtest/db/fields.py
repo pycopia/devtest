@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Custom field definitions for Peewee and Postgresql."""
 
 import enum
@@ -19,23 +18,27 @@ from datetime import timedelta
 # Need to register alternate JSON codecs early
 from devtest import json
 from psycopg2 import extras
+
 extras.register_default_json(globally=True, loads=json.loads)
 extras.register_default_jsonb(globally=True, loads=json.loads)
 del extras, json
 
 from peewee import Field
-from playhouse.postgres_ext import (BinaryJSONField, TSVectorField,  # noqa
-                                    DateTimeTZField, ArrayField)
+from playhouse.postgres_ext import (
+    BinaryJSONField,
+    TSVectorField,  # noqa
+    DateTimeTZField,
+    ArrayField)
 
 from devtest.core import types
 
 JSONField = BinaryJSONField
 
-_PEEWEE_FIELDS = ['BareField', 'BigIntegerField', 'BlobField',
-                  'BooleanField', 'CharField', 'DateField', 'DateTimeField',
-                  'DecimalField', 'DoubleField', 'FixedCharField',
-                  'FloatField', 'ForeignKeyField', 'IntegerField',
-                  'AutoField', 'TextField', 'TimeField', 'UUIDField']
+_PEEWEE_FIELDS = [
+    'BareField', 'BigIntegerField', 'BlobField', 'BooleanField', 'CharField', 'DateField',
+    'DateTimeField', 'DecimalField', 'DoubleField', 'FixedCharField', 'FloatField',
+    'ForeignKeyField', 'IntegerField', 'AutoField', 'TextField', 'TimeField', 'UUIDField'
+]
 
 
 # Peewee is monolithic
@@ -51,9 +54,10 @@ def _import_peewee_fields():
 _import_peewee_fields()
 del _import_peewee_fields
 
-__all__ = ['IPv4Field', 'IPv6Field', 'CIDRField', 'MACField', 'EnumField',
-           'IntervalField', 'TSVectorField', 'DateTimeTZField', 'ArrayField',
-           'BinaryJSONField', 'JSONField'] + _PEEWEE_FIELDS
+__all__ = [
+    'IPv4Field', 'IPv6Field', 'CIDRField', 'MACField', 'EnumField', 'IntervalField',
+    'TSVectorField', 'DateTimeTZField', 'ArrayField', 'BinaryJSONField', 'JSONField'
+] + _PEEWEE_FIELDS
 
 
 class IPv4Field(Field):
@@ -104,8 +108,7 @@ class EnumField(Field):
     """A field for storing enum.IntEnum objects as an Integer."""
     field_type = 'int'
 
-    def __init__(self, enumclass, default=None, help_text=None,
-                 verbose_name=None, **extra):
+    def __init__(self, enumclass, default=None, help_text=None, verbose_name=None, **extra):
         assert issubclass(enumclass, enum.IntEnum)
         self._eclass = enumclass
         choices = [(e.value, e.name) for e in enumclass]
@@ -113,7 +116,8 @@ class EnumField(Field):
             "verbose_name": verbose_name or enumclass.__name__,
             "choices": choices,
             "default": choices[0][0] if default is None else default,
-            "help_text": help_text}
+            "help_text": help_text
+        }
         kwargs.update(extra)
         super().__init__(**kwargs)
 
@@ -142,5 +146,6 @@ class IntervalField(Field):
 
     def python_value(self, value):
         return None if value is None else timedelta(seconds=value)
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

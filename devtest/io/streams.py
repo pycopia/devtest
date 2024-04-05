@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """IO for streams.
 
 Use the Stream object from here. Collects the curio supplies Stream objects and
@@ -22,13 +21,13 @@ from curio.traps import _read_wait  # noqa
 from curio.io import StreamBase, FileStream, SocketStream, Socket, WantRead, WantWrite  # noqa
 from curio.channel import Connection, Channel  # noqa
 
-
 __all__ = ["ReadableStream", "FileStream", "SocketStream", "Connection", "Channel"]
 
 
 class ReadableStream(StreamBase):
     """Stream wrapper for an object with read-only file descriptor.
     """
+
     async def _read(self, maxbytes=-1):
         while True:
             try:

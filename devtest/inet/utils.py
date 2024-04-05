@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Utility functions for sockets network functions.
 """
@@ -17,8 +16,7 @@ Utility functions for sockets network functions.
 import struct
 import fcntl
 from errno import EADDRNOTAVAIL
-from socket import (socket, getaddrinfo, gethostbyname, getfqdn,
-                    create_connection, error, gaierror,
+from socket import (socket, getaddrinfo, gethostbyname, getfqdn, create_connection, error, gaierror,
                     IPPROTO_TCP, IPPORT_USERRESERVED, AF_INET, SOCK_STREAM)
 
 # Extra ioctl numbers
@@ -78,5 +76,6 @@ def inq(sock):
 def outq(sock):
     """How many bytes are still in the kernel's output buffer?"""
     return struct.unpack("I", fcntl.ioctl(sock.fileno(), SIOCOUTQ, b'\0\0\0\0'))[0]
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

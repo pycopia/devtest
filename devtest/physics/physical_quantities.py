@@ -17,7 +17,6 @@
 #     Extended PhysicalQuantity constructor to allow easier and faster "casting".
 #     Make compatible with python 3
 #     Remove other external dependencies.
-
 """Physical quantities with units.
 
 This module provides a data type that represents a physical
@@ -46,7 +45,6 @@ from . import numberdict
 
 
 class PhysicalQuantity:
-
     """Physical quantity with units
 
     Constructor:
@@ -105,8 +103,7 @@ class PhysicalQuantity:
         return "{}{}{}".format(str(self.value), self._space, self.unit.name)
 
     def __repr__(self):
-        return "%s(%r, %r, %r)" % (self.__class__.__name__,
-                                   self.value, self.unit.name, self._space)
+        return "%s(%r, %r, %r)" % (self.__class__.__name__, self.value, self.unit.name, self._space)
 
     # sometimes we need space printed, and sometimes we dont.
     def nospace(self):
@@ -121,8 +118,8 @@ class PhysicalQuantity:
     def _sum(self, other, sign1, sign2):
         if not isPhysicalQuantity(other):
             raise TypeError('Incompatible types')
-        new_value = (sign1 * self.value + sign2 * other.value *
-                     other.unit.conversion_factor_to(self.unit))
+        new_value = (sign1 * self.value +
+                     sign2 * other.value * other.unit.conversion_factor_to(self.unit))
         return self.__class__(new_value, self.unit, self._space)
 
     def __add__(self, other):
@@ -187,6 +184,7 @@ class PhysicalQuantity:
             return value * unit.factor
         else:
             return self.__class__(value, unit, self._space)
+
     __rdiv__ = __rtruediv__
 
     def __pow__(self, other):
@@ -348,13 +346,10 @@ class PhysicalUnit:
         if self.offset != 0 or (isPhysicalUnit(other) and other.offset != 0):
             raise TypeError("cannot multiply units with non-zero offset")
         if isPhysicalUnit(other):
-            return PhysicalUnit(self.names + other.names,
-                                self.factor * other.factor,
+            return PhysicalUnit(self.names + other.names, self.factor * other.factor,
                                 list(map(lambda a, b: a + b, self.powers, other.powers)))
         else:
-            return PhysicalUnit(self.names + {str(other): 1},
-                                self.factor * other,
-                                self.powers,
+            return PhysicalUnit(self.names + {str(other): 1}, self.factor * other, self.powers,
                                 self.offset * other)
 
     __rmul__ = __mul__
@@ -363,24 +358,24 @@ class PhysicalUnit:
         if self.offset != 0 or (isPhysicalUnit(other) and other.offset != 0):
             raise TypeError("cannot divide units with non-zero offset")
         if isPhysicalUnit(other):
-            return PhysicalUnit(self.names - other.names,
-                                self.factor / other.factor,
+            return PhysicalUnit(self.names - other.names, self.factor / other.factor,
                                 list(map(lambda a, b: a - b, self.powers, other.powers)))
         else:
             return PhysicalUnit(self.names + numberdict.NumberDict({str(other): -1}, default=0),
                                 self.factor / float(other), self.powers)
+
     __div__ = __truediv__
 
     def __rtruediv__(self, other):
         if self.offset != 0 or (isPhysicalUnit(other) and other.offset != 0):
             raise TypeError("cannot divide units with non-zero offset")
         if isPhysicalUnit(other):
-            return PhysicalUnit(other.names - self.names,
-                                other.factor / self.factor,
+            return PhysicalUnit(other.names - self.names, other.factor / self.factor,
                                 list(map(lambda a, b: a - b, other.powers, self.powers)))
         else:
             return PhysicalUnit({str(other): 1.} - self.names,
                                 float(other) / self.factor, [-x for x in self.powers])
+
     __rdiv__ = __rtruediv__
 
     def __pow__(self, other):
@@ -393,12 +388,13 @@ class PhysicalUnit:
             inv_exp = 1. / other
             rounded = int(umath.floor(inv_exp + 0.5))
             if abs(inv_exp - rounded) < 1.e-10:
-                if reduce(lambda a, b: a and b, list(map(lambda x, e=rounded: x % e == 0,
-                                                         self.powers))):
+                if reduce(lambda a, b: a and b,
+                          list(map(lambda x, e=rounded: x % e == 0, self.powers))):
                     f = pow(self.factor, other)
                     p = [x / rounded for x in self.powers]
-                    if reduce(lambda a, b: a and b, list(map(lambda x, e=rounded: x % e == 0,
-                                                             list(self.names.values())))):
+                    if reduce(lambda a, b: a and b,
+                              list(map(lambda x, e=rounded: x % e == 0,
+                                       list(self.names.values())))):
                         names = self.names / rounded
                     else:
                         names = numberdict.NumberDict(default=0)
@@ -479,6 +475,7 @@ class PhysicalUnit:
 
 # Type checks
 
+
 def isPhysicalUnit(x):
     return isinstance(x, PhysicalUnit)
 
@@ -489,6 +486,7 @@ def isPhysicalQuantity(x):
 
 
 # Helper functions
+
 
 def _find_unit(unit):
     if isinstance(unit, (str, bytes)):
@@ -727,7 +725,6 @@ _add_unit('b', 'mol')  # bit
 _add_unit('B', '8*b')  # Byte
 _add_prefixed('b')
 _add_prefixed('B')
-
 
 if __name__ == '__main__':
     small_l = PhysicalQuantity(10., 'm')

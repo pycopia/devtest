@@ -21,6 +21,7 @@ keeping a consistent interface.
 
 
 class StringMatchObject:
+
     def __init__(self, start, end, string, pos, endpos, re):
         self._start = start
         self._end = end
@@ -33,9 +34,8 @@ class StringMatchObject:
 
     def __repr__(self):
         return ("{0}(start={1!r}, end={2!r}, string={3!r}, pos={4!r}, "
-                "endpos={5!r}, re={6!r})").format(
-                    self.__class__.__name__, self._start, self._end,
-                    self.string, self.pos, self.endpos, self.re)
+                "endpos={5!r}, re={6!r})").format(self.__class__.__name__, self._start, self._end,
+                                                  self.string, self.pos, self.endpos, self.re)
 
     def expand(self, template):
         raise NotImplementedError("Not applicable to plain strings")
@@ -77,6 +77,7 @@ class StringMatchObject:
 # an object that looks like a compiled regular expression, but does exact
 # string matching. This is usually much faster in that case.
 class StringExpression:
+
     def __init__(self, patt, flags=0):
         self.pattern = patt
         # bogus attributes to simulate compiled REs from re module.
@@ -84,16 +85,16 @@ class StringExpression:
         self.groupindex = {}
 
     def __repr__(self):
-        return "{0}(patt={1!r}, flags={2!r})".format(
-            self.__class__.__name__, self.pattern, self.flags)
+        return "{0}(patt={1!r}, flags={2!r})".format(self.__class__.__name__, self.pattern,
+                                                     self.flags)
 
     def search(self, text, pos=0, endpos=2147483647):
         n = text.find(self.pattern, pos, endpos)
         if n >= 0:
-            return StringMatchObject(
-                n, n + len(self.pattern), text, pos, endpos, self)
+            return StringMatchObject(n, n + len(self.pattern), text, pos, endpos, self)
         else:
             return None
+
     match = search  # match is same as search for strings
 
     def split(self, text, maxsplit=0):

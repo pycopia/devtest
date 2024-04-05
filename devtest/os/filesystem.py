@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 File system utilities.
 """
@@ -23,8 +22,7 @@ def df(path="/"):
     Values are same as output of df command.
     """
     stat = os.statvfs(path)
-    return (((stat.f_blocks - stat.f_bfree) * 8),
-            (stat.f_bavail * (stat.f_frsize // 512)))
+    return (((stat.f_blocks - stat.f_bfree) * 8), (stat.f_bavail * (stat.f_frsize // 512)))
 
 
 def touch(path):

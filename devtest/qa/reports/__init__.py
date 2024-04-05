@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Base class and factory functions for reporting objects.
 """
 
@@ -201,29 +200,25 @@ def get_report(rname):
             robj = importlib.get_class(rname)
             return robj()
         except ImportError as ierr:
-            raise ReportFindError(
-                "No report class {!r} found.".format(rname)) from ierr
+            raise ReportFindError("No report class {!r} found.".format(rname)) from ierr
     else:
         # name is taken as a module name in this package. First subclass of
         # BaseReport found in there is used.
         try:
             mod = importlib.import_module("." + rname, package=__name__)
         except ImportError:
-            raise ReportFindError(
-                "No report module {!r} found.".format(rname)) from None
+            raise ReportFindError("No report module {!r} found.".format(rname)) from None
         for name in dir(mod):
             obj = getattr(mod, name)
             if isinstance(obj, type) and issubclass(obj, BaseReport):
                 if obj is BaseReport:
                     continue
                 return obj()
-        raise ReportFindError(
-            "No report found in report module {!r}.".format(rname))
+        raise ReportFindError("No report found in report module {!r}.".format(rname))
 
 
 def _report_finder():
-    for finder, name, ispkg in pkgutil.iter_modules(__path__,
-                                                    prefix=__name__ + "."):
+    for finder, name, ispkg in pkgutil.iter_modules(__path__, prefix=__name__ + "."):
         if not ispkg:
             mod = importlib.import_module(name)
             for name in dir(mod):

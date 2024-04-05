@@ -1,5 +1,4 @@
 #!/usr/bin/env python3.7
-
 """CPU Information and monitors.
 """
 
@@ -38,4 +37,3 @@ if __name__ == "__main__":
 #    del mon
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
-

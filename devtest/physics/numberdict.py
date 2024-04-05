@@ -10,7 +10,6 @@
 # Modified by Keith Dart to work with new physical_quantities module, and
 # modern Python.
 
-
 from devtest.core import types
 
 

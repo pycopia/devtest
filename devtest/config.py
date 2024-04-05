@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 r"""Configuration object and factory function.
 
 Based on the confuse YAML configuration module.
@@ -37,7 +36,6 @@ from collections import ChainMap
 
 from devtest.third_party import confuse
 
-
 _CONFIG = None  # singleton instance.
 
 
@@ -55,8 +53,7 @@ class Config(ChainMap):
         try:
             return self.__getitem__(name)
         except KeyError:
-            raise AttributeError(
-                "Config: No attribute or key {!r}".format(name)) from None
+            raise AttributeError("Config: No attribute or key {!r}".format(name)) from None
 
     def __setattr__(self, name, val):
         self.__setitem__(name, val)

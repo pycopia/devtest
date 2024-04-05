@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Simple and fast interface to serial ports using termios.
 
 This serial port interface support non-blocking, asychronous designs. You can
@@ -28,7 +27,6 @@ from functools import wraps
 from termios import *
 from io import RawIOBase
 
-
 # Indexes for termios list.
 IFLAG = 0
 OFLAG = 1
@@ -38,25 +36,29 @@ ISPEED = 4
 OSPEED = 5
 CC = 6
 
-IFLAGS = ["IGNBRK", "BRKINT", "IGNPAR", "PARMRK", "INPCK", "ISTRIP",
-          "INLCR", "IGNCR", "ICRNL", "IXON", "IXANY", "IXOFF", "IMAXBEL"]
+IFLAGS = [
+    "IGNBRK", "BRKINT", "IGNPAR", "PARMRK", "INPCK", "ISTRIP", "INLCR", "IGNCR", "ICRNL", "IXON",
+    "IXANY", "IXOFF", "IMAXBEL"
+]
 
 OFLAGS = ["OPOST", "ONLCR", "OCRNL", "ONOCR", "ONLRET"]
 
 CFLAGS = ["CSTOPB", "CREAD", "PARENB", "CLOCAL", "CRTSCTS"]
 
-LFLAGS = ["ISIG", "ICANON", "ECHO", "ECHOE", "ECHOK", "ECHONL",
-          "ECHOCTL", "ECHOPRT", "ECHOKE", "FLUSHO", "NOFLSH", "TOSTOP",
-          "PENDIN", "IEXTEN"]
+LFLAGS = [
+    "ISIG", "ICANON", "ECHO", "ECHOE", "ECHOK", "ECHONL", "ECHOCTL", "ECHOPRT", "ECHOKE", "FLUSHO",
+    "NOFLSH", "TOSTOP", "PENDIN", "IEXTEN"
+]
 
-BAUDS = ["B0", "B50", "B75", "B110", "B134", "B150", "B200", "B300",
-         "B600", "B1200", "B1800", "B2400", "B4800", "B9600", "B19200",
-         "B38400", "B57600", "B115200", "B230400"]
+BAUDS = [
+    "B0", "B50", "B75", "B110", "B134", "B150", "B200", "B300", "B600", "B1200", "B1800", "B2400",
+    "B4800", "B9600", "B19200", "B38400", "B57600", "B115200", "B230400"
+]
 
-CCHARS = ["VINTR", "VQUIT", "VERASE", "VKILL", "VEOF", "VSTART", "VSTOP",
-          "VSUSP", "VEOL", "VREPRINT", "VDISCARD", "VWERASE", "VLNEXT",
-          "VEOL2"]
-
+CCHARS = [
+    "VINTR", "VQUIT", "VERASE", "VKILL", "VEOF", "VSTART", "VSTOP", "VSUSP", "VEOL", "VREPRINT",
+    "VDISCARD", "VWERASE", "VLNEXT", "VEOL2"
+]
 
 # Extra ioctls for Darwin
 if sys.platform == "darwin":
@@ -64,17 +66,17 @@ if sys.platform == "darwin":
 
     TIOCDRAIN = _IO('t', 94)  # wait till output drained
 
-# Sets the receive latency (in microseconds) with the default
-# value of 0 meaning a 256 / 3 character delay latency.
+    # Sets the receive latency (in microseconds) with the default
+    # value of 0 meaning a 256 / 3 character delay latency.
     IOSSDATALAT = _IOW('T', 0, ULONG)
 
-# Controls the pre-emptible status of IOSS based serial dial in devices
-# (i.e. /dev/tty.* devices).  If true an open tty.* device is pre-emptible by
-# a dial out call.  Once a dial in call is established then setting pre-empt
-# to false will halt any further call outs on the cu device.
+    # Controls the pre-emptible status of IOSS based serial dial in devices
+    # (i.e. /dev/tty.* devices).  If true an open tty.* device is pre-emptible by
+    # a dial out call.  Once a dial in call is established then setting pre-empt
+    # to false will halt any further call outs on the cu device.
     IOSSPREEMPT = _IOW('T', 1, INT)
 
-# Sets the input speed and output speed to a non-traditional baud rate
+    # Sets the input speed and output speed to a non-traditional baud rate
     IOSSIOSPEED = _IOW('T', 2, ULONG)
 else:
     IOSSIOSPEED = 0
@@ -87,8 +89,7 @@ def set_baud(fd, baud):
         sym = getattr(mod, "B%s" % baud)
         iflags, oflags, cflags, lflags, ispeed, ospeed, cc = tcgetattr(fd)
         ispeed = ospeed = sym
-        tcsetattr(fd, TCSANOW,
-                  [iflags, oflags, cflags, lflags, ispeed, ospeed, cc])
+        tcsetattr(fd, TCSANOW, [iflags, oflags, cflags, lflags, ispeed, ospeed, cc])
     except AttributeError:
         if IOSSIOSPEED != 0:
             ioctl(fd, IOSSIOSPEED, pack("L", int(baud)))
@@ -109,8 +110,8 @@ def flag_string(fd):
     lres = []
     for cname in CCHARS:
         cval = cc[getattr(mod, cname)][0]
-        cval = (("^" + chr(cval + 64)) if cval < 32 else
-                ("<undef>" if cval > 127 else ("^" + chr(cval-64))))
+        cval = (("^" + chr(cval + 64)) if cval < 32 else ("<undef>" if cval > 127 else
+                                                          ("^" + chr(cval - 64))))
         chars.append("{}={}".format(cname[1:].lower(), cval))
     chars.append("time={}; min={}".format(cc[VTIME], cc[VMIN]))
     for flag in IFLAGS:
@@ -225,13 +226,14 @@ def set_mode(fd: int, parity: str, data_bits: int, stop_bits: int):
 _MODEMAP = {
     "rb": os.O_NOCTTY,
     "wb": os.O_WRONLY | os.O_NOCTTY,
-    "w+b":  os.O_RDWR | os.O_NOCTTY,
-    "r+b":  os.O_RDWR | os.O_NOCTTY,
+    "w+b": os.O_RDWR | os.O_NOCTTY,
+    "r+b": os.O_RDWR | os.O_NOCTTY,
 }
 
 
 def rawstdin(meth):
     """Decorator for temporarily using stdin in raw mode."""
+
     @wraps(meth)
     def wrapcleantty(*args, **kwargs):
         savestate = tcgetattr(sys.stdin)
@@ -241,13 +243,15 @@ def rawstdin(meth):
         finally:
             tcsetattr(sys.stdin, TCSAFLUSH, savestate)
         return rv
+
     return wrapcleantty
 
 
 def enumerate_serial_ports():
-    return [f"/dev/{name}" for name in os.listdir("/dev") if (name.startswith("ttyS") or
-                                                              name.startswith("ttyUSB") or
-                                                              name.startswith("ttyACM"))]
+    return [
+        f"/dev/{name}" for name in os.listdir("/dev")
+        if (name.startswith("ttyS") or name.startswith("ttyUSB") or name.startswith("ttyACM"))
+    ]
 
 
 class SerialPort(RawIOBase):
@@ -260,8 +264,15 @@ class SerialPort(RawIOBase):
     Implements a basic file-like IO to the serial port (read, write, fileno,
     close, and closed attribute).
     """
-    def __init__(self, fname=None, mode="w+b", setup="115200 8N1", config=None,
-                 dsrdtr=False, rtscts=None, inter_byte_timeout=None):
+
+    def __init__(self,
+                 fname=None,
+                 mode="w+b",
+                 setup="115200 8N1",
+                 config=None,
+                 dsrdtr=False,
+                 rtscts=None,
+                 inter_byte_timeout=None):
         # In case of exception here, so the close method will still work.
         self._fd = None
         self.name = "unknown"
@@ -287,7 +298,13 @@ class SerialPort(RawIOBase):
     def closed(self):
         return self._fd is None
 
-    def open(self, fname, mode="w+b", setup="115200 8N1", config=None, dsrdtr=False, rtscts=False,
+    def open(self,
+             fname,
+             mode="w+b",
+             setup="115200 8N1",
+             config=None,
+             dsrdtr=False,
+             rtscts=False,
              inter_byte_timeout=None):
         self.close()
         st = os.stat(fname).st_mode
@@ -403,13 +420,13 @@ class SerialPort(RawIOBase):
 
     @property
     def out_waiting(self):
-        "Return number of bytes in output queue."""
+        "Return number of bytes in output queue." ""
         v = ioctl(self._fd, TIOCOUTQ, b'\x00\x00\x00\x00')
         return unpack("I", v)[0]
 
     @property
     def in_waiting(self):
-        "Return number of bytes in input queue."""
+        "Return number of bytes in input queue." ""
         v = ioctl(self._fd, TIOCINQ, b'\x00\x00\x00\x00')
         return unpack("I", v)[0]
 
@@ -419,6 +436,7 @@ class SerialPort(RawIOBase):
         if ld:
             buf[:ld] = data
         return ld
+
     #  The read and readline are implemented in base class.
 
     def write(self, data):

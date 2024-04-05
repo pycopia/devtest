@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Custom form fields. All available form field definitions are available here.
 """
 
@@ -29,19 +28,54 @@ from devtest import json
 
 # Current (Aug 15) field selection.
 
-__all__ = ['ArrayField', 'AttributesField', 'BooleanField', 'BooleanSelectField',
-           'CIDRField', 'DateField', 'DateTimeField', 'DateTimeLocalField',
-           'DecimalField', 'DecimalRangeField', 'EmailField', 'EnumField',
-           'FieldList', 'FileField', 'FloatField', 'FormField', 'HTMLField',
-           'HiddenField', 'HiddenQueryField', 'IPv4Field', 'IPv6Field',
-           'IntegerField', 'IntegerRangeField', 'IntervalField', 'JSONField',
-           'MACField', 'ModelHiddenField', 'ModelSelectField',
-           'ModelSelectMultipleField', 'PasswordField', 'RadioField',
-           'SearchField', 'SelectChoicesField', 'SelectField',
-           'SelectMultipleField', 'SelectMultipleQueryField',
-           'SelectQueryField', 'StringField', 'SubmitField', 'TelField',
-           'TextAreaField', 'TextField', 'URLField', 'WPDateField',
-           'WPDateTimeField', 'WPTimeField', ]
+__all__ = [
+    'ArrayField',
+    'AttributesField',
+    'BooleanField',
+    'BooleanSelectField',
+    'CIDRField',
+    'DateField',
+    'DateTimeField',
+    'DateTimeLocalField',
+    'DecimalField',
+    'DecimalRangeField',
+    'EmailField',
+    'EnumField',
+    'FieldList',
+    'FileField',
+    'FloatField',
+    'FormField',
+    'HTMLField',
+    'HiddenField',
+    'HiddenQueryField',
+    'IPv4Field',
+    'IPv6Field',
+    'IntegerField',
+    'IntegerRangeField',
+    'IntervalField',
+    'JSONField',
+    'MACField',
+    'ModelHiddenField',
+    'ModelSelectField',
+    'ModelSelectMultipleField',
+    'PasswordField',
+    'RadioField',
+    'SearchField',
+    'SelectChoicesField',
+    'SelectField',
+    'SelectMultipleField',
+    'SelectMultipleQueryField',
+    'SelectQueryField',
+    'StringField',
+    'SubmitField',
+    'TelField',
+    'TextAreaField',
+    'TextField',
+    'URLField',
+    'WPDateField',
+    'WPDateTimeField',
+    'WPTimeField',
+]
 
 
 class IPv4Field(StringField):
@@ -109,6 +143,7 @@ class UUIDField(StringField):
 
 
 class HTMLWidget:
+
     def __call__(self, field, **kwargs):
         kwargs.setdefault('id', field.id)
         return '<textarea {}>{}</textarea>'.format(widgets.html_params(name=field.name, **kwargs),

@@ -10,7 +10,6 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-
 """Worry-free YAML configuration files.
 """
 
@@ -23,7 +22,6 @@ import pkg_resources
 import yaml
 
 from devtest.core import exceptions
-
 
 UNIX_DIR_VAR = 'XDG_CONFIG_HOME'
 UNIX_DIR_FALLBACK = '~/.config'
@@ -53,6 +51,7 @@ def iter_first(sequence):
 
 class ConfigReadError(exceptions.ConfigError):
     """A configuration file could not be read."""
+
     def __init__(self, filename, reason=None):
         self.filename = filename
         self.reason = reason
@@ -74,10 +73,12 @@ class ConfigReadError(exceptions.ConfigError):
 
 # Views and sources.
 
+
 class ConfigSource(dict):
     """A dictionary augmented with metadata about the source of the
     configuration.
     """
+
     def __init__(self, value, filename=None, default=False):
         super().__init__(value)
         if filename is not None and not isinstance(filename, str):
@@ -86,11 +87,8 @@ class ConfigSource(dict):
         self.default = default
 
     def __repr__(self):
-        return 'ConfigSource({0}, {1}, {2})'.format(
-            super().__repr__(),
-            repr(self.filename),
-            repr(self.default)
-        )
+        return 'ConfigSource({0}, {1}, {2})'.format(super().__repr__(), repr(self.filename),
+                                                    repr(self.default))
 
     @classmethod
     def of(self, value):
@@ -138,8 +136,7 @@ class ConfigView(object):
         try:
             return iter_first(pairs)
         except ValueError:
-            raise exceptions.ConfigNotFoundError(
-                "{0} not found".format(self.name))
+            raise exceptions.ConfigNotFoundError("{0} not found".format(self.name))
 
     def exists(self):
         """Determine whether the view has a setting in any source.
@@ -233,11 +230,9 @@ class ConfigView(object):
             try:
                 cur_keys = dic.keys()
             except AttributeError:
-                raise exceptions.ConfigTypeError(
-                    '{0} must be a dict, not {1}'.format(
-                        self.name, type(dic).__name__
-                    )
-                )
+                raise exceptions.ConfigTypeError('{0} must be a dict, not {1}'.format(
+                    self.name,
+                    type(dic).__name__))
 
             for key in cur_keys:
                 if key not in keys:
@@ -274,11 +269,9 @@ class ConfigView(object):
             try:
                 it = iter(collection)
             except TypeError:
-                raise exceptions.ConfigTypeError(
-                    '{0} must be an iterable, not {1}'.format(
-                        self.name, type(collection).__name__
-                    )
-                )
+                raise exceptions.ConfigTypeError('{0} must be an iterable, not {1}'.format(
+                    self.name,
+                    type(collection).__name__))
             for value in it:
                 yield value
 
@@ -361,6 +354,7 @@ class RootView(ConfigView):
     """The base of a view hierarchy. This view keeps track of the
     sources that may be accessed by subviews.
     """
+
     def __init__(self, sources):
         """Create a configuration hierarchy for a list of sources. At
         least one source must be provided. The first source in the list
@@ -401,6 +395,7 @@ class RootView(ConfigView):
 
 class Subview(ConfigView):
     """A subview accessed via a subscript of a parent view."""
+
     def __init__(self, parent, key):
         """Make a subview of a parent view for a given subscript key.
         """
@@ -436,11 +431,9 @@ class Subview(ConfigView):
                 continue
             except TypeError:
                 # Not subscriptable.
-                raise exceptions.ConfigTypeError(
-                    "{0} must be a collection, not {1}".format(
-                        self.parent.name, type(collection).__name__
-                    )
-                )
+                raise exceptions.ConfigTypeError("{0} must be a collection, not {1}".format(
+                    self.parent.name,
+                    type(collection).__name__))
             yield value, source
 
     def set(self, value):
@@ -456,12 +449,12 @@ class Subview(ConfigView):
         self.parent.set_redaction((self.key,) + path, flag)
 
     def get_redactions(self):
-        return (kp[1:] for kp in self.parent.get_redactions()
-                if kp and kp[0] == self.key)
+        return (kp[1:] for kp in self.parent.get_redactions() if kp and kp[0] == self.key)
 
 
 # Config file paths, including platform-specific paths and in-package
 # defaults.
+
 
 def config_dirs():
     """Return a platform-specific list of candidates for user
@@ -501,6 +494,7 @@ def config_dirs():
 
 # YAML loading.
 
+
 class Loader(yaml.SafeLoader):
     """A customized YAML loader. This loader deviates from the official
     YAML spec in a few convenient ways:
@@ -509,6 +503,7 @@ class Loader(yaml.SafeLoader):
     - All maps are OrderedDicts.
     - Strings can begin with % without quotation.
     """
+
     # All strings should be Unicode objects, regardless of contents.
     def _construct_unicode(self, node):
         return self.construct_scalar(node)
@@ -526,10 +521,7 @@ class Loader(yaml.SafeLoader):
             self.flatten_mapping(node)
         else:
             raise yaml.constructor.ConstructorError(
-                None, None,
-                'expected a mapping node, but found %s' % node.id,
-                node.start_mark
-            )
+                None, None, 'expected a mapping node, but found %s' % node.id, node.start_mark)
 
         mapping = OrderedDict()
         for key_node, value_node in node.value:
@@ -537,11 +529,10 @@ class Loader(yaml.SafeLoader):
             try:
                 hash(key)
             except TypeError as exc:
-                raise yaml.constructor.ConstructorError(
-                    'while constructing a mapping',
-                    node.start_mark, 'found unacceptable key (%s)' % exc,
-                    key_node.start_mark
-                )
+                raise yaml.constructor.ConstructorError('while constructing a mapping',
+                                                        node.start_mark,
+                                                        'found unacceptable key (%s)' % exc,
+                                                        key_node.start_mark)
             value = self.construct_object(value_node, deep=deep)
             mapping[key] = value
         return mapping
@@ -570,10 +561,12 @@ def load_yaml(filename):
 
 # YAML dumping.
 
+
 class Dumper(yaml.SafeDumper):
     """A PyYAML Dumper that represents OrderedDicts as ordinary mappings
     (in order, of course).
     """
+
     # From http://pyyaml.org/attachment/ticket/161/use_ordered_dict.py
     def represent_mapping(self, tag, mapping, flow_style=None):
         value = []
@@ -586,11 +579,9 @@ class Dumper(yaml.SafeDumper):
         for item_key, item_value in mapping:
             node_key = self.represent_data(item_key)
             node_value = self.represent_data(item_value)
-            if not (isinstance(node_key, yaml.ScalarNode) and
-                    not node_key.style):
+            if not (isinstance(node_key, yaml.ScalarNode) and not node_key.style):
                 best_style = False
-            if not (isinstance(node_value, yaml.ScalarNode) and
-                    not node_value.style):
+            if not (isinstance(node_value, yaml.ScalarNode) and not node_value.style):
                 best_style = False
             value.append((node_key, node_value))
         if flow_style is None:
@@ -667,7 +658,9 @@ def restore_yaml_comments(data, default_data):
 
 # Main interface.
 
+
 class Configuration(RootView):
+
     def __init__(self, appname, modname=None, read=True):
         """Create a configuration object by reading the
         automatically-discovered config files for the application for a
@@ -741,9 +734,7 @@ class Configuration(RootView):
             appdir = os.environ[self._env_var]
             appdir = os.path.abspath(os.path.expanduser(appdir))
             if os.path.isfile(appdir):
-                raise exceptions.ConfigError('{0} must be a directory'.format(
-                    self._env_var
-                ))
+                raise exceptions.ConfigError('{0} must be a directory'.format(self._env_var))
 
         else:
             # Search platform-specific locations. If no config file is
@@ -789,9 +780,7 @@ class Configuration(RootView):
             temp_root.redactions = self.redactions
             out_dict = temp_root.flatten(redact=redact)
 
-        yaml_out = yaml.dump(out_dict, Dumper=Dumper,
-                             default_flow_style=None, indent=4,
-                             width=1000)
+        yaml_out = yaml.dump(out_dict, Dumper=Dumper, default_flow_style=None, indent=4, width=1000)
 
         # Restore comments to the YAML text.
         default_source = None
@@ -812,6 +801,7 @@ class LazyConfig(Configuration):
     accessed. This is appropriate for using as a global config object at
     the module level.
     """
+
     def __init__(self, appname, modname=None):
         super().__init__(appname, modname, False)
         self._materialized = False  # Have we read the files yet?
@@ -865,6 +855,7 @@ class Template(object):
     providing a default value, and validating for errors. For example, a
     filepath type might expand tildes and check that the file exists.
     """
+
     def __init__(self, default=REQUIRED):
         """Create a template with a given default value.
 
@@ -891,8 +882,7 @@ class Template(object):
             return self.convert(value, view)
         elif self.default is REQUIRED:
             # Missing required value. This is an error.
-            raise exceptions.ConfigNotFoundError(
-                "{0} not found".format(view.name))
+            raise exceptions.ConfigNotFoundError("{0} not found".format(view.name))
         else:
             # Missing value, but not required.
             return self.default
@@ -915,11 +905,8 @@ class Template(object):
         mismatch rather than a malformed value. In this case, a more
         specific exception is raised.
         """
-        exc_class = (exceptions.ConfigTypeError if type_error else
-                     exceptions.ConfigValueError)
-        raise exc_class(
-            '{0}: {1}'.format(view.name, message)
-        )
+        exc_class = (exceptions.ConfigTypeError if type_error else exceptions.ConfigValueError)
+        raise exc_class('{0}: {1}'.format(view.name, message))
 
     def __repr__(self):
         return '{0}({1})'.format(
@@ -931,6 +918,7 @@ class Template(object):
 class Integer(Template):
     """An integer configuration value template.
     """
+
     def convert(self, value, view):
         """Check that the value is an integer. Floats are rounded.
         """
@@ -945,23 +933,21 @@ class Integer(Template):
 class Number(Template):
     """A numeric type: either an integer or a floating-point number.
     """
+
     def convert(self, value, view):
         """Check that the value is an int or a float.
         """
         if isinstance(value, (int, float)):
             return value
         else:
-            self.fail(
-                'must be numeric, not {0}'.format(type(value).__name__),
-                view,
-                True
-            )
+            self.fail('must be numeric, not {0}'.format(type(value).__name__), view, True)
 
 
 class MappingTemplate(Template):
     """A template that uses a dictionary to specify other types for the
     values for a set of keys and produce a validated `AttrDict`.
     """
+
     def __init__(self, mapping):
         """Create a template according to a dict (mapping). The
         mapping's values should themselves either be Types or
@@ -988,6 +974,7 @@ class MappingTemplate(Template):
 class String(Template):
     """A string configuration value template.
     """
+
     def __init__(self, default=REQUIRED, pattern=None):
         """Create a template with the added optional `pattern` argument,
         a regular expression string that the value should match.
@@ -1013,10 +1000,7 @@ class String(Template):
         """
         if isinstance(value, str):
             if self.pattern and not self.regex.match(value):
-                str.fail(
-                    "must match the pattern {0}".format(self.pattern),
-                    view
-                )
+                str.fail("must match the pattern {0}".format(self.pattern), view)
             return value
         else:
             self.fail('must be a string', view, True)
@@ -1025,6 +1009,7 @@ class String(Template):
 class Choice(Template):
     """A template that permits values from a sequence of choices.
     """
+
     def __init__(self, choices):
         """Create a template that validates any of the values from the
         iterable `choices`.
@@ -1039,12 +1024,8 @@ class Choice(Template):
         choices are a mapping).
         """
         if value not in self.choices:
-            self.fail(
-                'must be one of {0}, not {1}'.format(
-                    repr(list(self.choices)), repr(value)
-                ),
-                view
-            )
+            self.fail('must be one of {0}, not {1}'.format(repr(list(self.choices)), repr(value)),
+                      view)
 
         if isinstance(self.choices, abc.Mapping):
             return self.choices[value]
@@ -1058,6 +1039,7 @@ class Choice(Template):
 class OneOf(Template):
     """A template that permits values complying to one of the given templates.
     """
+
     def __init__(self, allowed, default=REQUIRED):
         super().__init__(default)
         self.allowed = list(allowed)
@@ -1087,14 +1069,9 @@ class OneOf(Template):
                 if is_mapping:
                     if isinstance(candidate, Filename) and \
                             candidate.relative_to:
-                        next_template = candidate.template_with_relatives(
-                            view,
-                            self.template
-                        )
+                        next_template = candidate.template_with_relatives(view, self.template)
 
-                        next_template.subtemplates[view.key] = as_template(
-                            candidate
-                        )
+                        next_template.subtemplates[view.key] = as_template(candidate)
                     else:
                         next_template = MappingTemplate({view.key: candidate})
 
@@ -1108,12 +1085,7 @@ class OneOf(Template):
             except ValueError as exc:
                 raise exceptions.ConfigTemplateError(exc)
 
-        self.fail(
-            'must be one of {0}, not {1}'.format(
-                repr(self.allowed), repr(value)
-            ),
-            view
-        )
+        self.fail('must be one of {0}, not {1}'.format(repr(self.allowed), repr(value)), view)
 
 
 class StrSeq(Template):
@@ -1122,6 +1094,7 @@ class StrSeq(Template):
     Validates both actual YAML string lists and single strings. Strings
     can optionally be split on whitespace.
     """
+
     def __init__(self, split=True):
         """Create a new template.
 
@@ -1145,8 +1118,7 @@ class StrSeq(Template):
         try:
             value = list(value)
         except TypeError:
-            self.fail('must be a whitespace-separated string or a list',
-                      view, True)
+            self.fail('must be a whitespace-separated string or a list', view, True)
 
         def convert(x):
             if isinstance(x, str):
@@ -1155,6 +1127,7 @@ class StrSeq(Template):
                 return x.decode('utf8', 'ignore')
             else:
                 self.fail('must be a list of strings', view, True)
+
         return list(map(convert, value))
 
 
@@ -1169,8 +1142,8 @@ class Filename(Template):
     they are relative to the current working directory. This helps
     attain the expected behavior when using command-line options.
     """
-    def __init__(self, default=REQUIRED, cwd=None, relative_to=None,
-                 in_app_dir=False):
+
+    def __init__(self, default=REQUIRED, cwd=None, relative_to=None, in_app_dir=False):
         """`relative_to` is the name of a sibling value that is
         being validated at the same time.
 
@@ -1204,22 +1177,16 @@ class Filename(Template):
         if not isinstance(template, (abc.Mapping, MappingTemplate)):
             # disallow config.get(Filename(relative_to='foo'))
             raise exceptions.ConfigTemplateError(
-                'relative_to may only be used when getting multiple values.'
-            )
+                'relative_to may only be used when getting multiple values.')
 
         elif self.relative_to == view.key:
-            raise exceptions.ConfigTemplateError(
-                '{0} is relative to itself'.format(view.name)
-            )
+            raise exceptions.ConfigTemplateError('{0} is relative to itself'.format(view.name))
 
         elif self.relative_to not in list(view.parent.keys()):
             # self.relative_to is not in the config
             self.fail(
-                (
-                    'needs sibling value "{0}" to expand relative path'
-                ).format(self.relative_to),
-                view
-            )
+                ('needs sibling value "{0}" to expand relative path').format(self.relative_to),
+                view)
 
         old_template = {}
         old_template.update(template.subtemplates)
@@ -1237,14 +1204,13 @@ class Filename(Template):
             except KeyError:
                 if next_relative in template.subtemplates:
                     # we encountered this config key previously
-                    raise exceptions.ConfigTemplateError((
-                        '{0} and {1} are recursively relative'
-                    ).format(view.name, self.relative_to))
+                    raise exceptions.ConfigTemplateError(
+                        ('{0} and {1} are recursively relative').format(
+                            view.name, self.relative_to))
                 else:
-                    raise exceptions.ConfigTemplateError((
-                        'missing template for {0}, needed to expand {1}\'s' +
-                        'relative path'
-                    ).format(self.relative_to, view.name))
+                    raise exceptions.ConfigTemplateError(
+                        ('missing template for {0}, needed to expand {1}\'s' +
+                         'relative path').format(self.relative_to, view.name))
 
             next_template.subtemplates[next_relative] = rel_to_template
             next_relative = rel_to_template.relative_to
@@ -1254,11 +1220,7 @@ class Filename(Template):
     def value(self, view, template=None):
         path, source = view.first()
         if not isinstance(path, str):
-            self.fail(
-                'must be a filename, not {0}'.format(type(path).__name__),
-                view,
-                True
-            )
+            self.fail('must be a filename, not {0}'.format(type(path).__name__), view, True)
         path = os.path.expanduser(str(path))
 
         if not os.path.isabs(path):
@@ -1283,6 +1245,7 @@ class TypeTemplate(Template):
     """A simple template that checks that a value is an instance of a
     desired Python type.
     """
+
     def __init__(self, typ, default=REQUIRED):
         """Create a template that checks that the value is an instance
         of `typ`.
@@ -1292,14 +1255,10 @@ class TypeTemplate(Template):
 
     def convert(self, value, view):
         if not isinstance(value, self.typ):
-            self.fail(
-                'must be a {0}, not {1}'.format(
-                    self.typ.__name__,
-                    type(value).__name__,
-                ),
-                view,
-                True
-            )
+            self.fail('must be a {0}, not {1}'.format(
+                self.typ.__name__,
+                type(value).__name__,
+            ), view, True)
         return value
 
 
@@ -1307,6 +1266,7 @@ class AttrDict(dict):
     """A `dict` subclass that can be accessed via attributes (dot
     notation) for convenience.
     """
+
     def __getattr__(self, key):
         if key in self:
             return self[key]

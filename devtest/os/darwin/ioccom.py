@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Compute ioctl commands.
 
@@ -17,6 +16,7 @@ from <sys/ioccom.h>
 """
 
 import struct
+
 sizeof = struct.calcsize
 
 INT = sizeof("i")
@@ -27,7 +27,6 @@ ULONG = sizeof("L")
 SHORT = sizeof("h")
 USHORT = sizeof("H")
 CHAR = sizeof("c")
-
 
 # Ioctl's have the command encoded in the lower word, and the size of
 # any in or out parameters in the upper word.  The high 3 bits of the

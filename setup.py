@@ -83,7 +83,6 @@ setup(
         'psycopg2',
         'pygments',
         'pyyaml',
-        'numpy',
         'elicit>=1.7',
     ],
     author='Keith Dart',

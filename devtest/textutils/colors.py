@@ -1,20 +1,12 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""Support colorizing text in terminals.
 """
-Support colorizing text in terminals.
-"""
+
+__all__ = [
+    'color', 'red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'white', 'underline', 'inverse',
+    'box'
+]
 
 from functools import partial
-
 
 RESET = NORMAL = "\x1b[0m"
 
@@ -63,7 +55,6 @@ _FG_MAP = {
     "white": BRIGHT,
 }
 
-
 _LT_FG_MAP = {
     "red": LT_RED,
     "green": LT_GREEN,
@@ -86,9 +77,11 @@ _BG_MAP = {
 }
 
 #                 UL  hor   vert  UR  LL   LR
-_BOXCHARS = {0: ['┏', '━', '┃', '┓', '┗', '┛'],
-             1: ['╔', '═', '║', '╗', '╚', '╝'],
-             2: ['┌', '─', '│', '┐', '└', '┘']}
+_BOXCHARS = {
+    0: ['┏', '━', '┃', '┓', '┗', '┛'],
+    1: ['╔', '═', '║', '╗', '╚', '╝'],
+    2: ['┌', '─', '│', '┐', '└', '┘']
+}
 
 
 def color(text, fg, bg=None, bold=False):
@@ -136,8 +129,7 @@ def _test(argv):
 
     print(green("Green"))
     print(green("Green on Red", bg="red"))
-    print(red("This sentence is red, except for " +
-          green("these words, which are green") + "."))
+    print(red("This sentence is red, except for " + green("these words, which are green") + "."))
     print(cyan("Cyan"), cyan("Bright Cyan", bold=True))
     print("Regular", white("and white"))
 
@@ -145,5 +137,3 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

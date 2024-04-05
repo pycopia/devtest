@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """Python wrapper for Android uiautomator tool."""
 
 import os
@@ -17,14 +16,11 @@ from devtest import json
 from devtest import timers
 from devtest import config
 
-
 DEVICE_PORT = int(os.environ.get('UIAUTOMATOR_DEVICE_PORT', '9008'))
 LOCAL_PORT = int(os.environ.get('UIAUTOMATOR_LOCAL_PORT', '9008'))
 
-
 if 'localhost' not in os.environ.get('no_proxy', ''):
     os.environ['no_proxy'] = "localhost,%s" % os.environ.get('no_proxy', '')
-
 
 __authors__ = ["Xiaocong He", "Keith Dart"]
 __all__ = ["device", "AutomatorDevice", "rect", "point", "Selector", "JsonRPCError"]
@@ -77,6 +73,7 @@ def param_to_property(*props, **kwprops):
             else:
                 new_args, self.args = self.args + list(args), []
                 return self.func(*new_args, **kwargs)
+
     return Wrapper
 
 
@@ -87,8 +84,7 @@ class JsonRPCMethod:
 
     def __call__(self, *args, **kwargs):
         if args and kwargs:
-            raise ValueError(
-                "Could not accept both *args and **kwargs as JSONRPC parameters.")
+            raise ValueError("Could not accept both *args and **kwargs as JSONRPC parameters.")
         data = {"jsonrpc": "2.0", "method": self.method, "id": next(_counter)}
         if args:
             data["params"] = args
@@ -107,10 +103,8 @@ class JsonRPCMethod:
 
         if "error" in jsonresult and jsonresult["error"]:
             raise JsonRPCError(
-                jsonresult["error"]["code"],
-                "%s: %s" % (jsonresult["error"]["data"]["exceptionTypeName"],
-                            jsonresult["error"]["message"])
-            )
+                jsonresult["error"]["code"], "%s: %s" %
+                (jsonresult["error"]["data"]["exceptionTypeName"], jsonresult["error"]["message"]))
         return jsonresult["result"]
 
 
@@ -119,6 +113,7 @@ def id_counter():
     while 1:
         yield i
         i += 1
+
 
 _counter = id_counter()
 
@@ -135,7 +130,6 @@ class JsonRPCClient:
 
 
 class Selector(dict):
-
     """The class is to build parameters for UiSelector passed to Android device.
     """
     __fields = {
@@ -179,22 +173,20 @@ class Selector(dict):
     def __setitem__(self, k, v):
         if k in self.__fields:
             super(Selector, self).__setitem__(k, v)
-            super(Selector, self).__setitem__(self.__mask,
-                                              self[self.__mask] | self.__fields[k][0])
+            super(Selector, self).__setitem__(self.__mask, self[self.__mask] | self.__fields[k][0])
         else:
             raise ReferenceError("%s is not allowed." % k)
 
     def __delitem__(self, k):
         if k in self.__fields:
             super(Selector, self).__delitem__(k)
-            super(Selector, self).__setitem__(self.__mask,
-                                              self[self.__mask] & ~self.__fields[k][0])
+            super(Selector, self).__setitem__(self.__mask, self[self.__mask] & ~self.__fields[k][0])
 
     def clone(self):
-        kwargs = dict((k, self[k]) for k in self
-                      if k not in [self.__mask,
-                                   self.__childOrSibling,
-                                   self.__childOrSiblingSelector])
+        kwargs = dict(
+            (k, self[k])
+            for k in self
+            if k not in [self.__mask, self.__childOrSibling, self.__childOrSiblingSelector])
         selector = Selector(**kwargs)
         for v in self[self.__childOrSibling]:
             selector[self.__childOrSibling].append(v)
@@ -232,7 +224,6 @@ def point(x=0, y=0):
 
 
 class NotFoundHandler:
-
     '''
     Handler for UI Object Not Found exception.
     It's a replacement of UiAutomator watcher on device side.
@@ -251,14 +242,16 @@ class AutomatorServer:
 
     handlers = NotFoundHandler()  # handler UI Not Found exception
 
-    def __init__(self, serial, local_port=None, device_port=None,
-                 adb_server_host="localhost", adb_server_port=adb.ADB_PORT,
+    def __init__(self,
+                 serial,
+                 local_port=None,
+                 device_port=None,
+                 adb_server_host="localhost",
+                 adb_server_port=adb.ADB_PORT,
                  serversource="google"):
         self._sdk = 0
         self._uia_device_process = None
-        self._adb = adb.AndroidDeviceClient(serial,
-                                            host=adb_server_host,
-                                            port=adb_server_port)
+        self._adb = adb.AndroidDeviceClient(serial, host=adb_server_host, port=adb_server_port)
         self.device_port = int(device_port) if device_port else DEVICE_PORT
         self._local_port = int(local_port) if local_port else None
         self.host = adb_server_host
@@ -299,10 +292,10 @@ class AutomatorServer:
         return self._local_port
 
     def forward_port(self):
-            self._adb.forward(self.local_port, self.device_port)
+        self._adb.forward(self.local_port, self.device_port)
 
     def forward_remove(self):
-            self._adb.kill_forward(self.local_port)
+        self._adb.kill_forward(self.local_port)
 
     def install(self):
         cf = config.get_config()
@@ -342,17 +335,17 @@ class AutomatorServer:
                         try:
                             self.handlers['on'] = False
                             # any handler returns True will break the left handlers
-                            any(handler(self.handlers.get('device', None)) for handler in
-                                self.handlers['handlers'])
+                            any(
+                                handler(self.handlers.get('device', None))
+                                for handler in self.handlers['handlers'])
                         finally:
                             self.handlers['on'] = True
                         return _method_obj(*args, **kwargs)
                     raise
+
             return wrapper
 
-        return JsonRPCClient(self.rpc_uri,
-                             timeout=timeout,
-                             method_class=_JsonRPCMethod)
+        return JsonRPCClient(self.rpc_uri, timeout=timeout, method_class=_JsonRPCMethod)
 
     @property
     def sdk_version(self):
@@ -429,8 +422,8 @@ class AutomatorServer:
 
     def screenshot(self, filename=None, scale=1.0, quality=100):
         if self.sdk_version >= 18:
-            req = urllib.request.Request("%s?scale=%f&quality=%f" % (self.screenshot_uri,
-                                                                     scale, quality))
+            req = urllib.request.Request("%s?scale=%f&quality=%f" %
+                                         (self.screenshot_uri, scale, quality))
             result = urllib.request.urlopen(req, timeout=30)
             if filename:
                 with open(filename, 'wb') as f:
@@ -442,28 +435,22 @@ class AutomatorServer:
 
 
 class AutomatorDevice:
-
     '''uiautomator wrapper of android device'''
 
     __orientation = (  # device orientation
-        (0, "natural", "n", 0),
-        (1, "left", "l", 90),
-        (2, "upsidedown", "u", 180),
-        (3, "right", "r", 270)
-    )
-    __alias = {
-        "width": "displayWidth",
-        "height": "displayHeight"
-    }
+        (0, "natural", "n", 0), (1, "left", "l", 90), (2, "upsidedown", "u", 180), (3, "right", "r",
+                                                                                    270))
+    __alias = {"width": "displayWidth", "height": "displayHeight"}
 
-    def __init__(self, serial, local_port=LOCAL_PORT,
-                 adb_server_host="localhost", adb_server_port=adb.ADB_PORT):
-        self.server = AutomatorServer(
-            serial=serial,
-            local_port=local_port,
-            adb_server_host=adb_server_host,
-            adb_server_port=adb_server_port
-        )
+    def __init__(self,
+                 serial,
+                 local_port=LOCAL_PORT,
+                 adb_server_host="localhost",
+                 adb_server_port=adb.ADB_PORT):
+        self.server = AutomatorServer(serial=serial,
+                                      local_port=local_port,
+                                      adb_server_host=adb_server_host,
+                                      adb_server_port=adb_server_port)
 
     def __del__(self):
         self.server.stop()
@@ -526,8 +513,7 @@ class AutomatorDevice:
         if result:
             return result
 
-        device_file = self.server.jsonrpc.takeScreenshot("screenshot.png",
-                                                         scale, quality)
+        device_file = self.server.jsonrpc.takeScreenshot("screenshot.png", scale, quality)
         if not device_file:
             return None
         p = self.server.adb.cmd("pull", device_file, filename)
@@ -578,12 +564,14 @@ class AutomatorDevice:
         d.open.notification()
         d.open.quick_settings()
         '''
+
         @param_to_property(action=["notification", "quick_settings"])
         def _open(action):
             if action == "notification":
                 return self.server.jsonrpc.openNotification()
             else:
                 return self.server.jsonrpc.openQuickSettings()
+
         return _open
 
     @property
@@ -632,6 +620,7 @@ class AutomatorDevice:
             def run(self):
                 obj.server.jsonrpc.runWatchers()
                 return self
+
         return Watchers()
 
     def watcher(self, name):
@@ -659,14 +648,15 @@ class AutomatorDevice:
 
             @property
             def press(self):
-                @param_to_property(
-                    "home", "back", "left", "right", "up", "down", "center",
-                    "search", "enter", "delete", "del", "recent", "volume_up",
-                    "menu", "volume_down", "volume_mute", "camera", "power")
+
+                @param_to_property("home", "back", "left", "right", "up", "down", "center",
+                                   "search", "enter", "delete", "del", "recent", "volume_up",
+                                   "menu", "volume_down", "volume_mute", "camera", "power")
                 def _press(*args):
-                    obj.server.jsonrpc.registerPressKeyskWatcher(name,
-                                                                 self.__selectors, args)
+                    obj.server.jsonrpc.registerPressKeyskWatcher(name, self.__selectors, args)
+
                 return _press
+
         return Watcher()
 
     @property
@@ -681,16 +671,18 @@ class AutomatorDevice:
         d.press.menu()  # press home key
         d.press(89)     # press keycode
         '''
-        @param_to_property(
-            key=["home", "back", "left", "right", "up", "down", "center",
-                 "menu", "search", "enter", "delete", "del", "recent",
-                 "volume_up", "volume_down", "volume_mute", "camera", "power"]
-        )
+
+        @param_to_property(key=[
+            "home", "back", "left", "right", "up", "down", "center", "menu", "search", "enter",
+            "delete", "del", "recent", "volume_up", "volume_down", "volume_mute", "camera", "power"
+        ])
         def _press(key, meta=None):
             if isinstance(key, int):
-                return self.server.jsonrpc.pressKeyCode(key, meta) if meta else self.server.jsonrpc.pressKeyCode(key)  # noqa
+                return self.server.jsonrpc.pressKeyCode(
+                    key, meta) if meta else self.server.jsonrpc.pressKeyCode(key)  # noqa
             else:
                 return self.server.jsonrpc.pressKey(str(key))
+
         return _press
 
     def wakeup(self):
@@ -715,6 +707,7 @@ class AutomatorDevice:
         devive_self = self
 
         class _Screen(object):
+
             def on(self):
                 return devive_self.wakeup()
 
@@ -752,6 +745,7 @@ class AutomatorDevice:
         d.wait.idle(timeout=1000)
         d.wait.update(timeout=1000, package_name="com.android.settings")
         '''
+
         @param_to_property(action=["idle", "update"])
         def _wait(action, timeout=1000, package_name=None):
             if timeout / 1000 + 5 > 90:
@@ -761,7 +755,9 @@ class AutomatorDevice:
             if action == "idle":
                 return self.server.jsonrpc_wrap(timeout=http_timeout).waitForIdle(timeout)
             elif action == "update":
-                return self.server.jsonrpc_wrap(timeout=http_timeout).waitForWindowUpdate(package_name, timeout)  # noqa
+                return self.server.jsonrpc_wrap(timeout=http_timeout).waitForWindowUpdate(
+                    package_name, timeout)  # noqa
+
         return _wait
 
     def exists(self, **kwargs):
@@ -770,7 +766,6 @@ class AutomatorDevice:
 
 
 class AutomatorDeviceUiObject:
-
     '''Represent a UiObject, on which user can perform actions, such as click, set text
     '''
 
@@ -822,6 +817,7 @@ class AutomatorDeviceUiObject:
         d(text="John").click.topleft() # click on the topleft of the ui object
         d(text="John").click.bottomright() # click on the bottomright of the ui object
         '''
+
         @param_to_property(action=["tl", "topleft", "br", "bottomright", "wait"])
         def _click(action=None, timeout=3000):
             if action is None:
@@ -830,6 +826,7 @@ class AutomatorDeviceUiObject:
                 return self.jsonrpc.click(self.selector, action)
             else:
                 return self.jsonrpc.clickAndWaitForNewWindow(self.selector, timeout)
+
         return _click
 
     @property
@@ -841,6 +838,7 @@ class AutomatorDeviceUiObject:
         d(text="Image").long_click.topleft()  # long click on the topleft of the ui object
         d(text="Image").long_click.bottomright()  # long click on the topleft of the ui object
         '''
+
         @param_to_property(corner=["tl", "topleft", "br", "bottomright"])
         def _long_click(corner=None):
             info = self.info
@@ -861,6 +859,7 @@ class AutomatorDeviceUiObject:
                     x = (bounds["left"] + bounds["right"]) / 2
                     y = (bounds["top"] + bounds["bottom"]) / 2
                 return self.device.long_click(x, y)
+
         return _long_click
 
     @property
@@ -871,12 +870,16 @@ class AutomatorDeviceUiObject:
         d(text="Clock").drag.to(x=100, y=100)  # drag to point (x,y)
         d(text="Clock").drag.to(text="Remove") # drag to another object
         '''
+
         def to(obj, *args, **kwargs):
             if len(args) >= 2 or "x" in kwargs or "y" in kwargs:
-                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps)  # noqa
+                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps
+                                                                      )  # noqa
             else:
-                drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(self.selector, Selector(**kwargs), steps)  # noqa
+                drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(
+                    self.selector, Selector(**kwargs), steps)  # noqa
             return drag_to(*args, **kwargs)
+
         return type("Drag", (object,), {"to": to})()
 
     def gesture(self, start1, start2, *args, **kwargs):
@@ -886,10 +889,12 @@ class AutomatorDeviceUiObject:
         d().gesture(startPoint1, startPoint2).to(endPoint1, endPoint2, steps)
         d().gesture(startPoint1, startPoint2, endPoint1, endPoint2, steps)
         '''
+
         def to(obj_self, end1, end2, steps=100):
             ctp = lambda pt: point(*pt) if type(pt) == tuple else pt  # noqa convert tuple to point
             s1, s2, e1, e2 = ctp(start1), ctp(start2), ctp(end1), ctp(end2)
             return self.jsonrpc.gesture(self.selector, s1, s2, e1, e2, steps)
+
         obj = type("Gesture", (object,), {"to": to})()
         return obj if len(args) == 0 else to(None, *args, **kwargs)
 
@@ -900,10 +905,13 @@ class AutomatorDeviceUiObject:
         d().gestureM((100,200),(100,300),(100,400),(100,400),(100,400),(100,400))
         d().gestureM((100,200),(100,300),(100,400)).to((100,400),(100,400),(100,400))
         '''
+
         def to(obj_self, end1, end2, end3, steps=100):
             ctp = lambda pt: point(*pt) if type(pt) == tuple else pt  # noqa convert tuple to point
-            s1, s2, s3, e1, e2, e3 = ctp(start1), ctp(start2), ctp(start3), ctp(end1), ctp(end2), ctp(end3)  # noqa
+            s1, s2, s3, e1, e2, e3 = ctp(start1), ctp(start2), ctp(start3), ctp(end1), ctp(
+                end2), ctp(end3)  # noqa
             return self.jsonrpc.gesture(self.selector, s1, s2, s3, e1, e2, e3, steps)
+
         obj = type("Gesture", (object,), {"to": to})()
         return obj if len(args) == 0 else to(None, *args, **kwargs)
 
@@ -915,12 +923,14 @@ class AutomatorDeviceUiObject:
         d().pinch.In(percent=100, steps=10)
         d().pinch.Out(percent=100, steps=100)
         '''
+
         @param_to_property(in_or_out=["In", "Out"])
         def _pinch(in_or_out="Out", percent=100, steps=50):
             if in_or_out in ["Out", "out"]:
                 return self.jsonrpc.pinchOut(self.selector, percent, steps)
             elif in_or_out in ["In", "in"]:
                 return self.jsonrpc.pinchIn(self.selector, percent, steps)
+
         return _pinch
 
     @property
@@ -937,12 +947,14 @@ class AutomatorDeviceUiObject:
         d().swipe("right", steps=20)
         d().swipe("right", steps=20, percent=0.5)
         '''
+
         @param_to_property(direction=["up", "down", "right", "left"])
         def _swipe(direction="left", steps=10, percent=1):
             if percent == 1:
                 return self.jsonrpc.swipe(self.selector, direction, steps)
             else:
                 return self.jsonrpc.swipe(self.selector, direction, percent, steps)
+
         return _swipe
 
     @property
@@ -953,6 +965,7 @@ class AutomatorDeviceUiObject:
         d(text="Clock").wait.gone()  # wait until it's gone.
         d(text="Settings").wait.exists() # wait until it appears.
         '''
+
         @param_to_property(action=["exists", "gone"])
         def _wait(action, timeout=3000):
             if timeout / 1000 + 5 > 90:
@@ -961,8 +974,10 @@ class AutomatorDeviceUiObject:
                 http_timeout = 90
             method = self.device.server.jsonrpc_wrap(
                 timeout=http_timeout
-            ).waitUntilGone if action == "gone" else self.device.server.jsonrpc_wrap(timeout=http_timeout).waitForExists  # noqa
+            ).waitUntilGone if action == "gone" else self.device.server.jsonrpc_wrap(
+                timeout=http_timeout).waitForExists  # noqa
             return method(self.selector, timeout)
+
         return _wait
 
 
@@ -973,19 +988,14 @@ class AutomatorDeviceNamedUiObject(AutomatorDeviceUiObject):
 
     def child(self, **kwargs):
         return AutomatorDeviceNamedUiObject(
-            self.device,
-            self.jsonrpc.getChild(self.selector, Selector(**kwargs))
-        )
+            self.device, self.jsonrpc.getChild(self.selector, Selector(**kwargs)))
 
     def sibling(self, **kwargs):
         return AutomatorDeviceNamedUiObject(
-            self.device,
-            self.jsonrpc.getFromParent(self.selector, Selector(**kwargs))
-        )
+            self.device, self.jsonrpc.getFromParent(self.selector, Selector(**kwargs)))
 
 
 class AutomatorDeviceObject(AutomatorDeviceUiObject):
-
     '''Represent a generic UiObject/UiScrollable/UiCollection,
     on which user can perform actions, such as click, set text
     '''
@@ -995,59 +1005,35 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
 
     def child(self, **kwargs):
         '''set childSelector.'''
-        return AutomatorDeviceObject(
-            self.device,
-            self.selector.clone().child(**kwargs)
-        )
+        return AutomatorDeviceObject(self.device, self.selector.clone().child(**kwargs))
 
     def sibling(self, **kwargs):
         '''set fromParent selector.'''
-        return AutomatorDeviceObject(
-            self.device,
-            self.selector.clone().sibling(**kwargs)
-        )
+        return AutomatorDeviceObject(self.device, self.selector.clone().sibling(**kwargs))
 
     child_selector, from_parent = child, sibling
 
     def child_by_text(self, txt, **kwargs):
         if "allow_scroll_search" in kwargs:
             allow_scroll_search = kwargs.pop("allow_scroll_search")
-            name = self.jsonrpc.childByText(
-                self.selector,
-                Selector(**kwargs),
-                txt,
-                allow_scroll_search
-            )
+            name = self.jsonrpc.childByText(self.selector, Selector(**kwargs), txt,
+                                            allow_scroll_search)
         else:
-            name = self.jsonrpc.childByText(
-                self.selector,
-                Selector(**kwargs),
-                txt
-            )
+            name = self.jsonrpc.childByText(self.selector, Selector(**kwargs), txt)
         return AutomatorDeviceNamedUiObject(self.device, name)
 
     def child_by_description(self, txt, **kwargs):
         if "allow_scroll_search" in kwargs:
             allow_scroll_search = kwargs.pop("allow_scroll_search")
-            name = self.jsonrpc.childByDescription(
-                self.selector,
-                Selector(**kwargs),
-                txt,
-                allow_scroll_search
-            )
+            name = self.jsonrpc.childByDescription(self.selector, Selector(**kwargs), txt,
+                                                   allow_scroll_search)
         else:
-            name = self.jsonrpc.childByDescription(
-                self.selector,
-                Selector(**kwargs),
-                txt
-            )
+            name = self.jsonrpc.childByDescription(self.selector, Selector(**kwargs), txt)
         return AutomatorDeviceNamedUiObject(self.device, name)
 
     def child_by_instance(self, inst, **kwargs):
         return AutomatorDeviceNamedUiObject(
-            self.device,
-            self.jsonrpc.childByInstance(self.selector, Selector(**kwargs), inst)
-        )
+            self.device, self.jsonrpc.childByInstance(self.selector, Selector(**kwargs), inst))
 
     @property
     def count(self):
@@ -1085,27 +1071,35 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
         return Iter()
 
     def right(self, **kwargs):
+
         def onrightof(rect1, rect2):
             left, top, right, bottom = intersect(rect1, rect2)
             return rect2["left"] - rect1["right"] if top < bottom else -1
+
         return self.__view_beside(onrightof, **kwargs)
 
     def left(self, **kwargs):
+
         def onleftof(rect1, rect2):
             left, top, right, bottom = intersect(rect1, rect2)
             return rect1["left"] - rect2["right"] if top < bottom else -1
+
         return self.__view_beside(onleftof, **kwargs)
 
     def up(self, **kwargs):
+
         def above(rect1, rect2):
             left, top, right, bottom = intersect(rect1, rect2)
             return rect1["top"] - rect2["bottom"] if left < right else -1
+
         return self.__view_beside(above, **kwargs)
 
     def down(self, **kwargs):
+
         def under(rect1, rect2):
             left, top, right, bottom = intersect(rect1, rect2)
             return rect2["top"] - rect1["bottom"] if left < right else -1
+
         return self.__view_beside(under, **kwargs)
 
     def __view_beside(self, onsideof, **kwargs):
@@ -1128,10 +1122,10 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
         d().fling.toBeginning(max_swipes=100) # vertically
         d().fling.horiz.toEnd()
         '''
+
         @param_to_property(
             dimention=["vert", "vertically", "vertical", "horiz", "horizental", "horizentally"],
-            action=["forward", "backward", "toBeginning", "toEnd"]
-        )
+            action=["forward", "backward", "toBeginning", "toEnd"])
         def _fling(dimention="vert", action="forward", max_swipes=1000):
             vertical = dimention in ["vert", "vertically", "vertical"]
             if action == "forward":
@@ -1157,6 +1151,7 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
         d().scroll.vert.toEnd(steps=100)
         d().scroll.horiz.to(text="Clock")
         '''
+
         def __scroll(vertical, forward, steps=100):
             method = self.jsonrpc.scrollForward if forward else self.jsonrpc.scrollBackward
             return method(self.selector, vertical, steps)
@@ -1183,4 +1178,5 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
                 return __scroll_to_end(vertical, **kwargs)
             elif action == "to":
                 return __scroll_to(vertical, **kwargs)
+
         return _scroll

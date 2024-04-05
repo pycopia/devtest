@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Various extra basic types for use by the framework.
 """
 
@@ -20,6 +19,7 @@ from enum import IntEnum as Enum  # noqa
 class NULLType(type):
     """Similar to None, but is also a no-op callable and empty iterable.
     """
+
     def __new__(cls, name, bases, dct):
         return type.__new__(cls, name, bases, dct)
 
@@ -61,6 +61,7 @@ class NamedNumber(int):
     """A named number. Behaves as an integer, but produces a name when
     stringified.
     """
+
     def __new__(cls, val, name=None):
         v = int.__new__(cls, val)
         v._name = str(name)
@@ -76,12 +77,12 @@ class NamedNumber(int):
         return self._name
 
     def __repr__(self):
-        return "{}({:d}, {!r})".format(self.__class__.__name__,
-                                       self, self._name)
+        return "{}({:d}, {!r})".format(self.__class__.__name__, self, self._name)
 
 
 class NamedNumberSet(list):
     """A list of NamedNumber objects."""
+
     def __init__(self, *init, **kwinit):
         for i, val in enumerate(init):
             if isinstance(val, list):
@@ -108,6 +109,7 @@ class NamedNumberSet(list):
 class AttrDict(dict):
     """A dictionary with attribute-style access. It maps attribute access to
     the real dictionary.  """
+
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
 
@@ -140,6 +142,7 @@ class AttrDict(dict):
 class AttrDictDefault(dict):
     """A dictionary with attribute-style access. It maps attribute access to
     the real dictionary. Returns a default entry if key is not found. """
+
     def __init__(self, init={}, default=None):
         dict.__init__(self, init)
         self.__dict__["_default"] = default
@@ -180,10 +183,12 @@ class AttrDictDefault(dict):
 
 class MACAddress:
     """MAC addressess."""
+
     def __init__(self, mac):
         self.mac = str(mac)
 
     def __str__(self):
         return self.mac
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

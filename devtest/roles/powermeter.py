@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """The power measuring role.
 """
 
@@ -27,8 +26,12 @@ class PowerMeterRole(BaseRole):
     This one uses Monsoon device.
     """
 
-    def measure_average_power(self, duration=10, samples=None, voltage=4.2,
-                              passthrough="auto", delay=0):
+    def measure_average_power(self,
+                              duration=10,
+                              samples=None,
+                              voltage=4.2,
+                              passthrough="auto",
+                              delay=0):
         """Measure and report average power over the span of time.
 
         Returns:
@@ -46,8 +49,7 @@ class PowerMeterRole(BaseRole):
         result = measurer.measure(handlerclass=measure.AveragePowerHandler)
         return result
 
-    def record(self, filename, duration=10, samples=None, voltage=4.2,
-               passthrough="auto", delay=0):
+    def record(self, filename, duration=10, samples=None, voltage=4.2, passthrough="auto", delay=0):
         """Record all samples to a file.
 
         Returns:
@@ -84,10 +86,11 @@ class PowerMeterRole(BaseRole):
 
 if __name__ == "__main__":
     device = {
-            "serno": "20418",
+        "serno": "20418",
     }
     dev = PowerMeterRole(device)
     result = dev.measure_average_power(passthrough="on")
-    print("Main power: {:10.4f} W, USB power: {:10.4f} W".format(result.main_power, result.usb_power))
+    print("Main power: {:10.4f} W, USB power: {:10.4f} W".format(result.main_power,
+                                                                 result.usb_power))
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

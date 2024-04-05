@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Controllers for Android based products.  """
 
 from __future__ import generator_stop
@@ -168,9 +167,13 @@ class AndroidController(devices.Controller):
         else:
             raise AndroidControllerError((es, stderr))
 
-    def start_activity(self, package=None, component=None,
+    def start_activity(self,
+                       package=None,
+                       component=None,
                        action='android.intent.action.MAIN',
-                       data=None, mimetype=None, **extra):
+                       data=None,
+                       mimetype=None,
+                       **extra):
         """Start an activity on device.
 
         This also force-stops a prior instance.
@@ -320,15 +323,14 @@ class AndroidController(devices.Controller):
     def airplane_mode(self, onoff):
         """Set airplane mode on or off.
         """
-        original_mode = int(self.shell(['settings', 'get', 'global',
-                                       'airplane_mode_on']))
+        original_mode = int(self.shell(['settings', 'get', 'global', 'airplane_mode_on']))
         if original_mode == onoff:
             return original_mode
-        self.shell(['settings', 'put', 'global', 'airplane_mode_on',
-                    str(int(onoff))])
-        self.shell(['am', 'broadcast',
-                    '-a', 'android.intent.action.AIRPLANE_MODE',
-                    '--ez', 'state', 'true' if onoff else 'false'])
+        self.shell(['settings', 'put', 'global', 'airplane_mode_on', str(int(onoff))])
+        self.shell([
+            'am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE', '--ez', 'state',
+            'true' if onoff else 'false'
+        ])
         val = self.shell(['settings', 'get', 'global', 'airplane_mode_on'])
         if int(val.strip()) != onoff:
             raise AndroidControllerError("Didn't set airplane mode.")
@@ -413,6 +415,7 @@ class AndroidController(devices.Controller):
 
 
 class _Buttons:
+
     def __init__(self, controller):
         self._cont = controller
 
@@ -512,8 +515,8 @@ class _Thermal:
         if es:
             return int(out.strip())
         else:
-            raise AndroidControllerError(
-                "Couldn't read board temperature file: {}".format(self._board_temp_file))
+            raise AndroidControllerError("Couldn't read board temperature file: {}".format(
+                self._board_temp_file))
 
 
 class Intent:
@@ -572,8 +575,13 @@ class Intent:
     """
     DEFAULT_ACTION = 'android.intent.action.MAIN'
 
-    def __init__(self, uri=None, package=None, component=None,
-                 action=None, data=None, mimetype=None,
+    def __init__(self,
+                 uri=None,
+                 package=None,
+                 component=None,
+                 action=None,
+                 data=None,
+                 mimetype=None,
                  **extra):
         intent = []
         if data is not None:
@@ -623,12 +631,12 @@ def _intent_extra_type(value):
 
 
 class AndroidIntArray(array):
+
     def __new__(cls, init=()):
         return super().__new__(cls, 'i', init)
 
     def __repr__(self):
-        return "{}([{}])".format(self.__class__.__name__,
-                                 ", ".join(str(i) for i in self))
+        return "{}([{}])".format(self.__class__.__name__, ", ".join(str(i) for i in self))
 
 
 def _evaluate_value(value):
@@ -678,7 +686,7 @@ class _Settings:
             return str(value)
 
     def get(self, namespace, key):
-        val =  self._cont.shell(['settings', 'get', namespace, key])
+        val = self._cont.shell(['settings', 'get', namespace, key])
         return _evaluate_value(val)
 
     def put(self, namespace, key, value, tag=None, default=None):
@@ -720,19 +728,17 @@ class _Settings:
         # are removed, the location service is disabled.
         if onoff:
             # TODO(dart) fix hard-coded defaults
-            self._cont.shell(["settings", "put", "secure",
-                              "location_providers_allowed", "+gps"])
-            self._cont.shell(["settings", "put", "secure",
-                              "location_providers_allowed", "+network"])
+            self._cont.shell(["settings", "put", "secure", "location_providers_allowed", "+gps"])
+            self._cont.shell(
+                ["settings", "put", "secure", "location_providers_allowed", "+network"])
         else:
-            locations =  self._cont.shell(
+            locations = self._cont.shell(
                 ['settings', 'get', "secure", "location_providers_allowed"])
             locations = locations.strip()
             if locations:
                 for provider in locations.split(","):
                     self._cont.shell(
-                        ['settings', 'put',
-                         'secure', 'location_providers_allowed', '-' + provider])
+                        ['settings', 'put', 'secure', 'location_providers_allowed', '-' + provider])
 
 
 class MemoryMonitor:
@@ -872,5 +878,6 @@ class ProcessInfo:
     @cpu_monitor.deleter
     def cpu_monitor(self):
         self._cpum = None
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

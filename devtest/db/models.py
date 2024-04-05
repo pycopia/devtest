@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Data model for test beds, equipment, and other objects.
 
 These are persistent objects that may model equipment and their
@@ -28,11 +27,10 @@ from .. import json
 from ..core import constants
 from ..core.exceptions import ModelError
 
-
-TABLES = ['AccountIds', 'EquipmentModel', 'Equipment',
-          'Function', 'Software', 'SoftwareVariant', 'TestBed',
-          'Networks', 'Interfaces',
-          'TestSuites', 'TestCases', 'Scenario', 'TestResults']
+TABLES = [
+    'AccountIds', 'EquipmentModel', 'Equipment', 'Function', 'Software', 'SoftwareVariant',
+    'TestBed', 'Networks', 'Interfaces', 'TestSuites', 'TestCases', 'Scenario', 'TestResults'
+]
 
 _ASSOC_TABLES = [
     "_SoftwareVariants",
@@ -56,6 +54,7 @@ database = None
 
 
 class BaseModel(Model):
+
     class Meta:
         database = database_proxy
 
@@ -73,9 +72,7 @@ class AccountIds(BaseModel):
 
     class Meta:
         table_name = 'account_ids'
-        indexes = (
-            (("identifier",), True),
-        )
+        indexes = ((("identifier",), True),)
 
     def __str__(self):
         return "AccountId: {}".format(self.identifier)
@@ -84,8 +81,7 @@ class AccountIds(BaseModel):
     def create_or_get(cls, identifier=None, login=None, password=None):
         try:
             with database.atomic():
-                return cls.create(identifier=identifier, login=login,
-                                  password=password), True
+                return cls.create(identifier=identifier, login=login, password=password), True
         except IntegrityError:
             return cls.get(cls.identifier == identifier), False
 
@@ -103,9 +99,7 @@ class EquipmentModel(BaseModel):
 
     class Meta:
         table_name = 'equipment_model'
-        indexes = (
-            (("name", "manufacturer"), True),
-        )
+        indexes = ((("name", "manufacturer"), True),)
 
     def __str__(self):
         return "{} {}".format(self.manufacturer, self.name)
@@ -123,11 +117,9 @@ class EquipmentModel(BaseModel):
     def create_or_get(cls, name=None, manufacturer=None, attributes=None):
         try:
             with database.atomic():
-                return cls.create(name=name, manufacturer=manufacturer,
-                                  attributes=attributes), True
+                return cls.create(name=name, manufacturer=manufacturer, attributes=attributes), True
         except IntegrityError:
-            return (cls.get(cls.name == name,
-                            cls.manufacturer == manufacturer), False)
+            return (cls.get(cls.name == name, cls.manufacturer == manufacturer), False)
 
 
 class Equipment(BaseModel):
@@ -139,18 +131,24 @@ class Equipment(BaseModel):
     name = CharField(max_length=255, unique=True)
     serno = CharField(max_length=255, null=True)
     model = ForeignKeyField(column_name='model_id',
-                            model=EquipmentModel, field='id',
+                            model=EquipmentModel,
+                            field='id',
                             backref='equipment')
-    account = ForeignKeyField(column_name='account_id', null=True,
-                              model=AccountIds, field='id')
-    user = ForeignKeyField(column_name='user_id', null=True,
-                           model=AccountIds, field='id',
+    account = ForeignKeyField(column_name='account_id', null=True, model=AccountIds, field='id')
+    user = ForeignKeyField(column_name='user_id',
+                           null=True,
+                           model=AccountIds,
+                           field='id',
                            backref='user_equipment_set',
-                           on_update="CASCADE", on_delete="SET NULL")
-    partof = ForeignKeyField(column_name='partof_id', null=True,
-                             model='self', field='id',
+                           on_update="CASCADE",
+                           on_delete="SET NULL")
+    partof = ForeignKeyField(column_name='partof_id',
+                             null=True,
+                             model='self',
+                             field='id',
                              backref='subcomponents',
-                             on_update="CASCADE", on_delete="SET NULL")
+                             on_update="CASCADE",
+                             on_delete="SET NULL")
     location = TextField(null=True)
     notes = TextField(null=True)
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
@@ -163,11 +161,13 @@ class Equipment(BaseModel):
         return self.name
 
     @classmethod
-    def create_or_get(cls, name=None, serno=None, model=None, account=None,
-                      attributes=None):
+    def create_or_get(cls, name=None, serno=None, model=None, account=None, attributes=None):
         try:
             with database.atomic():
-                return cls.create(name=name, serno=serno, model=model, account=account,
+                return cls.create(name=name,
+                                  serno=serno,
+                                  model=model,
+                                  account=account,
                                   attributes=attributes), True
         except IntegrityError:
             return cls.get(cls.name == name), False
@@ -181,13 +181,22 @@ class Equipment(BaseModel):
     def attribute_del(self, attrname):
         return _attribute_del(self, attrname)
 
-    def add_interface(self, name, ifindex=None,
-                      macaddr=None, ipaddr=None, ipaddr6=None, network=None):
+    def add_interface(self,
+                      name,
+                      ifindex=None,
+                      macaddr=None,
+                      ipaddr=None,
+                      ipaddr6=None,
+                      network=None):
         if network is not None and isinstance(network, str):
             network = Networks.select().where(Networks.name == network).get()
         with database.atomic():
-            Interfaces.create(name=name, equipment=self, ifindex=ifindex,
-                              macaddr=macaddr, ipaddr=ipaddr, ipaddr6=ipaddr6,
+            Interfaces.create(name=name,
+                              equipment=self,
+                              ifindex=ifindex,
+                              macaddr=macaddr,
+                              ipaddr=ipaddr,
+                              ipaddr6=ipaddr6,
                               network=network)
 
     def attach_interface(self, **selectkw):
@@ -197,8 +206,7 @@ class Equipment(BaseModel):
             q = q.where(getattr(Interfaces, attrname) == value)
         intf = q.get()
         if intf.equipment is not None:
-            raise ModelError(
-                "Interface already attached to {!r}".format(intf.equipment))
+            raise ModelError("Interface already attached to {!r}".format(intf.equipment))
         with database.atomic():
             intf.equipment = self
 
@@ -287,7 +295,8 @@ class Software(BaseModel):
     name = CharField(max_length=255, unique=True)
     version = CharField(max_length=255, null=True)
     implements = ForeignKeyField(column_name='category_id',
-                                 model=Function, field='id',
+                                 model=Function,
+                                 field='id',
                                  backref="implementations")
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
 
@@ -318,10 +327,12 @@ class SoftwareVariant(BaseModel):
 
 class _SoftwareVariants(BaseModel):
     software = ForeignKeyField(column_name='software_id',
-                               model=Software, field='id',
+                               model=Software,
+                               field='id',
                                backref="variants")
     softwarevariant = ForeignKeyField(column_name='softwarevariant_id',
-                                      model=SoftwareVariant, field='id')
+                                      model=SoftwareVariant,
+                                      field='id')
 
     class Meta:
         table_name = 'software_variants'
@@ -349,8 +360,7 @@ class TestBed(BaseModel):
     def create_or_get(cls, name=None, notes=None, attributes=None):
         try:
             with database.atomic():
-                return cls.create(name=name, notes=notes,
-                                  attributes=attributes), True
+                return cls.create(name=name, notes=notes, attributes=attributes), True
         except IntegrityError:
             return cls.get(cls.name == name), False
 
@@ -386,9 +396,8 @@ class TestBed(BaseModel):
             raise ModelError("SUT is not defined in testbed '{}'.".format(self.name))
 
     def get_software_with_role(self, rolename):
-        q = (Software.select().join(_SoftwareRoles).join(Function)
-             .where(Function.name == rolename)
-             .switch(_SoftwareRoles).where(_SoftwareRoles.testbed == self))
+        q = (Software.select().join(_SoftwareRoles).join(Function).where(
+            Function.name == rolename).switch(_SoftwareRoles).where(_SoftwareRoles.testbed == self))
         return q.peek(n=100)
 
     def add_software_role(self, software, rolename):
@@ -399,9 +408,7 @@ class TestBed(BaseModel):
     def add_testequipment(self, eq, rolename):
         func = Function.select().where(Function.name == rolename).get()
         with database.atomic():
-            te, created = _Testequipment.create_or_get(testbed=self,
-                                                       equipment=eq,
-                                                       function=func)
+            te, created = _Testequipment.create_or_get(testbed=self, equipment=eq, function=func)
 
     def remove_testequipment(self, eq, rolename):
         func = Function.select().where(Function.name == rolename).get()
@@ -419,48 +426,50 @@ class TestBed(BaseModel):
             raise ModelError("No equipment with role {!r} defined.".format(rolename))
 
     def get_all_equipment_with_role(self, rolename):
-        q = (Equipment.select().join(_Testequipment)
-             .join(Function).where(Function.name == rolename)
-             .switch(_Testequipment).where(_Testequipment.testbed == self))
+        q = (Equipment.select().join(_Testequipment).join(Function).where(
+            Function.name == rolename).switch(_Testequipment).where(_Testequipment.testbed == self))
         return q.peek(n=100)
 
     def get_all_roles_for_equipment(self, eq):
-        q = (Function.select().join(_Testequipment)
-             .where((_Testequipment.testbed == self) & (_Testequipment.equipment == eq)))
+        q = (Function.select().join(_Testequipment).where((_Testequipment.testbed == self) &
+                                                          (_Testequipment.equipment == eq)))
         return q.peek(n=100)
 
 
 # Maps a testbed to equipment.
 class _Testequipment(BaseModel):
     testbed = ForeignKeyField(column_name='testbed_id',
-                              model=TestBed, field='id',
+                              model=TestBed,
+                              field='id',
                               backref="testequipment",
-                              on_update="CASCADE", on_delete="CASCADE")
+                              on_update="CASCADE",
+                              on_delete="CASCADE")
     equipment = ForeignKeyField(column_name='equipment_id',
-                                model=Equipment, field='id',
+                                model=Equipment,
+                                field='id',
                                 backref="testequipment",
-                                on_update="CASCADE", on_delete="CASCADE")
-    function = ForeignKeyField(column_name='function_id', null=True,
-                               model=Function, field='id',
-                               on_update="CASCADE", on_delete="CASCADE")
+                                on_update="CASCADE",
+                                on_delete="CASCADE")
+    function = ForeignKeyField(column_name='function_id',
+                               null=True,
+                               model=Function,
+                               field='id',
+                               on_update="CASCADE",
+                               on_delete="CASCADE")
 
     class Meta:
         table_name = 'testequipment'
-        indexes = (
-            (("testbed", "equipment", "function"), True),
-        )
+        indexes = ((("testbed", "equipment", "function"), True),)
 
     def __str__(self):
-        return "{} in TestBed {} as {}".format(self.equipment.name,
-                                               self.testbed.name,
+        return "{} in TestBed {} as {}".format(self.equipment.name, self.testbed.name,
                                                self.function.name)
 
     @classmethod
     def create_or_get(cls, testbed=None, equipment=None, function=None):
         try:
             with database.atomic():
-                return cls.create(testbed=testbed, equipment=equipment,
-                                  function=function), True
+                return cls.create(testbed=testbed, equipment=equipment, function=function), True
         except IntegrityError:
             return (cls.get(cls.testbed == testbed, cls.equipment == equipment,
                             cls.function == function), False)
@@ -468,14 +477,20 @@ class _Testequipment(BaseModel):
 
 class _SoftwareRoles(BaseModel):
     testbed = ForeignKeyField(column_name='testbed_id',
-                              model=TestBed, field='id',
-                              on_update="CASCADE", on_delete="CASCADE")
+                              model=TestBed,
+                              field='id',
+                              on_update="CASCADE",
+                              on_delete="CASCADE")
     software = ForeignKeyField(column_name='software_id',
-                               model=Software, field='id',
-                               on_update="CASCADE", on_delete="CASCADE")
+                               model=Software,
+                               field='id',
+                               on_update="CASCADE",
+                               on_delete="CASCADE")
     function = ForeignKeyField(column_name='function_id',
-                               model=Function, field='id',
-                               on_update="CASCADE", on_delete="CASCADE")
+                               model=Function,
+                               field='id',
+                               on_update="CASCADE",
+                               on_delete="CASCADE")
 
     class Meta:
         table_name = 'software_roles'
@@ -487,23 +502,23 @@ class _SoftwareRoles(BaseModel):
 # addressing.
 class _Connection(BaseModel):
     source = ForeignKeyField(column_name='source_id',
-                             model=Equipment, field='id',
+                             model=Equipment,
+                             field='id',
                              backref="connections",
                              on_delete="CASCADE")
     destination = ForeignKeyField(column_name='destination_id',
-                                  model=Equipment, field='id',
+                                  model=Equipment,
+                                  field='id',
                                   backref="connected",
                                   on_delete="CASCADE")
-    type = EnumField(constants.ConnectionType,
-                     default=constants.ConnectionType.Unknown)
+    type = EnumField(constants.ConnectionType, default=constants.ConnectionType.Unknown)
     state = IntegerField(null=True)  # User defined state
 
     class Meta:
         table_name = 'connections'
 
     def __str__(self):
-        return "{} <-<{}>-> {}".format(self.source.name, self.type.name,
-                                       self.destination.name)
+        return "{} <-<{}>-> {}".format(self.source.name, self.type.name, self.destination.name)
 
 
 class Networks(BaseModel):
@@ -515,11 +530,12 @@ class Networks(BaseModel):
     ip6network = CIDRField(null=True)
     vlanid = IntegerField(null=True)
     layer = IntegerField(default=3)
-    lower = ForeignKeyField(column_name='lower_id', null=True,
-                            model='self', field='id',
+    lower = ForeignKeyField(column_name='lower_id',
+                            null=True,
+                            model='self',
+                            field='id',
                             backref="upper")
-    type = EnumField(constants.NetworkType,
-                     default=constants.NetworkType.Unknown)
+    type = EnumField(constants.NetworkType, default=constants.NetworkType.Unknown)
     notes = TextField(null=True)
     # User defined attributes.
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
@@ -558,17 +574,23 @@ class Interfaces(BaseModel):
     ipaddr6 = IPv6Field(null=True)  # inet
     macaddr = MACField(null=True)  # macaddr
     vlan = IntegerField(null=True, default=0)
-    parent = ForeignKeyField(column_name='parent_id', null=True,
-                             model='self', field='id',
+    parent = ForeignKeyField(column_name='parent_id',
+                             null=True,
+                             model='self',
+                             field='id',
                              backref="subinterface",
                              on_update="CASCADE",
                              on_delete="SET NULL")
-    equipment = ForeignKeyField(column_name='equipment_id', null=True,
-                                model=Equipment, field='id',
+    equipment = ForeignKeyField(column_name='equipment_id',
+                                null=True,
+                                model=Equipment,
+                                field='id',
                                 backref="interfaces",
                                 on_delete="CASCADE")
-    network = ForeignKeyField(column_name='network_id', null=True,
-                              model=Networks, field='id',
+    network = ForeignKeyField(column_name='network_id',
+                              null=True,
+                              model=Networks,
+                              field='id',
                               on_update="CASCADE",
                               on_delete="SET NULL")
 
@@ -624,25 +646,20 @@ class TestCases(BaseModel):
 
     # Running, scheduling and reporting
     testimplementation = CharField(max_length=255, null=True)  # Python path
-    target_software = ForeignKeyField(null=True,
-                                      model=Software, field='id')
-    target_component = ForeignKeyField(null=True,
-                                       model=EquipmentModel, field='id')
+    target_software = ForeignKeyField(null=True, model=Software, field='id')
+    target_component = ForeignKeyField(null=True, model=EquipmentModel, field='id')
 
     # Classification
-    type = EnumField(constants.TestCaseType,
-                     default=constants.TestCaseType.Unknown)
-    priority = EnumField(constants.Priority,
-                         default=constants.Priority.Unknown)
-    status = EnumField(constants.TestCaseStatus,
-                       default=constants.TestCaseStatus.Unknown)
+    type = EnumField(constants.TestCaseType, default=constants.TestCaseType.Unknown)
+    priority = EnumField(constants.Priority, default=constants.Priority.Unknown)
+    status = EnumField(constants.TestCaseStatus, default=constants.TestCaseStatus.Unknown)
     interactive = BooleanField(default=False)
     automated = BooleanField(default=True)
-#    interactive | automated | meaning
-#        NO      |    NO     | Manual test, user must supply final result.
-#        NO      |    YES    | Fully automated
-#        YES     |    NO     | Manual test, user must supply result and data.
-#        YES     |    YES    | Partially automated, needs user input.
+    #    interactive | automated | meaning
+    #        NO      |    NO     | Manual test, user must supply final result.
+    #        NO      |    YES    | Fully automated
+    #        YES     |    NO     | Manual test, user must supply result and data.
+    #        YES     |    YES    | Partially automated, needs user input.
 
     # Management
     lastchange = DateTimeTZField(default=time_now)
@@ -653,9 +670,7 @@ class TestCases(BaseModel):
 
     class Meta:
         table_name = 'test_cases'
-        indexes = (
-            (("testimplementation",), False),
-        )
+        indexes = ((("testimplementation",), False),)
 
     def __str__(self):
         return self.name
@@ -690,11 +705,12 @@ class Scenario(BaseModel):
     reportname = CharField(max_length=80, null=True)
     owners = ArrayField(null=True)  # Array of user IDs
     notes = TextField(null=True)
-    testbed = ForeignKeyField(column_name='testbed_id',
-                              model=TestBed, field='id', null=True)
+    testbed = ForeignKeyField(column_name='testbed_id', model=TestBed, field='id', null=True)
     testsuite = ForeignKeyField(column_name='testsuite_id',
-                                model=TestSuites, field='id',
-                                backref="scenarios", null=True)
+                                model=TestSuites,
+                                field='id',
+                                backref="scenarios",
+                                null=True)
 
     class Meta:
         table_name = 'scenarios'
@@ -735,17 +751,22 @@ class TestResults(BaseModel):
     dutbuild = CharField(max_length=255, null=True)  # target build or version
 
     # Test case and result associations.
-    parent = ForeignKeyField(column_name='parent_id', null=True,
-                             model='self', field='id',
+    parent = ForeignKeyField(column_name='parent_id',
+                             null=True,
+                             model='self',
+                             field='id',
                              backref="subresults")
-    testcase = ForeignKeyField(column_name='testcase_id', null=True,
-                               model=TestCases, field='id',
+    testcase = ForeignKeyField(column_name='testcase_id',
+                               null=True,
+                               model=TestCases,
+                               field='id',
                                backref="testresults")
-    testsuite = ForeignKeyField(column_name='testsuite_id', null=True,
-                                model=TestSuites, field='id',
+    testsuite = ForeignKeyField(column_name='testsuite_id',
+                                null=True,
+                                model=TestSuites,
+                                field='id',
                                 backref="testresults")
-    testbed = ForeignKeyField(column_name='testbed_id', null=True,
-                              model=TestBed, field='id')
+    testbed = ForeignKeyField(column_name='testbed_id', null=True, model=TestBed, field='id')
 
     class Meta:
         table_name = 'test_results'
@@ -764,8 +785,7 @@ class TestResults(BaseModel):
                 name = "TestSuite: generic"
         elif self.resulttype == constants.TestResultType.TestRunSummary:
             name = "run id: {} on {}, artifacts: {}".format(
-                self.id, self.testbed.name if self.testbed else "no testbed",
-                self.resultslocation)
+                self.id, self.testbed.name if self.testbed else "no testbed", self.resultslocation)
         else:
             name = "{!r} id: {}".format(self.resulttype, self.id)
         return "TestResult: {:10.10s} {}".format(self.result.name, name)
@@ -773,35 +793,34 @@ class TestResults(BaseModel):
     @classmethod
     def get_latest_run(cls):
         r = cls.select().where((cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
-                (cls.resulttype == constants.TestResultType.TestRunSummary) &
-                (cls.valid == True))) &  # noqa
-                (cls.resulttype == constants.TestResultType.TestRunSummary)).get()
+            (cls.resulttype == constants.TestResultType.TestRunSummary) &
+            (cls.valid == True))) &  # noqa
+                               (cls.resulttype == constants.TestResultType.TestRunSummary)).get()
         return r
 
     @classmethod
     def for_testcase(cls, testcase, limit=100, offset=0):
-        return cls.select().where((cls.testcase == testcase) &
-                                  (cls.valid == True)).order_by(cls.starttime).limit(limit).offset(offset).execute()  # noqa
+        return cls.select().where((cls.testcase == testcase) & (cls.valid == True)).order_by(
+            cls.starttime).limit(limit).offset(offset).execute()  # noqa
 
     @classmethod
     def get_runs(cls, limit=20, offset=0):
-        return cls.select().where(
-                    (cls.resulttype == constants.TestResultType.TestRunSummary) &
-                    (cls.valid == True)  # noqa
-                        ).order_by(cls.starttime.desc()).limit(limit).offset(offset).execute()
+        return cls.select().where((cls.resulttype == constants.TestResultType.TestRunSummary) &
+                                  (cls.valid == True)  # noqa
+                                  ).order_by(
+                                      cls.starttime.desc()).limit(limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
-        return cls.select(cls.data).where(
-            (cls.resulttype == constants.TestResultType.Test) &
-            (cls.testcase == testcase) & (cls.valid == True)  # noqa
-            ).order_by(cls.starttime).limit(limit).execute()
+        return cls.select(cls.data).where((cls.resulttype == constants.TestResultType.Test) &
+                                          (cls.testcase == testcase) & (cls.valid == True)  # noqa
+                                          ).order_by(cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_latest_for_testcase(cls, testcase):
-        r = cls.select().where(cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
-                (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &
-                (cls.testcase == testcase))).get()
+        r = cls.select().where(cls.starttime == cls.select(fn.MAX(
+            cls.starttime)).where((cls.resulttype == constants.TestResultType.Test) &
+                                  (cls.valid == True) & (cls.testcase == testcase))).get()
         return r
 
 
@@ -838,8 +857,6 @@ def connect(url=None, autocommit=False):
     if not url:
         from devtest import config
         cf = config.get_config()
-        url = cf["database"]["url"]
+        url = cf["database"][cf["database"]["select"]]["url"]
     database = get_database(url, autocommit=autocommit)
     database_proxy.initialize(database)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

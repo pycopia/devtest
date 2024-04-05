@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Option parser that does not require pre-determined options. Collects short
 options for global options, and collects long options as configuration
 overrides.
@@ -36,8 +35,7 @@ class OptionSet:
         self.options[name] = value
 
     def __repr__(self):
-        return "{}({!r}, {!r})".format(self.__class__.__name__,
-                                       self.argument, self.options)
+        return "{}({!r}, {!r})".format(self.__class__.__name__, self.argument, self.options)
 
 
 class ArgumentList(list):
@@ -100,8 +98,7 @@ def getopt(argv, shortopts):
                             opts.append((c, optarg))
                             break
                     else:
-                        raise GetoptError(
-                            "Got unexpected short argument: {}".format(oc))
+                        raise GetoptError("Got unexpected short argument: {}".format(oc))
         else:
             currentset = OptionSet(arg)
             argumentlist.append(currentset)
@@ -126,9 +123,10 @@ def _eval(val):
 
 # Run as top-level script to unit test.
 if __name__ == "__main__":
-    argv = ["/usr/bin/prog", "-dv", "-v", "-s", "string", "name1",
-            "--arg11=val11", "--arg12=val12", "--same=0", "name2", "--same=5", "name3", "--arg31",
-            "--arg32=val32"]
+    argv = [
+        "/usr/bin/prog", "-dv", "-v", "-s", "string", "name1", "--arg11=val11", "--arg12=val12",
+        "--same=0", "name2", "--same=5", "name3", "--arg31", "--arg32=val32"
+    ]
 
     d = False
     v = 0

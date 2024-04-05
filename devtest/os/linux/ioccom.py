@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Linux ioctl macros. Adapted from /usr/include/asm/ioctl.h
 """
 
@@ -31,6 +30,7 @@
 # below from now on.
 
 import struct
+
 sizeof = struct.calcsize
 
 INT = sizeof("i")
@@ -66,10 +66,8 @@ _IOC_READ = 2
 
 
 def _IOC(dir, type, nr, FMT):
-        return int((((dir)  << _IOC_DIRSHIFT) |
-                   ((type) << _IOC_TYPESHIFT) |
-                   ((nr)   << _IOC_NRSHIFT) |
-                   ((FMT) << _IOC_SIZESHIFT)) & 0xffffffff)
+    return int((((dir) << _IOC_DIRSHIFT) | ((type) << _IOC_TYPESHIFT) | ((nr) << _IOC_NRSHIFT) |
+                ((FMT) << _IOC_SIZESHIFT)) & 0xffffffff)
 
 
 # used to create numbers

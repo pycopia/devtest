@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """A service for using Monsoon current and voltage measuring device.
 
 Provides background capture during span of time the service is wanted.
@@ -64,8 +63,8 @@ class MonsoonService(Service):
         if hvpm is None:
             raise exceptions.ConfigNotFoundError("Device has no connected HVPM")
         if hvpm.serno in self._used:
-            raise exceptions.TestImplementationError(
-                "HVPM {} is already being used!".format(hvpm.serno))
+            raise exceptions.TestImplementationError("HVPM {} is already being used!".format(
+                hvpm.serno))
 
         ctx = {
             "serialno": hvpm.serno,
@@ -139,5 +138,6 @@ def initialize(manager):
 def finalize(manager):
     srv = manager.unregister("monsoon")
     srv.close()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

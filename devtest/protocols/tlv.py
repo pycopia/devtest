@@ -1,5 +1,4 @@
 # python3.7
-
 """Implementation of TLV protocol base objects.
 """
 
@@ -202,6 +201,7 @@ class EmptyMessage(Message):
 
 # Utility functions.
 
+
 def decode_tlv(tlvdata):
     """decode TLV byte string to message object.
     """
@@ -298,6 +298,7 @@ class SyncInterface:
     def chat(self, msg):
         self.send(msg)
         return self.receive()
+
 
 # Concrete messages follow.
 # These are basic messages that all protocols may use.

@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """TELNET client module.
 
 Forked from Python's telnetlib and modified.  Originally forked into pycopia
@@ -23,7 +22,6 @@ import socket
 
 from devtest import logging
 
-
 __all__ = ["Telnet", "get_telnet"]
 
 # Telnet protocol defaults
@@ -35,32 +33,32 @@ def byte(val):
 
 
 # Telnet protocol characters (don't change)
-IAC   = byte(255)  # "Interpret As Command"
-DONT  = byte(254)  # 0xfe
-DO    = byte(253)  # 0xfd
-WONT  = byte(252)  # 0xfc
-WILL  = byte(251)  # 0xfb
-SB    = byte(250)  # sub negotiation 0xfa
-GA    = byte(249)  # Go ahead
-EL    = byte(248)  # Erase Line
-EC    = byte(247)  # Erase character
-AYT   = byte(246)  # Are You There
-AO    = byte(245)  # Abort output
-IP    = byte(244)  # Interrupt Process
+IAC = byte(255)  # "Interpret As Command"
+DONT = byte(254)  # 0xfe
+DO = byte(253)  # 0xfd
+WONT = byte(252)  # 0xfc
+WILL = byte(251)  # 0xfb
+SB = byte(250)  # sub negotiation 0xfa
+GA = byte(249)  # Go ahead
+EL = byte(248)  # Erase Line
+EC = byte(247)  # Erase character
+AYT = byte(246)  # Are You There
+AO = byte(245)  # Abort output
+IP = byte(244)  # Interrupt Process
 BREAK = byte(243)  # NVT character BRK.
-DM    = byte(242)  # Data Mark.
+DM = byte(242)  # Data Mark.
 
 # The data stream portion of a Synch.
 # This should always be accompanied by a TCP Urgent notification.
-NOP   = byte(241)  # No operation.
-SE    = byte(240)  # End of subnegotiation parameters.
+NOP = byte(241)  # No operation.
+SE = byte(240)  # End of subnegotiation parameters.
 
 IAC2 = IAC + IAC  # double IAC for escaping
 
 # NVT special codes
 NULL = byte(0)
 BELL = byte(7)
-BS  = byte(8)
+BS = byte(8)
 HT = byte(9)
 LF = byte(10)
 VT = byte(11)
@@ -68,7 +66,6 @@ FF = byte(12)
 CR = byte(13)
 CRLF = CR + LF
 CRNULL = CR + NULL
-
 
 # Telnet protocol options code (don't change)
 # These ones all come from arpa/telnet.h
@@ -133,33 +130,32 @@ PRAGMA_HEARTBEAT = byte(140)  # TELOPT PRAGMA HEARTBEAT
 EXOPL = byte(255)  # Extended-Options-List
 NOOPT = byte(0)
 
-
 # COM control sub commands, RFC 2217
-SET_BAUDRATE        =  byte(1)
-SET_DATASIZE        =  byte(2)
-SET_PARITY          =  byte(3)
-SET_STOPSIZE        =  byte(4)
-SET_CONTROL         =  byte(5)
-NOTIFY_LINESTATE    =  byte(6)
-NOTIFY_MODEMSTATE   =  byte(7)
-FLOWCONTROL_SUSPEND =  byte(8)
-FLOWCONTROL_RESUME  =  byte(9)
-SET_LINESTATE_MASK  =  byte(10)
-SET_MODEMSTATE_MASK =  byte(11)
-PURGE_DATA          =  byte(12)
+SET_BAUDRATE = byte(1)
+SET_DATASIZE = byte(2)
+SET_PARITY = byte(3)
+SET_STOPSIZE = byte(4)
+SET_CONTROL = byte(5)
+NOTIFY_LINESTATE = byte(6)
+NOTIFY_MODEMSTATE = byte(7)
+FLOWCONTROL_SUSPEND = byte(8)
+FLOWCONTROL_RESUME = byte(9)
+SET_LINESTATE_MASK = byte(10)
+SET_MODEMSTATE_MASK = byte(11)
+PURGE_DATA = byte(12)
 
-RESP_SET_BAUDRATE        =  byte(101)
-RESP_SET_DATASIZE        =  byte(102)
-RESP_SET_PARITY          =  byte(103)
-RESP_SET_STOPSIZE        =  byte(104)
-RESP_SET_CONTROL         =  byte(105)
-RESP_NOTIFY_LINESTATE    =  byte(106)
-RESP_NOTIFY_MODEMSTATE   =  byte(107)
-RESP_FLOWCONTROL_SUSPEND =  byte(108)
-RESP_FLOWCONTROL_RESUME  =  byte(109)
-RESP_SET_LINESTATE_MASK  =  byte(110)
-RESP_SET_MODEMSTATE_MASK =  byte(111)
-RESP_PURGE_DATA          =  byte(112)
+RESP_SET_BAUDRATE = byte(101)
+RESP_SET_DATASIZE = byte(102)
+RESP_SET_PARITY = byte(103)
+RESP_SET_STOPSIZE = byte(104)
+RESP_SET_CONTROL = byte(105)
+RESP_NOTIFY_LINESTATE = byte(106)
+RESP_NOTIFY_MODEMSTATE = byte(107)
+RESP_FLOWCONTROL_SUSPEND = byte(108)
+RESP_FLOWCONTROL_RESUME = byte(109)
+RESP_SET_LINESTATE_MASK = byte(110)
+RESP_SET_MODEMSTATE_MASK = byte(111)
+RESP_PURGE_DATA = byte(112)
 
 
 class TelnetError(Exception):
@@ -192,9 +188,11 @@ class Telnet:
 
     def __str__(self):
         return "Telnet({!r:s}, {:d}): {} ({})".format(
-            self.host, self.port,
+            self.host,
+            self.port,
             "open" if not self.eof else "closed",
-            "binary" if self._binary else "nonbinary",)
+            "binary" if self._binary else "nonbinary",
+        )
 
     def open(self, host, port=TELNET_PORT):
         """Open a conneciton to a host.
@@ -214,11 +212,8 @@ class Telnet:
             return self.sock.gettimeout()
 
     def _init_connection(self):
-        self._sendall(
-            IAC + DO + BINARY +
-            IAC + DO + SGA +
-            IAC + DONT + ECHO +
-            IAC + WILL + COM_PORT_OPTION)
+        self._sendall(IAC + DO + BINARY + IAC + DO + SGA + IAC + DONT + ECHO + IAC + WILL +
+                      COM_PORT_OPTION)
         self._fill_rawq(12)
         self._process_rawq()
         self._closed = 0
@@ -376,9 +371,7 @@ class Telnet:
             elif opt == COM_PORT_OPTION:
                 self._do_com = True
                 # Don't bother us with modem state changes
-                self._sendall(
-                    IAC + SB + COM_PORT_OPTION + SET_MODEMSTATE_MASK +
-                    b"\x00" + IAC + SE)
+                self._sendall(IAC + SB + COM_PORT_OPTION + SET_MODEMSTATE_MASK + b"\x00" + IAC + SE)
             else:
                 self._sendall(IAC + WONT + opt)
         elif cmd == WILL:
@@ -418,11 +411,9 @@ class Telnet:
                 self._suspended = False
                 logging.warning("Telnet: requested to resume tx.")
             else:
-                logging.warning(
-                    "Telnet: unhandled COM opton: {}".format(repr(subopt)))
+                logging.warning("Telnet: unhandled COM opton: {}".format(repr(subopt)))
         else:
-            logging.warning(
-                "Telnet: unhandled subnegotion: {}".format(repr(subopt)))
+            logging.warning("Telnet: unhandled subnegotion: {}".format(repr(subopt)))
 
     def interrupt(self):
         self._sendall(IAC + IP)
@@ -458,8 +449,7 @@ class Telnet:
         """
         text = open(filename, 'rb').read()
         sockfd = self.sock.fileno()
-        os.write(sockfd, b"cat - > %b\r" % (
-            os.path.basename(filename).encode("ascii"),))
+        os.write(sockfd, b"cat - > %b\r" % (os.path.basename(filename).encode("ascii"),))
         os.write(sockfd, text)
         os.write(sockfd, b"\r" + chr(4))
 
@@ -482,6 +472,7 @@ class LineState:
 
 
 class ModemState(object):
+
     def __init__(self, code):
         self.carrier_detect = bool(code & 128)
         self.ring_indicator = bool(code & 64)
@@ -502,18 +493,13 @@ class ModemState(object):
          ring_indicator: {}
     delta_dataset_ready: {}
     delta_clear_to_send: {}
-        """.format(
-            self.carrier_detect,
-            self.ring_indicator,
-            self.dataset_ready,
-            self.clear_to_send,
-            self.delta_rx_detect,
-            self.ring_indicator,
-            self.delta_dataset_ready,
-            self.delta_clear_to_send)
+        """.format(self.carrier_detect, self.ring_indicator, self.dataset_ready, self.clear_to_send,
+                   self.delta_rx_detect, self.ring_indicator, self.delta_dataset_ready,
+                   self.delta_clear_to_send)
 
 
 def get_telnet(host, port=TELNET_PORT, logfile=None):
     return Telnet(host, port, logfile)
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

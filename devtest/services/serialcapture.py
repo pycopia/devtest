@@ -126,8 +126,11 @@ class SerialCaptureService(Service):
             devicenode: name of tty device (e.g. /dev/cu.xxx)
             setup: serial port setup string (e.g. "115200 8N1")
         """
-        resp, msg = _send_message(ADD_CHANNEL,
-                                  {"name": name, "devicenode": devicenode, "setup": setup})
+        resp, msg = _send_message(ADD_CHANNEL, {
+            "name": name,
+            "devicenode": devicenode,
+            "setup": setup
+        })
         if resp != OK:
             raise exceptions.ConfigError(msg)
 

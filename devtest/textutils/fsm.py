@@ -92,6 +92,7 @@ class FiniteStateMachine:
             self.default_transition = None
         else:
             self.default_transition = (action, next_state)
+
     add_default_transition = set_default_transition  # alias
 
     def add_transition(self, input_symbol, state, action, next_state):
@@ -140,15 +141,13 @@ class FiniteStateMachine:
                     if self.default_transition is not None:
                         return self.default_transition
                     else:
-                        raise FSMError(
-                            'Undefined transition {!r}.'.format(input_symbol))
+                        raise FSMError('Undefined transition {!r}.'.format(input_symbol))
 
     def process(self, input_symbol):
         """This causes the fsm to change state and call an action:
         `(input_symbol, current_state) --> (action, next_state)`.
         """
-        action, next_state = self.get_transition(input_symbol,
-                                                 self.current_state)
+        action, next_state = self.get_transition(input_symbol, self.current_state)
         if action is not None:
             action(input_symbol, self)
         if next_state is not None:

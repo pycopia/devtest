@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Default report used when running tests.
 
 Supports simple, colored reports for both unicode and non-unicode terminals.
@@ -63,14 +62,17 @@ CYAN_BACK = "\x1b[46m"
 WHITE_BACK = "\x1b[47m"
 
 #                 UL  hor   vert  UR  LL   LR
-_BOXCHARS = {1: ['╔', '═', '║', '╗', '╚', '╝'],
-             2: ['┏', '━', '┃', '┓', '┗', '┛'],
-             3: ['┌', '─', '│', '┐', '└', '┘']}
+_BOXCHARS = {
+    1: ['╔', '═', '║', '╗', '╚', '╝'],
+    2: ['┏', '━', '┃', '┓', '┗', '┛'],
+    3: ['┌', '─', '│', '┐', '└', '┘']
+}
 
-
-_BOXCHARS_A = {1: ['+', '=', '|', '+', '+', '+'],
-               2: ['+', '-', '|', '+', '+', '+'],
-               3: ['+', '+', '|', '+', '+', '+']}
+_BOXCHARS_A = {
+    1: ['+', '=', '|', '+', '+', '+'],
+    2: ['+', '-', '|', '+', '+', '+'],
+    3: ['+', '+', '|', '+', '+', '+']
+}
 
 
 def white(text):
@@ -141,31 +143,37 @@ class DefaultReport(BaseReport):
         name = testcase.test_name
         ts = time.astimezone(self.timezone).timetz().isoformat()
         nw = WIDTH - len(ts) - 1
-        print("\n{W}{0:{width}s} {B}{1}{R}".format(name, ts,
-              width=nw, W=UNDERLINE_ON, B=BLUE, R=RESET), file=self._file)
+        print("\n{W}{0:{width}s} {B}{1}{R}".format(name,
+                                                   ts,
+                                                   width=nw,
+                                                   W=UNDERLINE_ON,
+                                                   B=BLUE,
+                                                   R=RESET),
+              file=self._file)
 
     def on_test_end(self, testcase, time=None):
         ts = time.astimezone(self.timezone).timetz().isoformat()
         print("{U}{}{R} ended at {B}{:s}{R}".format(testcase.test_name,
-              ts, B=BLUE, R=RESET, U=UNDERLINE_ON), file=self._file)
+                                                    ts,
+                                                    B=BLUE,
+                                                    R=RESET,
+                                                    U=UNDERLINE_ON),
+              file=self._file)
 
     def on_test_passed(self, testcase, message=None):
         print("{}: {!s}".format(green("PASSED"), message), file=self._file)
 
     def on_test_incomplete(self, testcase, message=None):
-        print("{}: {!s}".format(yellow("INCOMPLETE"), message),
-              file=self._file)
+        print("{}: {!s}".format(yellow("INCOMPLETE"), message), file=self._file)
 
     def on_test_failure(self, testcase, message=None):
         print("{}: {!s}".format(red("FAILED"), message), file=self._file)
 
     def on_test_expected_failure(self, testcase, message=None):
-        print("{}: {!s}".format(lt_red("EXPECTED FAILED"), message),
-              file=self._file)
+        print("{}: {!s}".format(lt_red("EXPECTED FAILED"), message), file=self._file)
 
     def on_test_abort(self, testcase, message=None):
-        print("{}: {!s}".format(inverse_red("ABORTED"), message),
-              file=self._file)
+        print("{}: {!s}".format(inverse_red("ABORTED"), message), file=self._file)
 
     def on_test_info(self, testcase, message=None):
         print(" info:", message, file=self._file)
@@ -183,14 +191,21 @@ class DefaultReport(BaseReport):
     def on_suite_start(self, testsuite, time=None):
         ts = time.astimezone(self.timezone).timetz().isoformat()
         nw = WIDTH - len(ts) - 13
-        print("\nstart suite {W}{0:{width}s} {B}{1}{R}".format(
-              testsuite.test_name, ts, width=nw, W=WHITE, B=BLUE, R=RESET),
+        print("\nstart suite {W}{0:{width}s} {B}{1}{R}".format(testsuite.test_name,
+                                                               ts,
+                                                               width=nw,
+                                                               W=WHITE,
+                                                               B=BLUE,
+                                                               R=RESET),
               file=self._file)
 
     def on_suite_end(self, testsuite, time=None):
         ts = time.astimezone(self.timezone).timetz().isoformat()
-        print("\nTestSuite {!r} ended at {B}{:s}{R}\n".format(
-            testsuite.test_name, ts, B=BLUE, R=RESET), file=self._file)
+        print("\nTestSuite {!r} ended at {B}{:s}{R}\n".format(testsuite.test_name,
+                                                              ts,
+                                                              B=BLUE,
+                                                              R=RESET),
+              file=self._file)
 
     def on_suite_info(self, testsuite, message=None):
         print("suite info:", message, file=self._file)
@@ -230,7 +245,8 @@ class DefaultReport(BaseReport):
         with open(fpath, "w") as fo:
             json.dump(data, fo)
         print(" Data {}:".format("added to" if olddata else "available in"),
-              repr(fname), file=self._file)
+              repr(fname),
+              file=self._file)
 
     def on_suite_summary(self, suite, result=None):
         print("Aggregate Suite Result:", result, file=self._file)
@@ -272,8 +288,14 @@ class DefaultReportUnicode(DefaultReport):
         nw = WIDTH - len(ts) - 21
         tt = "{}{}{}".format(UL, hor * (WIDTH - 2), UR)
         bt = "{}{}{}".format(LL, hor * (WIDTH - 2), LR)
-        ml = "{0} Start TestSuite: {1:{width}s} {B}{2}{R}{3}".format(
-            vert, testsuite.test_name, ts, vert, width=nw, B=BLUE, R=RESET)
+        ml = "{0} Start TestSuite: {1:{width}s} {B}{2}{R}{3}".format(vert,
+                                                                     testsuite.test_name,
+                                                                     ts,
+                                                                     vert,
+                                                                     width=nw,
+                                                                     B=BLUE,
+                                                                     R=RESET)
         print(tt, ml, bt, sep="\n", file=self._file)
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

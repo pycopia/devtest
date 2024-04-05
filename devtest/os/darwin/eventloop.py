@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Generic interface to system async event loop.
 """
@@ -23,5 +22,6 @@ EventLoop = selectors.DefaultSelector
 
 def get_event_loop():
     return EventLoop()
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

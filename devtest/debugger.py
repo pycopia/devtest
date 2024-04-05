@@ -1,69 +1,72 @@
-# python3
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """
-Generic debugger entry point to allow developers to use non-standard debuggers.
-Default is to use the built-in debugger, pdb.
+Debugger hooks for framework.
 
-set the environment variable PYTHON_DEBUGGER to the package name of the
-alternate debugger.
+Uses the debugger from the open-source `elicit` package.
 
-The debugger module should support the "post_mortem" interface.
+Performs lazy loading of the debugger is it isn't imported at runner load time.
 """
 
 import sys
-import os
+
+from elicit import debugger
+from elicit.debugger import DebuggerQuit  # noqa
 
 # Reset excepthook to default. Some Linux distros put something there
 # that can interfere with this. They think they're being helpful, but
 # they are not.
 sys.excepthook = sys.__excepthook__
 
-
-class _MakeDebugger:
-    def __getattr__(self, name):
-        global debugger
-        modname = os.environ.get("PYTHON_DEBUGGER", "pdb")
-        __import__(modname)
-        debugger = sys.modules[modname]
-        return getattr(debugger, name)
+# Global, singleton debugger for framework.
+_dbg = None
 
 
-debugger = _MakeDebugger()
+def get_debugger(io=None):
+    global _dbg
+    if _dbg is None:
+        dbg = debugger.Debugger(io=io)
+        _dbg = dbg
+    _dbg.reset()
+    return _dbg
 
 
-def post_mortem(tb=None):
+def post_mortem(tb=None, io=None):
+    "Start debugging at the given traceback."
+    exc = val = None
     if tb is None:
-        tb = sys.exc_info()[2]
+        exc, val, tb = sys.exc_info()
     if tb is None:
-        raise ValueError("A valid traceback must be passed in if no "
+        raise ValueError("A valid traceback must be passed if no "
                          "exception is being handled.")
-    debugger.post_mortem(tb)
+    dbg = get_debugger(io)
+
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    if exc and val:
+        dbg.print_exc("Post Mortem Exception: ", val)
+    dbg.interaction(tb.tb_frame, tb, val)
 
 
-def from_exception(exc):
-    if hasattr(debugger, "from_exception"):
-        debugger.from_exception(exc)
-    else:
-        debugger.post_mortem(exc.__traceback__)
+def from_exception(ex, io=None):
+    """Start debugging from the place of the given exception instance."""
+    tb = ex.__traceback__
+    dbg = get_debugger(io)
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    dbg.print_exc("", ex)
+    dbg.interaction(tb.tb_frame, tb, ex)
+
+
+def set_trace(frame=None, start=0):
+    get_debugger().set_trace(frame=frame, start=start)
+
+
+# Invoke our debugger instance when setting breakpoints.
+sys.breakpointhook = set_trace
 
 
 def debugger_hook(exc, value, tb):
-    if (not hasattr(sys.stderr, "isatty") or
-        not sys.stderr.isatty() or exc in (SyntaxError,
-                                           IndentationError,
-                                           KeyboardInterrupt)):
+    if (not hasattr(sys.stderr, "isatty") or not sys.stderr.isatty() or
+            exc in (SyntaxError, IndentationError, KeyboardInterrupt)):
         sys.__excepthook__(exc, value, tb)
     else:
         DEBUG("Uncaught exception:", exc.__name__, ":", value)
@@ -94,5 +97,3 @@ if __name__ == '__main__':
         raise RuntimeError("Testing")
     except:  # noqa
         post_mortem()
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

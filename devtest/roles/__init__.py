@@ -21,8 +21,10 @@ import abc
 from .. import importlib
 from .. import config
 
+
 class BaseRole(metaclass=abc.ABCMeta):
     """Base, abstract, role for equipment role controllers."""
+
     def __init__(self, equipment):
         cf = config.get_config()
         self.config = cf.roles.get(equipment["role"], config.ConfigDict())
@@ -43,6 +45,7 @@ class SoftwareRole(metaclass=abc.ABCMeta):
     """Base, abstract, role for software objects.
 
     Usually, this is an emulator of some kind."""
+
     def __init__(self, software):
         self._software = software
         self.initialize()

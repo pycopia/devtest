@@ -1,8 +1,6 @@
 # python3
-
 """A report that writes test results to the database.
 """
-
 
 from devtest.db import models
 from devtest.core.constants import TestResultType, TestResult
@@ -24,8 +22,7 @@ class DatabaseReport(BaseReport):
         models.database.commit()
 
     def on_run_start(self, runner, time=None):
-        runresult = models.TestResults(starttime=time,
-                                       resulttype=TestResultType.TestRunSummary)
+        runresult = models.TestResults(starttime=time, resulttype=TestResultType.TestRunSummary)
         runresult.save()
         self._resultstack.append(runresult)
 
@@ -43,11 +40,9 @@ class DatabaseReport(BaseReport):
         self._resultstack[0].resultslocation = path
 
     def on_suite_start(self, suite, time=None):
-        sr = models.TestResults(starttime=time,
-                                resulttype=TestResultType.TestSuite)
+        sr = models.TestResults(starttime=time, resulttype=TestResultType.TestSuite)
         sr.parent = self._resultstack[-1]
-        sr.testsuite = self._tci.process_testsuite(
-            type(suite), name=suite.test_name, doc=suite.doc)
+        sr.testsuite = self._tci.process_testsuite(type(suite), name=suite.test_name, doc=suite.doc)
         sr.save()
         self._resultstack.append(sr)
 
@@ -70,8 +65,7 @@ class DatabaseReport(BaseReport):
         _add_note(self._resultstack[0], message)
 
     def on_test_start(self, testcase, time=None):
-        tr = models.TestResults(starttime=time,
-                                resulttype=TestResultType.Test)
+        tr = models.TestResults(starttime=time, resulttype=TestResultType.Test)
         tr.parent = self._resultstack[-1]
         tr.testcase = self._tci.process_testcase(type(testcase), name=testcase.test_name)
         tr.save()

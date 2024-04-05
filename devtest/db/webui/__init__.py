@@ -19,7 +19,6 @@ from devtest import logging
 
 from flask import Flask
 
-
 app = Flask(__name__)
 app._logger = logging.Logger(app.logger_name)
 
