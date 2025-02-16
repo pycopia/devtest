@@ -1,0 +1,8 @@
+pypi:
+  server: "upload.pypi.org"
+  user: "__token__"
+  url: "https://upload.pypi.org/legacy/"
+  index: "https://pypi.org/simple"
+
+signers:
+  - "keith"

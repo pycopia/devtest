@@ -1,0 +1,13 @@
+blinker
+cryptography
+git+https://github.com/dabeaz/curio.git#egg=curio
+docopt
+docutils
+elicit
+peewee
+portpicker
+psutil
+psycopg2
+pygments
+pyyaml
+pytz
