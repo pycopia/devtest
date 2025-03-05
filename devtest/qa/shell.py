@@ -24,7 +24,7 @@ import sys
 from .. import config
 from .. import options
 from .. import debugger
-from ..utils import colors
+from ..textutils import colors
 from . import loader
 from . import runner
 from . import scanner

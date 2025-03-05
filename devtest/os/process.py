@@ -30,16 +30,15 @@ import inspect
 import psutil
 
 from subprocess import (  # noqa
-    CompletedProcess, SubprocessError, CalledProcessError, PIPE, STDOUT, DEVNULL,
+    CompletedProcess, Popen, SubprocessError, CalledProcessError, PIPE, STDOUT, DEVNULL,
 )
 
 from devtest import logging
 from devtest.textutils import shparser
-from devtest.io import subprocess
 from devtest.io import streams
 from devtest.io import socket
-from devtest.io.reactor import (get_kernel, sleep, spawn, timeout_after, CancelledError,
-                                TaskTimeout)
+from devtest.io.reactor import (AWAIT, run_in_thread, get_kernel, sleep, spawn, timeout_after,
+                                CancelledError, TaskTimeout)
 from devtest.os import procutils
 from devtest.os import exitstatus
 
@@ -54,6 +53,104 @@ class CoProcessError(Exception):
 
 class ProgramNotFound(ManagerError):
     pass
+
+
+class APopen:
+    '''
+    Curio wrapper around the Popen class from the subprocess module. All of the
+    methods from subprocess.Popen should be available, but the associated file
+    objects for stdin, stdout, stderr have been replaced by async versions.
+    Certain blocking operations (e.g., wait() and communicate()) have been
+    replaced by async compatible implementations.   Explicit timeouts
+    are not available. Use the timeout_after() function for timeouts.
+    '''
+
+    def __init__(self, args, **kwargs):
+        if 'universal_newlines' in kwargs:
+            raise RuntimeError('universal_newlines argument not supported')
+
+        # If stdin has been given and it's set to a curio FileStream object,
+        # then we need to flip it to blocking.
+        if 'stdin' in kwargs:
+            stdin = kwargs['stdin']
+            if isinstance(stdin, streams.FileStream):
+                # At hell's heart I stab thy coroutine attempting to read from a stream
+                # that's been used as a pipe input to a subprocess.  Must set back to
+                # blocking or all hell breaks loose in the child.
+                if hasattr(os, 'set_blocking'):
+                    os.set_blocking(stdin.fileno(), True)
+
+        self._popen = Popen(args, **kwargs)
+
+        if self._popen.stdin:
+            self.stdin = streams.FileStream(self._popen.stdin)
+        if self._popen.stdout:
+            self.stdout = streams.FileStream(self._popen.stdout)
+        if self._popen.stderr:
+            self.stderr = streams.FileStream(self._popen.stderr)
+
+    def __getattr__(self, name):
+        return getattr(self._popen, name)
+
+    async def wait(self):
+        retcode = self._popen.poll()
+        if retcode is None:
+            retcode = await run_in_thread(self._popen.wait)
+        return retcode
+
+    async def communicate(self, input=b''):
+        '''
+        Communicates with a subprocess.  input argument gives data to
+        feed to the subprocess stdin stream.  Returns a tuple (stdout, stderr)
+        corresponding to the process output.  If cancelled, the resulting
+        cancellation exception has stdout_completed and stderr_completed
+        attributes attached containing the bytes read so far.
+        '''
+        stdout_task = await spawn(self.stdout.readall) if self.stdout else None
+        stderr_task = await spawn(self.stderr.readall) if self.stderr else None
+        try:
+            if input:
+                await self.stdin.write(input)
+                await self.stdin.close()
+
+            stdout = await stdout_task.join() if stdout_task else b''
+            stderr = await stderr_task.join() if stderr_task else b''
+            return (stdout, stderr)
+        except CancelledError as err:
+            if stdout_task:
+                await stdout_task.cancel()
+                err.stdout = stdout_task.exception.bytes_read
+            else:
+                err.stdout = b''
+
+            if stderr_task:
+                await stderr_task.cancel()
+                err.stderr = stderr_task.exception.bytes_read
+            else:
+                err.stderr = b''
+            raise
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        if self.stdout:
+            await self.stdout.close()
+
+        if self.stderr:
+            await self.stderr.close()
+
+        if self.stdin:
+            await self.stdin.close()
+
+        # Wait for the process to terminate
+        await self.wait()
+
+    def __enter__(self):
+        return AWAIT(self.__aenter__())
+
+    def __exit__(self, *args):
+        return AWAIT(self.__aexit__(*args))
 
 
 class Process(psutil.Process):
@@ -71,7 +168,7 @@ class PipeProcess(Process):
     """
 
     def __init__(self, *args, **kwargs):
-        self._popen = subprocess.Popen(*args, **kwargs)
+        self._popen = APopen(*args, **kwargs)
         self._init(self._popen.pid, _ignore_nsp=True)
 
     def __dir__(self):
@@ -677,5 +774,3 @@ if __name__ == "__main__":
     print(resp)
     assert resp == b"echo me"
     proc.close()
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

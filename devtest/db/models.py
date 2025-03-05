@@ -807,14 +807,14 @@ class TestResults(BaseModel):
     def get_runs(cls, limit=20, offset=0):
         return cls.select().where((cls.resulttype == constants.TestResultType.TestRunSummary) &
                                   (cls.valid == True)  # noqa
-                                  ).order_by(
-                                      cls.starttime.desc()).limit(limit).offset(offset).execute()
+                                 ).order_by(
+                                     cls.starttime.desc()).limit(limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
         return cls.select(cls.data).where((cls.resulttype == constants.TestResultType.Test) &
                                           (cls.testcase == testcase) & (cls.valid == True)  # noqa
-                                          ).order_by(cls.starttime).limit(limit).execute()
+                                         ).order_by(cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_latest_for_testcase(cls, testcase):

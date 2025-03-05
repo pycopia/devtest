@@ -1,4 +1,4 @@
-FROM python:3.8 as pythonbase
+FROM python:3.12 as pythonbase
 
 FROM pythonbase as devtest_builder
 # These are used by installer script.

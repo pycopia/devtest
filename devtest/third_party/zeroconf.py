@@ -1696,7 +1696,7 @@ def get_all_addresses() -> Set[str]:
                for iface in ifaddr.get_adapters()
                for addr in iface.ips
                if addr.is_IPv4 and addr.network_prefix != 32  # Host only netmask 255.255.255.255
-               )
+              )
 
 
 def find_likely_address():

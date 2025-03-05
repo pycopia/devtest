@@ -874,7 +874,7 @@ class AutomatorDeviceUiObject:
         def to(obj, *args, **kwargs):
             if len(args) >= 2 or "x" in kwargs or "y" in kwargs:
                 drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps
-                                                                      )  # noqa
+                                                                     )  # noqa
             else:
                 drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(
                     self.selector, Selector(**kwargs), steps)  # noqa

@@ -26,6 +26,7 @@ from devtest.os import eventloop
 
 # Re-exported curio objects.
 from curio import (
+    AWAIT,
     Kernel,
     sleep,
     spawn,
@@ -39,13 +40,26 @@ from curio import (
     RLock,
     timeout_after,
     TaskGroup,
-    run_in_thread,
-    block_in_thread)
+    run_in_thread)
 
 __all__ = [
-    "get_kernel", "get_new_kernel", "Kernel", "sleep", "spawn", "CancelledError", "TaskError",
-    "TaskTimeout", "Queue", "Event", "SignalEvent", "Lock", "RLock", "timeout_after", "TaskGroup",
-    "run_in_thread", "block_in_thread"
+    "AWAIT",
+    "get_kernel",
+    "get_new_kernel",
+    "Kernel",
+    "sleep",
+    "spawn",
+    "CancelledError",
+    "TaskError",
+    "TaskTimeout",
+    "Queue",
+    "Event",
+    "SignalEvent",
+    "Lock",
+    "RLock",
+    "timeout_after",
+    "TaskGroup",
+    "run_in_thread",
 ]
 
 _default_kernel = None

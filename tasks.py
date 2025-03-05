@@ -1,4 +1,3 @@
-#!/usr/bin/env python3.9
 """Tasks file used by the *invoke* command.
 
 This simplifies some common development tasks.
@@ -6,12 +5,12 @@ This simplifies some common development tasks.
 Run these tasks with the `invoke` tool.
 """
 
-from __future__ import annotations
-
 import sys
 import os
 import shutil
+import json
 import getpass
+import tomllib
 from glob import glob
 from pathlib import Path
 
@@ -20,21 +19,18 @@ import semver
 from setuptools_scm import get_version
 from invoke import task, run, Exit
 
-SIGNERS = ["keith"]
-
 PYTHONBIN = os.environ.get("PYTHONBIN", sys.executable)
 # Put the path in quotes in case there is a space in it.
 PYTHONBIN = f'"{PYTHONBIN}"'
 
+with open("pyproject.toml", "rb") as fo:
+    PKG_INFO = tomllib.load(fo)
+PACKAGE_NAME = PKG_INFO["project"]["name"]
+del fo
+
 GPG = "gpg2"
 
 CURRENT_USER = getpass.getuser()
-
-# Putting pypi info here eliminates the need for user-private ~/.pypirc file.
-PYPI_HOST = "upload.pypi.org"
-PYPI_URL = f"https://{PYPI_HOST}/legacy/"
-PYPI_USER = "__token__"
-PYPI_INDEX = f"{PYPI_URL}simple"
 
 
 @task
@@ -47,7 +43,17 @@ def info(ctx):
     print(f"Package version: {version}")
     venv = get_virtualenv()
     if venv:
-        print(f"Virtual environment:", venv)
+        print("Virtual environment:", venv)
+
+
+@task
+def clean(ctx):
+    """Clean out build and cache files. Remove extension modules."""
+    ctx.run(r"find . -depth -type d -name __pycache__ -exec rm -rf {} \;")
+    ctx.run('find devtest -name "*.so" -delete')
+    with ctx.cd("docs"):
+        ctx.run('rm -f modules/devtest.*.rst')
+        ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M clean . _build")
 
 
 @task
@@ -82,52 +88,83 @@ def format_changed(ctx, check=False, untracked=False):
 def set_pypi_token(ctx):
     """Set the token in the local key ring.
     """
-    pw = getpass.getpass(f"Enter pypi token? ")
+    pw = getpass.getpass("Enter pypi token? ")
     if pw:
-        keyring.set_password(PYPI_HOST, PYPI_USER, pw)
+        keyring.set_password(ctx.config.pypi.server, ctx.config.pypi.user, pw)
     else:
         raise Exit("No password entered.", 3)
 
 
 @task
+def cleandist(ctx):
+    """Clean out distributably build subdirectory."""
+    if os.path.isdir("dist"):
+        shutil.rmtree("dist", ignore_errors=True)
+        os.mkdir("dist")
+    if os.path.isdir("wheelhouse"):
+        shutil.rmtree("wheelhouse", ignore_errors=True)
+
+
+@task
+def freeze(ctx):
+    """Freeze current package versions into requirements.txt file.
+    """
+    user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
+    pipcmd = (f"{PYTHONBIN} -m pip --disable-pip-version-check freeze --exclude-editable "
+              f"--local {user} --requirement requirements-in.txt")
+    freeze_output = ctx.run(pipcmd, hide="out")
+    editablesout = ctx.run("pip list --editable --format json", hide="out")
+    if ctx.config.run.dry:
+        return
+    with open("requirements.txt", "w") as fo:
+        for line in freeze_output.stdout.splitlines():
+            if "following requirements were added" in line:
+                break
+            fo.write(line + "\n")
+        # Add back in dependencies installed as editable.
+        editables = json.loads(editablesout.stdout)
+        basereqs = [s.strip() for s in open("requirements-in.txt").readlines()]
+        for editable in editables:
+            for req in basereqs:
+                if req.startswith(editable["name"]):
+                    fo.write(f'{req}=={editable["version"]}\n')
+
+
+@task(pre=[cleandist, freeze], aliases=["wheel"])
 def build(ctx):
-    """Build the intermediate package components."""
-    ctx.run(f"{PYTHONBIN} setup.py build")
+    """Build a standard wheel file, an installable format, with native arch."""
+    ctx.run(f"{PYTHONBIN} -m build --no-isolation")
 
 
 @task
 def dev_requirements(ctx):
     """Install development requirements."""
-    ctx.run(f"{PYTHONBIN} -m pip install --index-url {PYPI_INDEX} --trusted-host {PYPI_HOST} "
-            f"-r dev-requirements.txt")
+    user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
+    ctx.run(f'{PYTHONBIN} -m pip install --index-url "{ctx.config.pypi.index}" '
+            f'--upgrade {user} -r dev-requirements.txt', pty=True,
+            hide=False)
 
 
 @task(pre=[dev_requirements])
 def develop(ctx, uninstall=False):
-    """Start developing in developer mode."""
+    """Start developing in developer, or editable, mode."""
+    user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
     if uninstall:
-        ctx.run(f"{PYTHONBIN} setup.py develop --uninstall")
+        ctx.run(f"{PYTHONBIN} -m pip uninstall -y {PACKAGE_NAME}")
     else:
-        ctx.run(f'{PYTHONBIN} setup.py develop --index-url "{PYPI_INDEX}"')
+        ctx.run(f'{PYTHONBIN} -m pip --isolated install --index-url "{ctx.config.pypi.index}" '
+                f'{user} --editable .')
 
 
-@task
-def clean(ctx):
-    """Clean out build and cache files. Remove extension modules."""
-    ctx.run(f"{PYTHONBIN} setup.py clean")
-    ctx.run(r"find . -depth -type d -name __pycache__ -exec rm -rf {} \;")
-    ctx.run('find devtest -name "*.so" -delete')
-    with ctx.cd("docs"):
-        ctx.run('rm -f modules/devtest.*.rst')
-        ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M clean . _build")
-
-
-@task
-def cleandist(ctx):
-    """Clean out dist subdirectory."""
-    if os.path.isdir("dist"):
-        shutil.rmtree("dist", ignore_errors=True)
-        os.mkdir("dist")
+@task(pre=[clean])
+def update_deps(ctx):
+    """Update the project dependencies to the most recent versions."""
+    user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
+    deps = [s.strip() for s in open("requirements-in.txt").readlines()]
+    if deps:
+        deps = [f'"{s}"' for s in deps]
+        ctx.run(f'{PYTHONBIN} -m pip install '
+                f'--index-url "{ctx.config.pypi.index}" --upgrade {user} {" ".join(deps)}')
 
 
 @task
@@ -138,7 +175,7 @@ def test(ctx, testfile=None, ls=False):
     elif testfile:
         ctx.run(f"{PYTHONBIN} -m pytest -s {testfile}")
     else:
-        ctx.run(f"{PYTHONBIN} -m pytest tests", hide=False, in_stream=False)
+        ctx.run(f"{PYTHONBIN} -m pytest tests", hide=False, pty=True)
 
 
 @task
@@ -168,7 +205,7 @@ def tag(ctx, tag=None, major=False, minor=False, patch=False):
             raise Exit("Invalid semver tag.", 2)
 
     print(latest, "->", nextver)
-    tagopt = "-s" if CURRENT_USER in SIGNERS else "-a"
+    tagopt = "-s" if CURRENT_USER in ctx.signers else "-a"
     ctx.run(f'git tag {tagopt} -m "Release v{nextver}" v{nextver}')
 
 
@@ -178,7 +215,6 @@ def tag_delete(ctx, tag=None):
     if tag:
         ctx.run(f"git tag -d {tag}")
         ctx.run(f"git push origin :refs/tags/{tag}")
-
 
 
 @task(cleandist)
@@ -202,7 +238,7 @@ def bdist(ctx):
 @task(bdist)
 def sign(ctx):
     """Cryptographically sign dist with your default GPG key."""
-    if CURRENT_USER in SIGNERS:
+    if CURRENT_USER in ctx.signers:
         ctx.run(f"{GPG} --detach-sign -a dist/devtest-*.whl")
         ctx.run(f"{GPG} --detach-sign -a dist/devtest-*.tar.gz")
     else:
@@ -212,14 +248,14 @@ def sign(ctx):
 @task(pre=[sign])
 def publish(ctx):
     """Publish built wheel file to package repo."""
-    token = get_pypi_token()
+    token = get_pypi_token(ctx)
     distfiles = glob("dist/*.whl")
     distfiles.extend(glob("dist/*.tar.gz"))
     if not distfiles:
         raise Exit("Nothing in dist folder!")
     distfiles = " ".join(distfiles)
-    ctx.run(f'{PYTHONBIN} -m twine upload --repository-url \"{PYPI_URL}\" '
-            f'--username {PYPI_USER} --password {token} {distfiles}')
+    ctx.run(f'{PYTHONBIN} -m twine upload --repository-url \"{ctx.config.pypi.url}\" '
+            f'--username {ctx.config.pypi.user} --password {token} {distfiles}')
 
 
 @task
@@ -264,26 +300,15 @@ def docker_build(ctx):
     environ = {
         "PYVER": "{}.{}".format(sys.version_info.major, sys.version_info.minor),
         "VERSION": version,
-        "PYPI_REPO": PYPI_INDEX,
-        "PYPI_HOST": PYPI_HOST,
+        "PYPI_HOST": ctx.config.pypi.server,
+        "PYPI_REPO": ctx.config.pypi.index,
     }
     ctx.run(
         f"docker build "
         f"--build-arg PYVER --build-arg VERSION "
-        f"--build-arg PYPI_REPO --build-arg PYPI_HOST -t devtest:{version} .",
+        f"--build-arg PYPI_REPO --build-arg {ctx.config.pypi.server} -t devtest:{version} .",
         env=environ)
     print(f"Done. To run it:\n docker run -it devtest:{version}")
-
-
-@task
-def logfile(ctx, name="devtester"):
-    """Dump the system log file with optional name filter."""
-    if WINDOWS:
-        ctx.run(f'wevtutil.exe qe Application /query:"*[System[Provider[@Name={name!r}]]]" /f:text')
-    elif LINUX:
-        ctx.run(f'journalctl --identifier={name!r} --no-pager --priority=debug')
-    elif DARWIN:  # May need a tweak
-        ctx.run(f'log stream --predicate \'senderImagePath contains "Python"\' --level debug')
 
 
 # Helper functions follow.
@@ -308,8 +333,8 @@ def get_tags():
     return vilist
 
 
-def get_pypi_token():
-    cred = keyring.get_credential(PYPI_HOST, PYPI_USER)
+def get_pypi_token(ctx):
+    cred = keyring.get_credential(ctx.config.pypi.server, ctx.config.pypi.user)
     if not cred:
         raise Exit("You must set the pypi token with the set-pypi-token target.", 1)
     return cred.password

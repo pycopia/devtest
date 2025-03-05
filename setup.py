@@ -19,7 +19,8 @@ from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
 NAME = "devtest"
-VERSION = "1.0"  # not used here.
+
+REQUIREMENTS = [s.strip() for s in open("requirements.txt").readlines()]
 
 SCRIPTS = glob("bin/*")
 EXTENSIONS = [
@@ -57,8 +58,7 @@ if subprocess.run(['pkg-config', LIBUSB_PKG, '--exists']).returncode == 0:
 
 setup(
     name=NAME,
-    version=VERSION,
-    packages=find_packages(exclude=("tests.*", "tests")),
+    packages=find_packages('.', exclude=('tests', 'tests.*', '*.tests', '*.tests.*')),
     package_data={"devtest": ["*.yaml"]},
     scripts=SCRIPTS,
     test_suite="tests",
@@ -67,32 +67,5 @@ setup(
     cmdclass={"build_ext": build_ext},
     setup_requires=['setuptools_scm'],
     use_scm_version=True,
-
-    license='Apache 2.0',
-    description='General purpose device and system test framework.',
-    long_description=open('README.md').read(),
-    install_requires=[
-        'blinker',
-        'cryptography',
-        'curio',
-        'docopt',
-        'docutils>=0.13',
-        'peewee>=3.0',
-        'portpicker',
-        'psutil',
-        'psycopg2',
-        'pygments',
-        'pyyaml',
-        'elicit>=1.7',
-    ],
-    author='Keith Dart',
-    author_email='keith@dartworks.biz',
-    url="https://github.com/kdart/devtest",
-    classifiers=[
-        "Programming Language :: Python",
-        "License :: Apache 2.0",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3 :: Only",
-        "Topic :: Software Development :: Testing",
-    ],
+    install_requires=REQUIREMENTS,
 )

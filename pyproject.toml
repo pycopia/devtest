@@ -1,6 +1,22 @@
 [build-system]
-requires = ["setuptools>=42", "cython", "flake8", "pytest>=5.4", "pytest-cov",
-            "pytest-runner", "setuptools_scm[toml]>=3.4", "wheel", "sphinx",
-            "sphinx-autodoc-annotation", ]
+requires = ["setuptools>=64.0", "cython", "setuptools_scm>=8", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devtest"
+dynamic = ["version", "dependencies", "scripts"]
+description='General purpose device and large system test framework.'
+readme = "README.md"
+license = {"file" = "LICENSE"}
+authors = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
+maintainers = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
+requires-python = ">=3.12"
+classifiers = [
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
 
 [tool.setuptools_scm]

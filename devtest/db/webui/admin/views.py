@@ -482,7 +482,7 @@ class TestSuiteView(ModelView):
     form_overrides = dict(purpose=formfields.HTMLField,
                           # owners=formfields.ArrayField,
                           # test_cases=formfields.ArrayField,
-                          )
+                         )
     can_edit = False
     can_view_details = True
 
