@@ -9,37 +9,42 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Native adb client-to-server protocol implementation.
+"""Native adb client-to-server protocol implementation.
 
 This is an async implementation, suitable for including in an event loop.
 """
 
-import os
-import sys
-import stat
 import errno
-import struct
+import os
 import signal
+import stat
+import struct
+import sys
 import typing
 
 from devtest import logging
-from devtest import timers
 from devtest import ringbuffer
+from devtest import timers
 from devtest.io import socket
 from devtest.io import streams
+from devtest.io.reactor import (
+    SignalEvent,
+    TaskTimeout,
+    get_kernel,
+    run_in_thread,
+    sleep,
+    spawn,
+    timeout_after,
+)
+from devtest.os import exitstatus
 from devtest.os import process
 from devtest.os import procutils
-from devtest.os import exitstatus
-from devtest.io.reactor import (get_kernel, spawn, block_in_thread, sleep, SignalEvent,
-                                timeout_after, TaskTimeout)
 
 from . import logcat
 
 ADB = procutils.which("adb")
 if ADB is None:
-    raise ImportError("The adb program was not found in PATH. "
-                      "This module will not work.")
+    raise ImportError("The adb program was not found in PATH. This module will not work.")
 
 ADB_PORT = 5037
 
@@ -175,8 +180,7 @@ class AdbClient:
             self._conn = None
 
     def get_device(self, serial):
-        """Get a AndroidDeviceClient instance.
-        """
+        """Get a AndroidDeviceClient instance."""
         return AndroidDeviceClient(serial, host=self._conn.host, port=self._conn.port)
 
     def get_state(self, serial):
@@ -206,9 +210,12 @@ class AdbClient:
         return dl
 
     def forward(self, serial, hostport, devport):
-        """Tell server to start forwarding TCP ports.
-        """
-        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (serial.encode("ascii"), hostport, devport)
+        """Tell server to start forwarding TCP ports."""
+        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (
+            serial.encode("ascii"),
+            hostport,
+            devport,
+        )
         get_kernel().run(_command_transact(self._conn, msg))
 
     def list_forward(self):
@@ -222,8 +229,11 @@ class AdbClient:
         for line in resp.splitlines():
             # <serial> " " <local> " " <remote> "\n"
             serno, host_port, remote_port = line.split()
-            fl.append((serno.decode("ascii"), int(host_port.split(b":")[1]),
-                       int(remote_port.split(b":")[1])))
+            fl.append((
+                serno.decode("ascii"),
+                int(host_port.split(b":")[1]),
+                int(remote_port.split(b":")[1]),
+            ))
         return fl
 
     def reconnect_offline(self):
@@ -242,8 +252,7 @@ class AdbClient:
 
 
 def getAsyncAndroidDeviceClient(serial, host="localhost", port=ADB_PORT):
-    """Get initialized _AsyncAndroidDeviceClient object from sync code.
-    """
+    """Get initialized _AsyncAndroidDeviceClient object from sync code."""
     return get_kernel().run(AsyncAndroidDeviceClient(serial, host, port))
 
 
@@ -257,9 +266,9 @@ async def AsyncAndroidDeviceClient(serial, host="localhost", port=ADB_PORT):
 class _AsyncAndroidDeviceClient:
     """An active adb client per device.
 
-    For device specific operations.
-    For use in asynchronous event loops.
-    """
+      For device specific operations.
+      For use in asynchronous event loops.
+      """
 
     def __init__(self, serial, host="localhost", port=ADB_PORT):
         self.serial = serial.encode("ascii")
@@ -307,20 +316,21 @@ class _AsyncAndroidDeviceClient:
         return resp.decode("ascii")
 
     async def forward(self, hostport, devport):
-        """Tell server to start forwarding TCP ports.
-        """
-        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (self.serial, hostport, devport)
+        """Tell server to start forwarding TCP ports."""
+        msg = b"host-serial:%b:forward:tcp:%d;tcp:%d" % (
+            self.serial,
+            hostport,
+            devport,
+        )
         await _command_transact(self._conn, msg)
 
     async def kill_forward(self, hostport):
-        """Tell server to remove forwarding TCP ports.
-        """
+        """Tell server to remove forwarding TCP ports."""
         msg = b"host-serial:%b:killforward:tcp:%d" % (self.serial, hostport)
         await _command_transact(self._conn, msg)
 
     async def kill_forward_all(self):
-        """Tell server to remove all forwarding TCP ports.
-        """
+        """Tell server to remove all forwarding TCP ports."""
         msg = b"host-serial:%b:killforward-all" % (self.serial,)
         await _command_transact(self._conn, msg)
 
@@ -347,7 +357,10 @@ class _AsyncAndroidDeviceClient:
         """
         if state not in {"any", "bootloader", "device", "recovery", "sideload"}:
             raise ValueError("Invalid state to wait for.")
-        msg = b"host-serial:%b:wait-for-usb-%b" % (self.serial, state.encode("ascii"))
+        msg = b"host-serial:%b:wait-for-usb-%b" % (
+            self.serial,
+            state.encode("ascii"),
+        )
         await _command_transact(self._conn, msg)
 
     async def command(self, cmdline, usepty=False):
@@ -375,10 +388,15 @@ class _AsyncAndroidDeviceClient:
         rc = resp[0]
         if rc & 0x80:
             rc = -(rc & 0x7F)
-        return (stdout.read().decode("utf8"), stderr.read().decode("utf8"),
-                exitstatus.ExitStatus(None,
-                                      name="{}@{}".format(name, self.serial.decode("ascii")),
-                                      returncode=rc))
+        return (
+            stdout.read().decode("utf8"),
+            stderr.read().decode("utf8"),
+            exitstatus.ExitStatus(
+                None,
+                name="{}@{}".format(name, self.serial.decode("ascii")),
+                returncode=rc,
+            ),
+        )
 
     async def list(self, name, coro_cb):
         sp = SyncProtocol(self.serial)
@@ -402,8 +420,7 @@ class _AsyncAndroidDeviceClient:
         return st
 
     async def push(self, localfiles: list, remotepath: str, sync: bool = False):
-        """Push a list of local files to remote file or directory.
-        """
+        """Push a list of local files to remote file or directory."""
         sp = SyncProtocol(self.serial)
         await sp.connect_with(self._conn)
         try:
@@ -414,8 +431,7 @@ class _AsyncAndroidDeviceClient:
         return resp
 
     async def pull_file(self, remotepath: str, filelike: typing.BinaryIO):
-        """Pull a remote file into given file-like object.
-        """
+        """Pull a remote file into given file-like object."""
         sp = SyncProtocol(self.serial)
         await sp.connect_with(self._conn)
         try:
@@ -446,14 +462,16 @@ class _AsyncAndroidDeviceClient:
         sock = await _start_exec(self.serial, self._conn, cmdline)
         return DeviceProcess(sock, name)
 
-    async def install(self,
-                      apkfile,
-                      allow_test=True,
-                      installer=None,
-                      onsdcard=False,
-                      onflash=False,
-                      allow_downgrade=True,
-                      grant_all=True):
+    async def install(
+        self,
+        apkfile,
+        allow_test=True,
+        installer=None,
+        onsdcard=False,
+        onflash=False,
+        allow_downgrade=True,
+        grant_all=True,
+    ):
         """Install an APK.
 
         Performs a streaming installation.  Returns True if Success.
@@ -484,7 +502,7 @@ class _AsyncAndroidDeviceClient:
             await p.copy_from(afo)
         status_response = await p.read(4096)
         await p.close()
-        return b'Success' in status_response
+        return b"Success" in status_response
 
     # TODO(dart) install sessions
 
@@ -493,7 +511,7 @@ class _AsyncAndroidDeviceClient:
 
         Equivalent of 'pm' command.
         """
-        cmdline = ['cmd', 'package']
+        cmdline = ["cmd", "package"]
         if user is not None:
             cmdline.append("--user")
             cmdline.append(str(user))
@@ -520,34 +538,35 @@ class _AsyncAndroidDeviceClient:
         if not es:
             raise AdbCommandFail("Didn't clear logcat")
 
-    async def logcat(self,
-                     stdoutstream,
-                     stderrstream,
-                     format="threadtime",
-                     buffers="default",
-                     modifiers=None,
-                     binary=False,
-                     regex=None,
-                     dump=False,
-                     logtags=""):
+    async def logcat(
+        self,
+        stdoutstream,
+        stderrstream,
+        format="threadtime",
+        buffers="default",
+        modifiers=None,
+        binary=False,
+        regex=None,
+        dump=False,
+        logtags="",
+    ):
         """Coroutine for streaming logcat output to the provided file-like
+
         streams.
 
-        Args:
-            stdout, stderr: file-like object to write log events to.
+        Args: stdout, stderr: file-like object to write log events to.
             binary: bool output binary format if True.
             regex: A Perl compatible regular expression to match messages against.
-            format: str of one of the following:
-                    "brief", "long", "process", "raw", "tag", "thread",
-                    "threadtime", "time".
-            buffers: list or comma separated string of:
-                     'main', 'system', 'radio', 'events', 'crash', 'default' or 'all'
-            modifiers: str of one or more of:
-                       epoch", "monotonic", "uid", "usec", "UTC", "year", "zone"
+            format: str of one of the following: "brief", "long", "process", "raw",
+            "tag", "thread", "threadtime", "time".
+            buffers: list or comma separated string of: 'main', 'system', 'radio',
+            'events', 'crash', 'default' or 'all'
+            modifiers: str of one or more of: epoch", "monotonic", "uid", "usec",
+            "UTC", "year", "zone"
             logcats: str of space separated filter expressions.
         """
         logtags = os.environ.get("ANDROID_LOG_TAGS", logtags)
-        cmdline = ['exec', 'logcat']
+        cmdline = ["exec", "logcat"]
         # buffers
         if isinstance(buffers, str):
             buffers = buffers.split(",")
@@ -560,14 +579,31 @@ class _AsyncAndroidDeviceClient:
         if dump:
             cmdline.append("-d")
         # output format
-        if format not in {"brief", "long", "process", "raw", "tag", "thread", "threadtime", "time"}:
+        if format not in {
+                "brief",
+                "long",
+                "process",
+                "raw",
+                "tag",
+                "thread",
+                "threadtime",
+                "time",
+        }:
             raise ValueError("Bad format type.")
         if modifiers:
             if isinstance(modifiers, str):
                 modifiers = modifiers.split(",")
             for modifier in modifiers:
-                if modifier in {"epoch", "monotonic", "uid", "usec", "UTC", "year", "zone"}:
-                    format += ("," + modifier)
+                if modifier in {
+                        "epoch",
+                        "monotonic",
+                        "uid",
+                        "usec",
+                        "UTC",
+                        "year",
+                        "zone",
+                }:
+                    format += "," + modifier
                 else:
                     raise ValueError("Invalid logcat format modifier")
         cmdline.extend(["-v", format])
@@ -630,13 +666,11 @@ class AndroidDeviceClient:
         return get_kernel().run(self._aadb.unroot())
 
     def forward(self, hostport, devport):
-        """Tell server to start forwarding TCP ports.
-        """
+        """Tell server to start forwarding TCP ports."""
         return get_kernel().run(self._aadb.forward(hostport, devport))
 
     def kill_forward(self, hostport):
-        """Tell server to remove forwarding TCP ports.
-        """
+        """Tell server to remove forwarding TCP ports."""
         return get_kernel().run(self._aadb.kill_forward(hostport))
 
     def list_forward(self):
@@ -697,7 +731,7 @@ class AndroidDeviceClient:
         """
 
         async def acb(stat, path):
-            await block_in_thread(cb, stat, path)
+            await run_in_thread(cb, stat, path)
 
         coro = self._aadb.list(name, acb)
         return get_kernel().run(coro)
@@ -711,14 +745,12 @@ class AndroidDeviceClient:
         return get_kernel().run(coro)
 
     def push(self, localfiles: list, remotepath: str, sync: bool = False):
-        """Push a list of local files to remote file or directory.
-        """
+        """Push a list of local files to remote file or directory."""
         coro = self._aadb.push(localfiles, remotepath, sync)
         return get_kernel().run(coro)
 
     def pull(self, remotepath, localpath):
-        """Pull a single file from device to local file system.
-        """
+        """Pull a single file from device to local file system."""
         coro = self._aadb.pull(remotepath, localpath)
         return get_kernel().run(coro)
 
@@ -726,7 +758,6 @@ class AndroidDeviceClient:
         """Pull a file into local memory, as bytes.
 
         A path to a file on the device.
-
         """
         coro = self._aadb.pull_file(remotepath, filelike)
         return get_kernel().run(coro)
@@ -739,31 +770,33 @@ class AndroidDeviceClient:
         """Clear logcat buffer."""
         return get_kernel().run(self._aadb.logcat_clear())
 
-    async def logcat(self,
-                     stdoutstream,
-                     stderrstream,
-                     format="threadtime",
-                     buffers="default",
-                     modifiers=None,
-                     binary=False,
-                     regex=None,
-                     logtags=""):
-        """Coroutine for streaming logcat output to the provided file-like
-        streams.
+    async def logcat(
+        self,
+        stdoutstream,
+        stderrstream,
+        format="threadtime",
+        buffers="default",
+        modifiers=None,
+        binary=False,
+        regex=None,
+        logtags="",
+    ):
+        """Coroutine for streaming logcat output to the provided file-like streams.
         """
-        await self._aadb.logcat(stdoutstream,
-                                stderrstream,
-                                format=format,
-                                buffers=buffers,
-                                modifiers=modifiers,
-                                binary=binary,
-                                regex=regex,
-                                logtags=logtags)
+        await self._aadb.logcat(
+            stdoutstream,
+            stderrstream,
+            format=format,
+            buffers=buffers,
+            modifiers=modifiers,
+            binary=binary,
+            regex=regex,
+            logtags=logtags,
+        )
 
 
 class DeviceProcess:
-    """Represents an attached process on the device.
-    """
+    """Represents an attached process on the device."""
 
     def __init__(self, asocket, name):
         self.socket = asocket
@@ -820,8 +853,14 @@ def _fix_command_line(cmdline):
 # Perform shell request, connection stays open
 async def _start_shell(serial, conn, usepty, cmdline):
     tpmsg = b"host:transport:%b" % serial
-    msg = b"shell,%b:%b" % (b",".join(
-        [b"v2", b"TERM=%b" % os.environb[b"TERM"], b"pty" if usepty else b"raw"]), cmdline)
+    msg = b"shell,%b:%b" % (
+        b",".join([
+            b"v2",
+            b"TERM=%b" % os.environb[b"TERM"],
+            b"pty" if usepty else b"raw",
+        ]),
+        cmdline,
+    )
     await conn.open()
     await conn.message(tpmsg, expect_response=False)
     await conn.message(msg, expect_response=False)
@@ -860,6 +899,7 @@ async def _special_command(serial, conn, cmd):
 
 class ShellProtocol:
     """Implement the shell protocol v2."""
+
     IDSTDIN = 0
     IDSTDOUT = 1
     IDSTDERR = 2
@@ -905,19 +945,19 @@ class SyncProtocol:
     Only recent devices are supported.
     """
 
-    mkid = lambda code: int.from_bytes(code, byteorder='little')  # noqa
-    ID_LSTAT_V1 = mkid(b'STAT')
-    ID_STAT_V2 = mkid(b'STA2')
-    ID_LSTAT_V2 = mkid(b'LST2')
-    ID_LIST = mkid(b'LIST')
-    ID_SEND = mkid(b'SEND')
-    ID_RECV = mkid(b'RECV')
-    ID_DENT = mkid(b'DENT')
-    ID_DONE = mkid(b'DONE')
-    ID_DATA = mkid(b'DATA')
-    ID_OKAY = mkid(b'OKAY')
-    ID_FAIL = mkid(b'FAIL')
-    ID_QUIT = mkid(b'QUIT')
+    mkid = lambda code: int.from_bytes(code, byteorder="little")  # noqa
+    ID_LSTAT_V1 = mkid(b"STAT")
+    ID_STAT_V2 = mkid(b"STA2")
+    ID_LSTAT_V2 = mkid(b"LST2")
+    ID_LIST = mkid(b"LIST")
+    ID_SEND = mkid(b"SEND")
+    ID_RECV = mkid(b"RECV")
+    ID_DENT = mkid(b"DENT")
+    ID_DONE = mkid(b"DONE")
+    ID_DATA = mkid(b"DATA")
+    ID_OKAY = mkid(b"OKAY")
+    ID_FAIL = mkid(b"FAIL")
+    ID_QUIT = mkid(b"QUIT")
     del mkid
 
     SYNC_DATA_MAX = 65536
@@ -942,7 +982,7 @@ class SyncProtocol:
 
     async def quit(self):
         msg = SyncProtocol.SYNCMSG_STATUS.pack(SyncProtocol.ID_QUIT, 0)
-        self.socket.sendall(msg)
+        await self.socket.sendall(msg)
 
     async def send_request(self, protoid: int, path_and_mode: str):
         path_and_mode = path_and_mode.encode("utf-8")
@@ -971,7 +1011,7 @@ class SyncProtocol:
         s = SyncProtocol.SYNCMSG_STAT_V2
         await self.send_request(SyncProtocol.ID_STAT_V2, remotepath)
         resp = await self.socket.recv(s.size)
-        stat_id, err, dev, ino, mode, nlink, uid, gid, size, atime, mtime, ctime = s.unpack(resp)
+        stat_id, err, dev, ino, mode, nlink, uid, gid, size, atime, mtime, ctime = (s.unpack(resp))
         if stat_id == SyncProtocol.ID_STAT_V2:
             if err != 0:
                 raise OSError(err, errno.errorcode[err], remotepath)
@@ -989,7 +1029,8 @@ class SyncProtocol:
                 # int nanoseconds, but not really
                 atime * 1e9,
                 mtime * 1e9,
-                ctime * 1e9))
+                ctime * 1e9,
+            ))
             return sr
         else:
             raise AdbProtocolError("SyncProtocol: invalid response type.")
@@ -1008,12 +1049,10 @@ class SyncProtocol:
             elif stat.S_ISREG(dest_st.st_mode):
                 dst_isdir = False
             else:
-                raise ValueError("push: destination is not a directory or "
-                                 "regular file")
+                raise ValueError("push: destination is not a directory or regular file")
         if not dst_isdir:
             if len(localfiles) > 1:
-                raise ValueError("push: destination is not a dir when copying "
-                                 "multiple files.")
+                raise ValueError("push: destination is not a dir when copying multiple files.")
             if dst_exists:
                 raise ValueError("push: destination exists")
         for localfile in localfiles:
@@ -1127,6 +1166,7 @@ class SyncProtocol:
 
 class LogcatHandler:
     """Host side logcat handler that receives logcat messages in binary mode
+
     over raw connection.
     """
 
@@ -1157,7 +1197,7 @@ class LogcatHandler:
         ac = self._aadb
         signalset = SignalEvent(signal.SIGINT, signal.SIGTERM)
         await ac.logcat_clear()
-        proc = await ac.spawn('logcat -B -b default')
+        proc = await ac.spawn("logcat -B -b default")
         task = await spawn(self._read_and_dump(proc, streams.FileStream(sys.stdout.buffer)))
         await signalset.wait()
         await task.cancel()
@@ -1167,7 +1207,7 @@ class LogcatHandler:
         while True:
             lm = await self._read_one(proc)
             await out.write(str(lm).encode("utf8"))
-            await out.write(b'\n')
+            await out.write(b"\n")
 
     async def _read_one(self, proc):
         s = self.LOGCAT_MESSAGE
@@ -1181,7 +1221,7 @@ class LogcatHandler:
         return get_kernel().run(self._dump_to(localfile, logtags))
 
     async def _dump_to(self, localfile, logtags):
-        cmdline = ['logcat', '-d', '-B', '-b', 'default']
+        cmdline = ["logcat", "-d", "-B", "-b", "default"]
         if logtags:
             cmdline.extend(logtags.split())
         proc = await self._aadb.spawn(cmdline)
@@ -1191,6 +1231,7 @@ class LogcatHandler:
 
     def watch_for(self, tag=None, priority=None, text=None, timeout=90):
         """Watch for first occurence of a particular set of tag, priority, or
+
         message text.
 
         If tag is given watch for first of that tag.
@@ -1200,15 +1241,14 @@ class LogcatHandler:
         If text is given look for first occurence of text in message part.
         """
         if tag is None and text is None:
-            raise ValueError("watch_for: must supply one or both of 'tag' or "
-                             "'text' parameters.")
+            raise ValueError("watch_for: must supply one or both of 'tag' or 'text' parameters.")
         return get_kernel().run(self._watch_for(tag, priority, text, timeout))
 
     async def _watch_for(self, tag, priority, text, timeout):
         lm = None
         ac = self._aadb
         await ac.logcat_clear()
-        proc = await ac.spawn('logcat -B -b default')
+        proc = await ac.spawn("logcat -B -b default")
         try:
             async with timeout_after(timeout):
                 while True:
@@ -1270,6 +1310,7 @@ def _device_factory(line):
 
 if __name__ == "__main__":
     from devtest import debugger
+
     debugger.autodebug()
     start_server()
     print("Test AdbClient:")
@@ -1314,13 +1355,15 @@ if __name__ == "__main__":
         try:
             await ac.logcat_clear()
             task = await spawn(
-                ac.logcat(sys.stdout.buffer,
-                          sys.stdout.buffer,
-                          buffers="kernel,main",
-                          format="long",
-                          modifiers="epoch,usec",
-                          binary=False,
-                          logtags=" ".join(sys.argv[1:])))
+                ac.logcat(
+                    sys.stdout.buffer,
+                    sys.stdout.buffer,
+                    buffers="kernel,main",
+                    format="long",
+                    modifiers="epoch,usec",
+                    binary=False,
+                    logtags=" ".join(sys.argv[1:]),
+                ))
             await signalset.wait()
             await task.cancel()
         finally:
@@ -1329,5 +1372,3 @@ if __name__ == "__main__":
 
     kern = get_kernel()
     kern.run(dostuff)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

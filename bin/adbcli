@@ -11,16 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""
-An interactive CLI for Android devices, using adb module.
-"""
+"""An interactive CLI for Android devices, using adb module."""
 
 import sys
 
-from elicit.all import *  # noqa
-
 from devtest.devices.android import adb
+from elicit.all import *  # noqa
 
 
 class AdbCommands(ObjectCommands):
@@ -49,9 +45,7 @@ class AdbCommands(ObjectCommands):
 
 
 def adbcli(argv):
-    """adbcli <serial>
-
-    """
+    """adbcli <serial>"""
     serial = argv[1] if len(argv) > 1 else os.environ.get("ANDROID_SERIAL")
     if not serial:
         print(adbcli.__doc__)
@@ -78,5 +72,3 @@ def adbcli(argv):
 
 
 adbcli(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

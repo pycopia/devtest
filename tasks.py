@@ -5,19 +5,19 @@ This simplifies some common development tasks.
 Run these tasks with the `invoke` tool.
 """
 
-import sys
-import os
-import shutil
-import json
 import getpass
-import tomllib
 from glob import glob
+import json
+import os
 from pathlib import Path
+import shutil
+import sys
+import tomllib
 
+from invoke import Exit, run, task
 import keyring
 import semver
 from setuptools_scm import get_version
-from invoke import task, run, Exit
 
 PYTHONBIN = os.environ.get("PYTHONBIN", sys.executable)
 # Put the path in quotes in case there is a space in it.
@@ -52,7 +52,7 @@ def clean(ctx):
     ctx.run(r"find . -depth -type d -name __pycache__ -exec rm -rf {} \;")
     ctx.run('find devtest -name "*.so" -delete')
     with ctx.cd("docs"):
-        ctx.run('rm -f modules/devtest.*.rst')
+        ctx.run("rm -f modules/devtest.*.rst")
         ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M clean . _build")
 
 
@@ -86,8 +86,7 @@ def format_changed(ctx, check=False, untracked=False):
 
 @task
 def set_pypi_token(ctx):
-    """Set the token in the local key ring.
-    """
+    """Set the token in the local key ring."""
     pw = getpass.getpass("Enter pypi token? ")
     if pw:
         keyring.set_password(ctx.config.pypi.server, ctx.config.pypi.user, pw)
@@ -107,11 +106,10 @@ def cleandist(ctx):
 
 @task
 def freeze(ctx):
-    """Freeze current package versions into requirements.txt file.
-    """
+    """Freeze current package versions into requirements.txt file."""
     user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
-    pipcmd = (f"{PYTHONBIN} -m pip --disable-pip-version-check freeze --exclude-editable "
-              f"--local {user} --requirement requirements-in.txt")
+    pipcmd = (f"{PYTHONBIN} -m pip --disable-pip-version-check freeze"
+              f" --exclude-editable --local {user} --requirement requirements-in.txt")
     freeze_output = ctx.run(pipcmd, hide="out")
     editablesout = ctx.run("pip list --editable --format json", hide="out")
     if ctx.config.run.dry:
@@ -140,9 +138,12 @@ def build(ctx):
 def dev_requirements(ctx):
     """Install development requirements."""
     user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
-    ctx.run(f'{PYTHONBIN} -m pip install --index-url "{ctx.config.pypi.index}" '
-            f'--upgrade {user} -r dev-requirements.txt', pty=True,
-            hide=False)
+    ctx.run(
+        f'{PYTHONBIN} -m pip install --index-url "{ctx.config.pypi.index}" '
+        f"--upgrade {user} -r dev-requirements.txt",
+        pty=True,
+        hide=False,
+    )
 
 
 @task(pre=[dev_requirements])
@@ -152,8 +153,8 @@ def develop(ctx, uninstall=False):
     if uninstall:
         ctx.run(f"{PYTHONBIN} -m pip uninstall -y {PACKAGE_NAME}")
     else:
-        ctx.run(f'{PYTHONBIN} -m pip --isolated install --index-url "{ctx.config.pypi.index}" '
-                f'{user} --editable .')
+        ctx.run(f"{PYTHONBIN} -m pip --isolated install --index-url"
+                f' "{ctx.config.pypi.index}" {user} --editable .')
 
 
 @task(pre=[clean])
@@ -163,8 +164,9 @@ def update_deps(ctx):
     deps = [s.strip() for s in open("requirements-in.txt").readlines()]
     if deps:
         deps = [f'"{s}"' for s in deps]
-        ctx.run(f'{PYTHONBIN} -m pip install '
-                f'--index-url "{ctx.config.pypi.index}" --upgrade {user} {" ".join(deps)}')
+        ctx.run(f"{PYTHONBIN} -m pip install "
+                f'--index-url "{ctx.config.pypi.index}" --upgrade'
+                f' {user} {" ".join(deps)}')
 
 
 @task
@@ -173,14 +175,17 @@ def test(ctx, testfile=None, ls=False):
     if ls:
         ctx.run(f"{PYTHONBIN} -m pytest --collect-only -qq tests")
     elif testfile:
-        ctx.run(f"{PYTHONBIN} -m pytest -s {testfile}")
+        ctx.run(f"{PYTHONBIN} -m pytest -s {testfile}", hide=False, pty=True)
     else:
         ctx.run(f"{PYTHONBIN} -m pytest tests", hide=False, pty=True)
 
 
 @task
 def tag(ctx, tag=None, major=False, minor=False, patch=False):
-    """Tag or bump release with a semver tag. Makes a signed tag if you're a signer."""
+    """Tag or bump release with a semver tag.
+
+    Makes a signed tag if you're a signer.
+    """
     latest = None
     if tag is None:
         tags = get_tags()
@@ -254,16 +259,16 @@ def publish(ctx):
     if not distfiles:
         raise Exit("Nothing in dist folder!")
     distfiles = " ".join(distfiles)
-    ctx.run(f'{PYTHONBIN} -m twine upload --repository-url \"{ctx.config.pypi.url}\" '
-            f'--username {ctx.config.pypi.user} --password {token} {distfiles}')
+    ctx.run(f'{PYTHONBIN} -m twine upload --repository-url "{ctx.config.pypi.url}" '
+            f"--username {ctx.config.pypi.user} --password {token} {distfiles}")
 
 
 @task
 def docs(ctx):
     """Build the HTML documentation."""
     ctx.run("rm docs/modules/devtest.*.rst", warn=True)
-    ctx.run(f"{PYTHONBIN} -m sphinx.ext.apidoc --force --separate --no-toc --output-dir "
-            f"docs/modules devtest")
+    ctx.run(f"{PYTHONBIN} -m sphinx.ext.apidoc --force --separate --no-toc"
+            " --output-dir docs/modules devtest")
     with ctx.cd("docs"):
         ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M html . _build")
     if os.environ.get("DISPLAY"):
@@ -304,10 +309,10 @@ def docker_build(ctx):
         "PYPI_REPO": ctx.config.pypi.index,
     }
     ctx.run(
-        f"docker build "
-        f"--build-arg PYVER --build-arg VERSION "
-        f"--build-arg PYPI_REPO --build-arg {ctx.config.pypi.server} -t devtest:{version} .",
-        env=environ)
+        "docker build --build-arg PYVER --build-arg VERSION --build-arg"
+        f" PYPI_REPO --build-arg {ctx.config.pypi.server} -t devtest:{version} .",
+        env=environ,
+    )
     print(f"Done. To run it:\n docker run -it devtest:{version}")
 
 
@@ -342,7 +347,8 @@ def get_pypi_token(ctx):
 
 def get_suffix():
     return run(
-        f'{PYTHONBIN} -c \'import sysconfig; print(sysconfig.get_config_vars()["EXT_SUFFIX"])\'',
+        f"{PYTHONBIN} -c 'import sysconfig;"
+        ' print(sysconfig.get_config_vars()["EXT_SUFFIX"])\'',
         hide=True,
     ).stdout.strip()  # noqa
 
@@ -372,7 +378,7 @@ def get_modified_files(untracked):
     """
     filelist = []
     gitbase = find_git_base()
-    gitout = run('git status --porcelain=1 -z', hide=True)
+    gitout = run("git status --porcelain=1 -z", hide=True)
     for line in gitout.stdout.split("\0"):
         if line:
             if not line.endswith(".py"):
