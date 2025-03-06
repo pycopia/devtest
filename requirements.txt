@@ -1,5 +1,5 @@
 blinker==1.8.2
-cryptography==42.0.7
+cryptography==44.0.1
 curio @ git+https://github.com/dabeaz/curio.git@148454621f9bd8dd843f591e87715415431f6979
 docopt==0.6.2
 peewee==3.17.3
