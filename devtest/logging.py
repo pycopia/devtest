@@ -9,9 +9,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """
 Replacement logging module. This module is light, and intended to leverage the
-sytem's syslog service. Log destination configuration should be done there.
+system's syslog service. Log destination configuration should be done there.
 
 Why use this instead of the "stock" logging module?
 
@@ -27,106 +28,99 @@ Configurable with the following environment variables:
 DEVTEST_LOG_FACILITY
     Sets the syslog facility to use, default USER.
 
-DEVTEST_LOG_LEVEL
-    Sets the syslog level to log, default NOTICE.
+DEVTEST_LOG_PRIORITY
+    Sets the syslog priority to log, default NOTICE.
 
 DEVTEST_LOG_STDERR
     Set to include stderr in log output.
 
-You may use a function call interface, with the various logging functions, or
-the object interface by getting a Logger instance.
 
-View log output in a shell like this:
-
-    # log stream --predicate 'senderImagePath contains "Python"' --level debug
+When this module is imported it monkey-patches the stock logging module to use this module, and sets
+up a syslog handler.
 """
 
 import sys
 import os
 import syslog
+from typing import Optional, Dict
 
-# also import and configure standard logging here. Avoid using the logging
-# module in other code.
+# also import and configure standard logging here. This module will override the root logger.
+# This module should be imported first.
 import logging
 
-FACILITY = os.environ.get("DEVTEST_LOG_FACILITY", "USER")
-LEVEL = os.environ.get("DEVTEST_LOG_LEVEL", "NOTICE")
-USESTDERR = bool(os.environ.get("DEVTEST_LOG_STDERR"))
+FACILITY: str = os.environ.get("DEVTEST_LOG_FACILITY", "USER").upper()
+PRIORITY: str = os.environ.get("DEVTEST_LOG_PRIORITY", "NOTICE").upper()
+USESTDERR: bool = bool(os.environ.get("DEVTEST_LOG_STDERR"))
 
-_oldloglevel = syslog.setlogmask(syslog.LOG_UPTO(getattr(syslog, "LOG_" + LEVEL)))
-
-
-def DEBUG(*args, **kwargs):
-    """Use this instead of 'print()' when debugging. Prints to stderr.
-    """
-    parts = []
-    for name, value in list(kwargs.items()):
-        parts.append("{}: {!r}".format(name, value))
-    print("DEBUG", " ".join(str(o) for o in args), ", ".join(parts), file=sys.stderr)
+_oldpriority = 0
 
 
 def openlog(ident=None, usestderr=USESTDERR, facility=FACILITY):
-    opts = syslog.LOG_PID | syslog.LOG_PERROR if usestderr else 0
+    opts = syslog.LOG_PID | (syslog.LOG_PERROR if usestderr else 0)
     if isinstance(facility, str):
-        facility = getattr(syslog, "LOG_" + facility)
+        facility = getattr(syslog, "LOG_" + facility.upper())
     if ident is None:  # openlog does not take None as an ident parameter.
         syslog.openlog(logoption=opts, facility=facility)
     else:
         syslog.openlog(ident=ident, logoption=opts, facility=facility)
 
 
-def close():
+def closelog():
     syslog.closelog()
 
 
-def debug(msg):
-    syslog.syslog(syslog.LOG_DEBUG, _encode(msg))
+def debug(msg, *args):
+    syslog.syslog(syslog.LOG_DEBUG, _encode(msg, args))
 
 
-def info(msg):
-    syslog.syslog(syslog.LOG_INFO, _encode(msg))
+def info(msg, *args):
+    syslog.syslog(syslog.LOG_INFO, _encode(msg, args))
 
 
-def notice(msg):
-    syslog.syslog(syslog.LOG_NOTICE, _encode(msg))
+def notice(msg, *args):
+    syslog.syslog(syslog.LOG_NOTICE, _encode(msg, args))
 
 
-def warning(msg):
-    syslog.syslog(syslog.LOG_WARNING, _encode(msg))
+def warning(msg, *args):
+    syslog.syslog(syslog.LOG_WARNING, _encode(msg, args))
 
 
-def error(msg):
-    syslog.syslog(syslog.LOG_ERR, _encode(msg))
+def error(msg, *args):
+    syslog.syslog(syslog.LOG_ERR, _encode(msg, args))
 
 
-def critical(msg):
-    syslog.syslog(syslog.LOG_CRIT, _encode(msg))
+def critical(msg, *args):
+    syslog.syslog(syslog.LOG_CRIT, _encode(msg, args))
 
 
-def alert(msg):
-    syslog.syslog(syslog.LOG_ALERT, _encode(msg))
+def alert(msg, *args):
+    syslog.syslog(syslog.LOG_ALERT, _encode(msg, args))
 
 
-def emergency(msg):
-    syslog.syslog(syslog.LOG_EMERG, _encode(msg))
+def emergency(msg, *args):
+    syslog.syslog(syslog.LOG_EMERG, _encode(msg, args))
 
 
-def _encode(o):
-    # Causes UTF8 BOM to be added to message per RFC-5424
-    return '\ufeff' + str(o).replace("\r\n", " ")
+def _encode(o, args):
+    # Add UTF8 BOM to message per RFC-5424. str is UTF-8 encoded by syslog module.
+    if args:
+        return '\ufeff' + (str(o) % args)
+    return '\ufeff' + str(o)
 
 
-# set loglevels
-def get_logmask():
-    return syslog.setlogmask(0)
+def set_priority(level):
+    """Set syslog priority.
+
+    Args:
+        level: syslog.LOG_* level.
+    """
+    global _oldpriority
+    _oldpriority = syslog.setlogmask(syslog.LOG_UPTO(level))
+    logging.root.level = _LOGGING_LEVELS[PRIORITIES_REV[level]]
 
 
-def loglevel(level):
-    global _oldloglevel
-    _oldloglevel = syslog.setlogmask(syslog.LOG_UPTO(level))
-
-
-def get_loglevel():
+def get_priority():
+    """Get max syslog priority."""
     mask = syslog.setlogmask(0)
     for level in (syslog.LOG_DEBUG, syslog.LOG_INFO, syslog.LOG_NOTICE, syslog.LOG_WARNING,
                   syslog.LOG_ERR, syslog.LOG_CRIT, syslog.LOG_ALERT, syslog.LOG_EMERG):
@@ -134,45 +128,46 @@ def get_loglevel():
             return level
 
 
-def loglevel_restore():
-    syslog.setlogmask(_oldloglevel)
+def priority_restore():
+    syslog.setlogmask(_oldpriority)
+    logging.root.level = _LOGGING_LEVELS[PRIORITIES_REV[_oldpriority]]
 
 
-def loglevel_debug():
-    loglevel(syslog.LOG_DEBUG)
+def priority_debug():
+    set_priority(syslog.LOG_DEBUG)
 
 
-def loglevel_info():
-    loglevel(syslog.LOG_INFO)
+def priority_info():
+    set_priority(syslog.LOG_INFO)
 
 
-def loglevel_notice():
-    loglevel(syslog.LOG_NOTICE)
+def priority_notice():
+    set_priority(syslog.LOG_NOTICE)
 
 
-def loglevel_warning():
-    loglevel(syslog.LOG_WARNING)
+def priority_warning():
+    set_priority(syslog.LOG_WARNING)
 
 
-def loglevel_error():
-    loglevel(syslog.LOG_ERR)
+def priority_error():
+    set_priority(syslog.LOG_ERR)
 
 
-def loglevel_critical():
-    loglevel(syslog.LOG_CRIT)
+def priority_critical():
+    set_priority(syslog.LOG_CRIT)
 
 
-def loglevel_alert():
-    loglevel(syslog.LOG_ALERT)
+def priority_alert():
+    set_priority(syslog.LOG_ALERT)
 
 
 # common logging patterns
-def exception_error(prefix, ex):
-    error("{}: {}".format(prefix, _format_exception(ex)))
+def exception_error(prefix, ex, *args):
+    error("{}: {}".format(_encode(prefix, args), _format_exception(ex)))
 
 
-def exception_warning(prefix, ex):
-    warning("{}: {}".format(prefix, _format_exception(ex)))
+def exception_warning(prefix, ex, *args):
+    warning("{}: {}".format(_encode(prefix, args), _format_exception(ex)))
 
 
 def _format_exception(ex):
@@ -184,12 +179,12 @@ def _format_exception(ex):
     ex = orig
     while ex.__cause__ is not None:
         ex = ex.__cause__
-        s.append(" From: {} ({})".format(ex.__class__.__name__, ex))
+        s.append(" Cause: {} ({})".format(ex.__class__.__name__, ex))
     return " | ".join(s)
 
 
 # Allow use of names, and useful aliases, to select logging level.
-LEVELS = {
+PRIORITIES = {
     "DEBUG": syslog.LOG_DEBUG,
     "INFO": syslog.LOG_INFO,
     "NOTICE": syslog.LOG_NOTICE,
@@ -201,7 +196,145 @@ LEVELS = {
     "CRITICAL": syslog.LOG_CRIT,
     "ALERT": syslog.LOG_ALERT,
 }
-LEVELS_REV = dict((v, k) for k, v in list(LEVELS.items()))
+PRIORITIES_REV = dict((v, k) for k, v in PRIORITIES.items())
+
+
+class Logger:
+    """Simple logger using only syslog.
+
+    Users of this logging object will have ``name`` prefixed to every message.
+
+    Args:
+        name: name to prefix to logging messages. The program name will be used by default.
+        usestderr: Also write log messages to stderr.
+        facility: name of facility. Must be one of:
+                  "KERN", "USER", "MAIL", "DAEMON", "AUTH", "LPR", "NEWS", "UUCP", "CRON", "SYSLOG",
+                  "LOCAL0" to "LOCAL7". Default is "USER"
+        priority: name of priority level to emit log messages at. Must be one of:
+                  "EMERG", "ALERT", "CRIT", "ERR", "WARNING", "NOTICE", "INFO", "DEBUG". Default is
+                  "NOTICE"
+    """
+
+    _LOGGERS: Dict[str, "Logger"] = {}  # cache of all open loggers
+
+    def __init__(self,
+                 name: Optional[str] = None,
+                 usestderr: Optional[bool] = False,
+                 facility: Optional[str] = FACILITY,
+                 priority: Optional[str] = PRIORITY):
+
+        self.name = name or sys.argv[0].split("/")[-1]
+        closelog()
+        openlog(name, usestderr, facility)
+        self.priority = priority
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        try:
+            del Logger._LOGGERS[self.name]
+        except KeyError:
+            pass
+        if not Logger._LOGGERS:
+            closelog()
+
+    def debug(self, msg, *args):
+        debug(f"{self.name}: {msg}", *args)
+
+    def info(self, msg, *args):
+        info(f"{self.name}: {msg}", *args)
+
+    log = info  # backwards compatible alias
+
+    def notice(self, msg, *args):
+        notice(f"{self.name}: {msg}", *args)
+
+    def warning(self, msg, *args):
+        warning(f"{self.name}: {msg}", *args)
+
+    def critical(self, msg, *args):
+        critical(f"{self.name}: {msg}", *args)
+
+    def fatal(self, msg, *args):
+        critical(f"{self.name}: {msg}", *args)
+
+    def alert(self, msg, *args):
+        alert(f"{self.name}: {msg}", *args)
+
+    def emergency(self, msg, *args):
+        emergency(f"{self.name}: {msg}", *args)
+
+    def syslog(self, level, msg, *args):
+        syslog.syslog(level, _encode(f"{self.name}: {msg}", args))
+
+    def exception(self, exc, *args):
+        exception_error(f"{self.name}: {exc.__class__.__name__}:", exc, *args)
+
+    def error(self, msg, *args, exc_info=None):
+        if exc_info is not None:
+            if exc_info is True:
+                ex, val, tb = sys.exc_info()
+            else:
+                ex, val, tb = exc_info
+            tb = None  # noqa
+            exception_error(f"{self.name}: {msg}", val, *args)
+        else:
+            error(f"{self.name}: {msg}", *args)
+
+    @property
+    def priority(self):
+        level = get_priority()
+        return PRIORITIES_REV[level]
+
+    @priority.setter
+    def priority(self, newlevel):
+        newlevel = PRIORITIES[newlevel.upper()]
+        set_priority(newlevel)
+
+    # Python's logging compatibility methods, note the non-PEP8 names.
+    def getEffectiveLevel(self):
+        return get_priority()
+
+    def setLevel(self, newlevel):
+        set_priority(newlevel)
+
+    def addHandler(self, *args, **kwargs):
+        pass  # Purposely a no-op.
+
+
+class LogLevel:
+    """Context manager to run a block of code at a specific log level.
+
+    Supply the level name as a string.
+    """
+
+    def __init__(self, level):
+        self._level = PRIORITIES[level.upper()]
+
+    def __enter__(self):
+        self._oldpriority = syslog.setlogmask(syslog.LOG_UPTO(self._level))
+
+    def __exit__(self, extype, exvalue, traceback):
+        syslog.setlogmask(self._oldpriority)
+
+
+def get_logger(name=None, usestderr=USESTDERR, facility=FACILITY, priority=PRIORITY):
+    """Get a :py:class:`Logger` object.
+
+    May return cached logger object. Global logger configuration reflects the last one created.
+    """
+    name = name or os.path.basename(sys.argv[0])
+    if name in Logger._LOGGERS:
+        return Logger._LOGGERS[name]
+    logger = Logger(name=name, usestderr=usestderr, facility=facility, priority=priority)
+    Logger._LOGGERS[name] = logger
+    return logger
+
+
+# stock logging module compatibility objects.
+# Set up custom handler for logging module that uses this module. This is for
+# third-party packages that use the logging module.
 
 # Rough guess at mapping to logging mdule levels.
 _LOGGING_LEVELS = {
@@ -226,122 +359,6 @@ _LEVEL_MAP = {
 }
 
 
-class Logger:
-    """Simple logger using only syslog."""
-
-    def __init__(self, name=None, usestderr=False, facility=FACILITY, level=LEVEL):
-        self.name = name or sys.argv[0].split("/")[-1]
-        close()
-        openlog(name, usestderr, facility)
-        self.loglevel = level
-
-    def close(self):
-        close()
-
-    def debug(self, msg):
-        debug(msg)
-
-    def info(self, msg):
-        info(msg)
-
-    log = info
-
-    def notice(self, msg):
-        notice(msg)
-
-    def warning(self, msg):
-        warning(msg)
-
-    def critical(self, msg):
-        critical(msg)
-
-    def fatal(self, msg):
-        critical(msg)
-
-    def alert(self, msg):
-        alert(msg)
-
-    def emergency(self, msg):
-        emergency(msg)
-
-    def syslog(self, level, msg):
-        syslog.syslog(level, _encode(msg))
-
-    def exception(self, ex, val, tb=None):
-        error("Exception: {}: {}".format(ex.__name__, val))
-
-    def error(self, msg, exc_info=None):
-        if exc_info is not None:
-            if exc_info is True:
-                ex, val, tb = sys.exc_info()
-            else:
-                ex, val, tb = exc_info
-            tb = None  # noqa
-            msg = "{}: {} ({})".format(msg, ex.__name__, val)
-        error(msg)
-
-    @property
-    def logmask(self):
-        return syslog.setlogmask(0)
-
-    @logmask.setter
-    def logmask(self, newmask):
-        syslog.setlogmask(newmask)
-
-    @property
-    def loglevel(self):
-        level = get_loglevel()
-        return LEVELS_REV[level]
-
-    @loglevel.setter
-    def loglevel(self, newlevel):
-        newlevel = LEVELS[newlevel.upper()]
-        loglevel(newlevel)
-
-    # Python's logging compatibility methods, note the non-PEP8 names.
-    def getEffectiveLevel(self):
-        return get_loglevel()
-
-    def setLevel(self, newlevel):
-        loglevel(newlevel)
-
-    def addHandler(self, *args, **kwargs):
-        pass
-
-
-class LogLevel:
-    """Context manager to run a block of code at a specific log level.
-
-    Supply the level name as a string.
-    """
-
-    def __init__(self, level):
-        self._level = LEVELS[level.upper()]
-
-    def __enter__(self):
-        self._oldloglevel = syslog.setlogmask(syslog.LOG_UPTO(self._level))
-
-    def __exit__(self, extype, exvalue, traceback):
-        syslog.setlogmask(self._oldloglevel)
-
-
-# Set up custom handler for logging module that uses this module. This is for
-# third-party packages that use the logging module.
-
-_LOGGERS = {}
-
-
-def get_logger(*args, **kwargs):
-    name = args[0] if len(args) > 1 else os.path.basename(sys.argv[0])
-    if name in _LOGGERS:
-        return _LOGGERS[name]
-    facility = kwargs.get("facility", FACILITY)
-    level = kwargs.get("level", LEVEL)
-    _logger = Logger(name, facility=facility, level=level)
-    _LOGGERS[name] = _logger
-    return _logger
-
-
 def getLogger(name=None, *args, **kwargs):
     logging.root.info("getLogger: {}".format(name))
     return logging.root
@@ -351,7 +368,8 @@ class SyslogHandler(logging.Handler):
 
     def __init__(self, level=logging.INFO):
         super().__init__(level)
-        self._logger = get_logger()
+        pri = PRIORITIES_REV[_LEVEL_MAP[level]]
+        self._logger = Logger(usestderr=USESTDERR, priority=pri)
 
     def emit(self, record):
         try:
@@ -361,8 +379,8 @@ class SyslogHandler(logging.Handler):
             self.handleError(record)
 
 
-logging.root.addHandler(SyslogHandler())
-logging.root.level = _LOGGING_LEVELS[LEVEL]
+logging.root.addHandler(SyslogHandler(level=_LOGGING_LEVELS[PRIORITY]))
+logging.root.level = _LOGGING_LEVELS[PRIORITY]
 
 # Monkey patch the stock logging module to use this logger.
 logging.getLogger = getLogger
@@ -378,7 +396,9 @@ def _test(argv):
     logger.warning("Καλημέρα κόσμε")
 
     with LogLevel("DEBUG"):
+        logger.info('Info with arg %s', "the arg")
         logger.debug("You see me in debug level context manager")
+        logger.debug("Debug with arg: %s", "debug arg")
     logger.debug("You don't see me again")
 
     log = getLogger("self")
@@ -393,5 +413,3 @@ def _test(argv):
 
 if __name__ == "__main__":
     _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8
