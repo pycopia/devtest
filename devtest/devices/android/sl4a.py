@@ -1,4 +1,9 @@
-# python3
+"""An interface to SL4A on an Android device.
+
+Supports original and a new protocol.
+
+NOTE: New protocol is not implemented yet.
+"""
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,17 +16,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""An interface to SL4A on an Android device.
-
-Supports original and a new protocol.
-
-NOTE: New protocol is not implemented yet.
-"""
 
 import struct
 
 import portpicker
-
 from devtest import json
 from devtest.io import reactor
 from devtest.io import socket
@@ -50,8 +48,8 @@ def counter():
 
 
 class _OldSL4AProtocol:
-    """Implementation of existing (old) SL4A RPC protocol.
-    """
+    """Implementation of existing (old) SL4A RPC protocol."""
+
     UNKNOWN_UID = -1
 
     def __init__(self, sock):
@@ -83,20 +81,20 @@ class _OldSL4AProtocol:
         return resp
 
     async def _initiate(self):
-        data = {"cmd": "initiate", "uid": self._uid}
+        data = {'cmd': 'initiate', 'uid': self._uid}
         result = await self._transact(data)
         if result['status']:  # This will never be False, but...
             self._uid = result['uid']
         else:
-            raise SL4AProtocolError("Did not initialize connection:" + result)
+            raise SL4AProtocolError('Did not initialize connection:' + result)
 
     async def _continue(self):
-        data = {"cmd": "continue", "id": self._uid}
+        data = {'cmd': 'continue', 'id': self._uid}
         result = await self._transact(data)
         if result['status']:  # This will never be False, but...
             self._uid = result['uid']
         else:
-            raise SL4AProtocolError("Did not initialize connection:" + result)
+            raise SL4AProtocolError('Did not initialize connection:' + result)
 
     async def _transact(self, data):
         await self._send(data)
@@ -114,23 +112,23 @@ class _OldSL4AProtocol:
         rpcid = next(self._counter)
         data = {'id': rpcid, 'method': methodname, 'params': args}
         resp = await self._transact(data)
-        if resp["id"] != rpcid:
-            raise SL4AProtocolError("RPC response id did not match request.")
-        if resp["error"] is not None:
-            raise SL4AProtocolError(resp["error"])
-        return resp["result"]
+        if resp['id'] != rpcid:
+            raise SL4AProtocolError('RPC response id did not match request.')
+        if resp['error'] is not None:
+            raise SL4AProtocolError(resp['error'])
+        return resp['result']
 
 
 class _SL4AProtocol:
     """Implementation of new SL4A protocol.
 
-    This is a multiplexed TLV style protocol.
+  This is a multiplexed TLV style protocol.
 
-    TODO
-    """
+  TODO
+  """
 
     def __init__(self, sock):
-        self._packer = struct.Struct("!LQ")  # tag, length
+        self._packer = struct.Struct('!LQ')  # tag, length
         self._sock = sock
         self._uid = -1
 
@@ -152,7 +150,8 @@ class SL4AInterface:
     """Interface to SL4A server running on device."""
 
     START = ('am start -a com.googlecode.android_scripting.action.LAUNCH_SERVER '
-             '--ei com.googlecode.android_scripting.extra.USE_SERVICE_PORT {device_port} '
+             '--ei com.googlecode.android_scripting.extra.USE_SERVICE_PORT'
+             ' {device_port} '
              'com.googlecode.android_scripting/.activity.ScriptingLayerServiceLauncher')
 
     STOP = ('am start -a com.googlecode.android_scripting.action.KILL_PROCESS '
@@ -189,7 +188,7 @@ class SL4AInterface:
     async def _connect(self, newprotocol, sessionid):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         await reactor.sleep(3)  # Time for sl4a server to initialize
-        await sock.connect(("localhost", self.host_port))
+        await sock.connect(('localhost', self.host_port))
         if newprotocol:
             self._proto = _SL4AProtocol(sock)
         else:
@@ -202,6 +201,3 @@ class SL4AInterface:
             return self._proto.rpc(name, args, kwargs)
 
         return _fun
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

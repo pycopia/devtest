@@ -9,11 +9,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Where device controllers live.
-
-Instantiated by the framework in devtest.db.testbeds, using
-implementation configuration.
+"""Common base for device controllers.
 """
 
 from __future__ import generator_stop

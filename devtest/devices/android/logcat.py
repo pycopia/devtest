@@ -1,4 +1,8 @@
-#!/usr/bin/env python3.6
+"""Logcat utilities.
+
+This framework interfaces to logcat in binary mode. These are tools to read
+binary logcat files.
+"""
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,21 +15,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Logcat utilities.
 
-This framework interfaces to logcat in binary mode. These are tools to read binary logcat files.
-"""
-
-import sys
+import enum
 import os
 import struct
-import enum
-
-from devtest.qa import signals
+import sys
 
 
 class LogPriority(enum.IntEnum):
     """Logging priority levels."""
+
     UNKNOWN = 0
     DEFAULT = 1
     VERBOSE = 2
@@ -39,8 +38,9 @@ class LogPriority(enum.IntEnum):
 class LogId(enum.IntEnum):
     """Source of the log entry.
 
-    See: android/core/include/android/log.h
-    """
+  See: android/core/include/android/log.h
+  """
+
     MAIN = 0
     RADIO = 1
     EVENTS = 2
@@ -54,16 +54,16 @@ class LogId(enum.IntEnum):
 class LogcatMessage:
     """An Android log message.
 
-    Attributes:
-        tag: (str) The tag of the message as set by the sender.
-        priority: (LogPriority) The priority of the message.
-        message: (str) The text message given by the caller.
-        timestamp: (float) The devices' time that the message was created.
-        pid: (int) The process ID of sending process.
-        tid: (int) The thread ID of sending thread.
-        lid: (int) The log ID.
-        uid: (int) The user ID of the process that sent this message.
-    """
+  Attributes:
+      tag: (str) The tag of the message as set by the sender.
+      priority: (LogPriority) The priority of the message.
+      message: (str) The text message given by the caller.
+      timestamp: (float) The devices' time that the message was created.
+      pid: (int) The process ID of sending process.
+      tid: (int) The thread ID of sending thread.
+      lid: (int) The log ID.
+      uid: (int) The user ID of the process that sent this message.
+  """
 
     def __init__(self, pid, tid, sec, nsec, lid, uid, msg):
         self.pid = pid
@@ -75,7 +75,7 @@ class LogcatMessage:
             self.priority = LogPriority(msg[0])
         except ValueError:
             self.priority = LogPriority.UNKNOWN
-        tagend = msg.find(b'\x00')
+        tagend = msg.find(b"\x00")
         if tagend > 0:
             self.tag = (msg[1:tagend]).decode("ascii")
             self.message = (msg[tagend + 1:-1]).decode("utf8")
@@ -84,15 +84,22 @@ class LogcatMessage:
             self.message = msg.decode("utf8")
 
     def __str__(self):
-        return "{:11.6f} {}:{} {}|{}¦{}".format(self.timestamp, self.pid, self.tid, self.tag,
-                                                self.priority.name, self.message)
+        return "{:11.6f} {}:{} {}|{}¦{}".format(
+            self.timestamp,
+            self.pid,
+            self.tid,
+            self.tag,
+            self.priority.name,
+            self.message,
+        )
 
 
 class LogcatFileReader:
     """Read and decode binary logcat files.
 
-    These are usually obtained from a LogcatHandler dump_to.
-    """
+  These are usually obtained from a LogcatHandler dump_to.
+  """
+
     LOGCAT_MESSAGE = struct.Struct("<HHiIIIII")  # logger_entry_v4
 
     def __init__(self, filename):
@@ -104,15 +111,15 @@ class LogcatFileReader:
     def search(self, tag=None, priority=None, regex=None):
         """Search the log for tag or regular expression in text.
 
-        If tag is given, match on tag. If priority is also given, must match
-        both tag and priority.
-        IF a Regex object is given, match the message body only with that regex.
-        If both tag and regex given, both must match. If all given, all must
-        match.
+    If tag is given, match on tag. If priority is also given, must match
+    both tag and priority.
+    IF a Regex object is given, match the message body only with that regex.
+    If both tag and regex given, both must match. If all given, all must
+    match.
 
-        Yield LogcatMessage and MatchObject on matches. MatchObject will be None
-        if regex is not given.
-        """
+    Yield LogcatMessage and MatchObject on matches. MatchObject will be None
+    if regex is not given.
+    """
         if tag is None and regex is None:
             raise ValueError("At least one of tag or regex must be supplied.")
         with open(self.filename, "rb") as lfo:
@@ -143,8 +150,7 @@ class LogcatFileReader:
                         yield lm, mo
 
     def find_first_tag(self, tag):
-        """Find first occurence of a tag.
-        """
+        """Find first occurence of a tag."""
         for lm, _ in self.search(tag=tag):
             return lm
 
@@ -170,7 +176,7 @@ class LogcatFileReader:
                     continue
                 lines += 1
                 out.write(str(lm).encode("utf8"))
-                out.write(b'\n')
+                out.write(b"\n")
         except BrokenPipeError:
             pass
         return lines
@@ -201,25 +207,3 @@ class LogcatFileReader:
                 return
             else:
                 fo.seek(-(header_peek.size - 1), 1)
-
-
-def to_logcat_filereader(analyzer, data=None, config=None):
-    """Data converter handler."""
-    if isinstance(data, dict):
-        fname = data.get("logcatfile")
-        if fname:
-            fname = analyzer.fix_path(fname)
-            data["logcatfile"] = LogcatFileReader(fname)
-        return data
-
-
-signals.data_convert.connect(to_logcat_filereader)
-
-if __name__ == "__main__":
-    fname = sys.argv[1] if len(sys.argv) > 1 else None
-    tag = sys.argv[2] if len(sys.argv) > 2 else None
-    if fname:
-        lfr = LogcatFileReader(fname)
-        lfr.dump(tag=tag)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
