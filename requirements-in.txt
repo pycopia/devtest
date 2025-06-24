@@ -4,6 +4,7 @@ git+https://github.com/dabeaz/curio.git#egg=curio
 docopt
 docutils
 elicit
+h11
 peewee
 portpicker
 psutil
@@ -11,3 +12,4 @@ psycopg2
 pygments
 pyyaml
 pytz
+rfc3986
