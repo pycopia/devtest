@@ -360,7 +360,6 @@ def _fork_coprocess(cwd):
     os.set_inheritable(childsock.fileno(), True)
     pid = os.fork()
     if pid == 0:  # child
-        _close_files()
         if cwd is not None:
             os.chdir(str(cwd))
         mysock._socket.close()
@@ -374,17 +373,6 @@ def _fork_coprocess(cwd):
         mysock = mysock.as_stream()
         conn = streams.Connection(mysock, mysock)
         return pid, conn
-
-# A coprocess is just fork, but we still don't want it inherit parent fds. So close them as
-# exec would.
-def _close_files():
-    me = psutil.Process()
-    for of in me.open_files():
-        if of.flags & os.O_CLOEXEC:
-            os.close(of.fd)
-    for opennet in me.net_connections(kind="all"):
-        if opennet.flags & os.O_CLOEXEC:
-            os.close(opennet.fd)
 
 
 async def _coprocess_server_coro(conn):
@@ -786,3 +774,9 @@ if __name__ == "__main__":
     print(resp)
     assert resp == b"echo me"
     proc.close()
+
+    print("Coprocess:")
+    pm = get_manager()
+    coproc = pm.coprocess()
+    coproc.start(os.listdir, "/tmp")
+    print(coproc.wait())

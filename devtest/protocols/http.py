@@ -17,9 +17,10 @@ from devtest.core import exceptions
 from devtest.io import ssl as async_ssl
 from devtest.io import socket as async_socket
 
-__all__ = ['HttpControllerError', 'AsyncWebInterface', 'SyncWebInterface', 'HttpProtocolError',
-           'SimpleWebInterface']
-
+__all__ = [
+    'HttpControllerError', 'AsyncWebInterface', 'SyncWebInterface', 'HttpProtocolError',
+    'SimpleWebInterface'
+]
 
 TargetEncoder = Callable[[str, Optional[dict]], str]
 
@@ -58,7 +59,6 @@ class HttpResponseError(HttpProtocolError):
 
 class HttpProtocolRedirect(HttpProtocolError):
     """Raised when redirect is requested."""
-
 
 
 def _default_target_encoder(path: str, params: Optional[dict] = None):

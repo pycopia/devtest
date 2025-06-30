@@ -9,7 +9,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """General text functions similar to GNU core utils.
 """
 
@@ -32,10 +31,12 @@ middle missing. """
     halflen = (min(maxlen, len(s)) // 2) - 6
     return s[:halflen] + "[...snip...]" + s[-halflen:]
 
+
 def crange(start, fin):
     """like range(), but for characters."""
-    for i in range(start, fin+1):
+    for i in range(start, fin + 1):
         yield chr(i)
+
 
 def grep(patt, *args):
     """grep(pattern, objects...)
@@ -44,15 +45,18 @@ strings, but could be a single string.  """
     regex = re.compile(patt)
     return list(filter(regex.search, _allargs(args)))
 
+
 def cat(*args):
     """cat(obj...)
 Combines all objects lines into one list."""
     return _allargs(args)
 
+
 def text(*args):
     """text(object, ...)
 Returns all given objects as a single string."""
     return "".join(_allargs(args))
+
 
 def tac(*args):
     """tac(obj...)
@@ -60,6 +64,7 @@ Combines all objects lines into one list and returns them in reverse order."""
     l = _allargs(args)
     l.reverse()
     return l
+
 
 def head(*args, n=10):
     """Returns the top n lines of the combined objects."""
@@ -72,12 +77,14 @@ def head(*args, n=10):
         c += 1
     return rv
 
+
 def tail(*args, n=10):
     """Returns the bottom 10 lines of the combined objects."""
     q = collections.deque([], n)
     for item in _allargs(args):
         q.append(item)
     return list(q)
+
 
 def cksum(*args):
     """cksum(args...)
@@ -88,6 +95,7 @@ Returns the crc32 value of arguments."""
             crc = binascii.crc32(_encode(item), crc)
     return crc
 
+
 def md5sum(*args):
     "Return the MD5 sum of the arguments."
     h = hashlib.md5()
@@ -95,6 +103,7 @@ def md5sum(*args):
         for item in _to_iter(arg):
             h.update(_encode(item))
     return h.digest()
+
 
 def sha1sum(*args):
     "Return the SHA1 sum of the arguments."
@@ -104,6 +113,7 @@ def sha1sum(*args):
             h.update(_encode(item))
     return h.digest()
 
+
 def sha256sum(*args):
     "Return the SHA256 sum of the arguments."
     h = hashlib.sha256()
@@ -111,15 +121,18 @@ def sha256sum(*args):
         h.update(_encode(item))
     return h.digest()
 
+
 def sort(*args):
     """sort - Returns argument list sorted."""
     rv = list(_allargs(args))
     rv.sort()
     return rv
 
+
 def uniq(*args):
     "Unique - returns the unique elements of the objects."
     return removedups(_allargs(args))
+
 
 def wc(*args):
     "Word count - returns a tuple of (lines, words, characters) of the objects."
@@ -130,6 +143,7 @@ def wc(*args):
         l += 1
     return l, w, c
 
+
 def nl(*args):
     "line numbers - prepends line numbers to strings in list."
     rv = []
@@ -137,13 +151,14 @@ def nl(*args):
         rv.append(f"{n + 1:6d}  {s}")
     return rv
 
+
 def cut(obj, chars=None, fields=None, delim="\t"):
     """cut(obj, bytes=None, chars=None, fields=None, delim="\t")
 Cut a section from the list of lines. arguments are tuples, except delim."""
     rv = []
     if chars:
         for line in _to_iter(obj):
-            st, end = chars # a 2-tuple of start and end positions
+            st, end = chars  # a 2-tuple of start and end positions
             rv.append(line[st:end])
     elif fields:
         for line in _to_iter(obj):
