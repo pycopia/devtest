@@ -21,6 +21,8 @@ from pygments import highlight
 
 from devtest import logging
 
+from ..ui import ptui
+from ..db import testbeds
 from . import bases
 
 ModuleType = type(bases)
@@ -35,9 +37,19 @@ class TestReporter:
 
     def __init__(self, cfg):
         self.config = cfg
+        self._testbed = None
+        self._ui = ptui.PromptToolkitUserInterface()
         self._pylexer = python.Python3Lexer()
         self._doclexer = markup.RstLexer()
         self._formatter = terminal.TerminalFormatter()
+
+    @property
+    def testbed(self):
+        if self._testbed is None:
+            cf = self.config
+            testbed = testbeds.get_testbed(cf.get("testbed", "default"), debug=cf.flags.debug)
+            self._testbed = testbed
+        return self._testbed
 
     def showall(self, testlist):
         for obj in testlist:
@@ -52,7 +64,7 @@ class TestReporter:
             elif objecttype is ModuleType and hasattr(obj, "run"):
                 self.show_module(obj)
             else:
-                logging.warn("{!r} is not a runnable object.".format(obj))
+                logging.warning("{!r} is not a runnable object.".format(obj))
 
     def show_testcase(self, testcase):
         name = testcase.__qualname__
@@ -60,7 +72,7 @@ class TestReporter:
         doc = inspect.cleandoc(inspect.getdoc(testcase))
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
-            print(highlight(inspect.getsource(testcase.execute), self._pylexer, self._formatter))
+            print(highlight(inspect.getsource(testcase.procedure), self._pylexer, self._formatter))
 
     def show_scenario(self, scenario):
         name = scenario.__qualname__
@@ -69,15 +81,32 @@ class TestReporter:
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
             print(highlight(inspect.getsource(scenario.get_suite), self._pylexer, self._formatter))
+        suite = scenario.get_suite(self.config, self.testbed, self._ui)
+        self.show_suite(suite)
 
     def show_suite(self, suite):
-        name = suite.__qualname__
+        name = suite.test_name
         head = "\n".join([name, "=" * len(name)])
-        doc = inspect.cleandoc(inspect.getdoc(suite))
-        print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
+        if suite.__class__ is bases.TestSuite:
+            doc = "\nGeneric TestSuite.\n"
+        else:
+            doc = inspect.cleandoc(inspect.getdoc(suite))
+        print(highlight(head + "\n\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
             print(highlight(inspect.getsource(suite.initialize), self._pylexer, self._formatter))
             print(highlight(inspect.getsource(suite.finalize), self._pylexer, self._formatter))
+        self._suite_content(suite, 0)
+
+    def _suite_content(self, suite, indent):
+        print(" " * indent,
+              f"Suite {suite.test_name!r} has the following test cases (and sub-suites):",
+              sep="")
+        for obj in suite.testcases:
+            objecttype = type(obj)
+            if issubclass(objecttype, bases.TestCase):
+                print("  " * indent, obj.test_name, sep="")
+            elif issubclass(objecttype, bases.TestSuite):
+                self._suite_content(obj, indent + 1)
 
     def show_module(self, mod):
         name = mod.__name__

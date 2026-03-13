@@ -1068,15 +1068,14 @@ cdef class UsbDevice:
     def parent(self):
         cdef libusb_device* parent
         cdef libusb_device **usb_devices
+        usbdev = None
         libusb_get_device_list(self._session._ctx, &usb_devices)
         parent = libusb_get_parent(self._device)
-        libusb_free_device_list(usb_devices, 1)
         if parent:
             usbdev = UsbDevice(self._session)
-            usbdev._device = parent
-            return usbdev
-        else:
-            return None
+            usbdev._device = libusb_ref_device(parent)
+        libusb_free_device_list(usb_devices, 1)
+        return usbdev
 
     @property
     def configuration(self):

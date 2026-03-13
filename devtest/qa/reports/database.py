@@ -58,7 +58,7 @@ class DatabaseReport(BaseReport):
     def on_suite_info(self, suite, message=None):
         _add_diagnostic(self._resultstack[-1], message)
 
-    def on_dut_version(self, device, build=None, variant=None):
+    def on_dut_version(self, testcase, build=None, variant="release"):
         self._resultstack[0].dutbuild = "{} ({})".format(build, variant)
 
     def on_run_comment(self, runner, message=None):
@@ -129,9 +129,9 @@ def _add_diagnostic(obj, message):
     if message:
         if obj.diagnostic:
             obj.diagnostic += "\n"
-            obj.diagnostic += message
+            obj.diagnostic += str(message)
         else:
-            obj.diagnostic = message
+            obj.diagnostic = str(message)
 
 
 def _add_note(obj, note):

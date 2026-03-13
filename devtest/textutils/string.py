@@ -10,18 +10,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Additional string helper functions.
+Additional string helper functions and constants.
 """
 
 import keyword
 
-ascii_lowercase = 'abcdefghijklmnopqrstuvwxyz'
-ascii_uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-ascii_letters = ascii_lowercase + ascii_uppercase
+# ASCII values
+lowercase = 'abcdefghijklmnopqrstuvwxyz'
+uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 digits = '0123456789'
+hexdigits = '0123456789ABCDEF'
+letters = lowercase + uppercase
+alphanumeric = lowercase + uppercase + digits
+whitespace = ' \t\n\r\v\f'
+punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+printable = digits + letters + punctuation + whitespace
+control = "".join(map(chr, range(32))) + chr(127)
+ascii = control + " " + digits + letters + punctuation
+
+CR = "\r"
+LF = "\n"
+CRLF = CR + LF
+ESCAPE = chr(27)
+DEL = chr(127)
 
 tbl = ["_"] * 256
-for c in ascii_letters:
+for c in letters:
     tbl[ord(c)] = c
 for c in digits:
     tbl[ord(c)] = c
@@ -35,7 +49,7 @@ del kw, keyword
 
 
 def identifier(name, asclass=False):
-    """Return a valid Python keyword identifier given an arbitrary string."""
+    """Return a valid Python identifier given an arbitrary string."""
     ident = name.translate(_IDENTTABLE)
     if asclass:
         return ''.join(x.capitalize() for x in ident.split("_"))
@@ -47,5 +61,3 @@ if __name__ == "__main__":
     assert identifier("class") == "class_"
     assert identifier("class", asclass=True) == "Class"
     assert identifier("some class name", asclass=True) == "SomeClassName"
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

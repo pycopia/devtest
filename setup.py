@@ -23,13 +23,14 @@ NAME = "devtest"
 REQUIREMENTS = [s.strip() for s in open("requirements.txt").readlines()]
 
 SCRIPTS = glob("bin/*")
-EXTENSIONS = [
-    Extension('devtest.ringbuffer', ['src/ringbuffer.pyx'])
-]
+EXTENSIONS = [Extension('devtest.ringbuffer', ['src/ringbuffer.pyx'])]
+
 
 def get_pkgconfig_value(pkgname, option):
     cp = subprocess.run(['pkg-config', pkgname, option],
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="ascii")
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        encoding="ascii")
     return cp.stdout[2:].strip()  # chop flag prefixes
 
 
@@ -37,8 +38,10 @@ if sys.platform == "darwin":
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx']))
 elif sys.platform.startswith("linux"):
     EXTENSIONS.append(Extension('devtest.timers', ['src/timers.pyx'], libraries=["rt"]))
-    EXTENSIONS.append(Extension('devtest.signals', ['src/signals.pyx'],
-                                extra_compile_args=["-pthread"], libraries=["pthread"]))
+    EXTENSIONS.append(
+        Extension('devtest.signals', ['src/signals.pyx'],
+                  extra_compile_args=["-pthread"],
+                  libraries=["pthread"]))
 
 # Build USB module if we can.
 # need: "brew install libusb" on MacOS
@@ -49,12 +52,11 @@ if subprocess.run(['pkg-config', LIBUSB_PKG, '--exists']).returncode == 0:
     includedir = get_pkgconfig_value(LIBUSB_PKG, '--cflags-only-I')
     libdir = get_pkgconfig_value(LIBUSB_PKG, '--libs-only-L')
     lib = get_pkgconfig_value(LIBUSB_PKG, '--libs-only-l')
-    EXTENSIONS.append(Extension('devtest.usb',
-                                ['src/libusb.pyx'],
-                                library_dirs=([libdir] if libdir else None),
-                                libraries=([lib] if lib else None),
-                                include_dirs=([includedir] if includedir else None)))
-
+    EXTENSIONS.append(
+        Extension('devtest.usb', ['src/libusb.pyx'],
+                  library_dirs=([libdir] if libdir else None),
+                  libraries=([lib] if lib else None),
+                  include_dirs=([includedir] if includedir else None)))
 
 setup(
     name=NAME,

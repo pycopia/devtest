@@ -18,7 +18,7 @@ import platform
 from collections import abc, OrderedDict
 import re
 
-import pkg_resources
+from importlib.resources import files
 import yaml
 
 from devtest.core import exceptions
@@ -703,9 +703,9 @@ class Configuration(RootView):
         `modname` if it was given.
         """
         if self.modname:
-            filename = pkg_resources.resource_filename(self.modname, DEFAULT_FILENAME)
-            if os.path.isfile(filename):
-                self.add(ConfigSource(load_yaml(filename), filename, True))
+            cf_path = files('devtest').joinpath('config_default.yaml')
+            if cf_path.is_file():
+                self.add(ConfigSource(load_yaml(str(cf_path)), str(cf_path), True))
 
     def read(self, user=True, defaults=True):
         """Find and read the files for this configuration and set them

@@ -15,13 +15,30 @@ Use the Stream object from here. Collects the curio supplies Stream objects and
 adds some new ones.
 """
 
-from __future__ import generator_stop
-
-from curio.traps import _read_wait  # noqa
+from curio.traps import _read_wait, _write_wait  # noqa
 from curio.io import StreamBase, FileStream, SocketStream, Socket, WantRead, WantWrite  # noqa
 from curio.channel import Connection, Channel  # noqa
 
-__all__ = ["ReadableStream", "FileStream", "SocketStream", "Connection", "Channel"]
+# make these public since they are needed for user-defined streams.
+trap_read_wait = _read_wait
+trap_write_wait = _write_wait
+
+__all__ = [
+    "ReadableStream", "TimerStream", "FileStream", "SocketStream", "Connection", "Channel",
+    "WantRead", "WantWrite", "trap_read_wait", "trap_write_wait"
+]
+
+
+class TimerStream(StreamBase):
+    """Stream wrapper for an FDTimer.
+    """
+
+    async def _read(self, maxbytes=-1):
+        while True:
+            try:
+                return self._file.read()
+            except WantRead:
+                await _read_wait(self._fileno)
 
 
 class ReadableStream(StreamBase):
@@ -58,5 +75,3 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

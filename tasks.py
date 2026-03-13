@@ -5,6 +5,8 @@ This simplifies some common development tasks.
 Run these tasks with the `invoke` tool.
 """
 
+# mypy: allow-untyped-defs
+
 import getpass
 from glob import glob
 import json
@@ -71,6 +73,16 @@ def format(ctx, pathname="devtest", check=False):
 
 
 @task
+def mdl(ctx):
+    """Run Markdownlint (mdl) linter on markdown files.
+
+    Install mdl with ``sudo gem install mdl``.
+    """
+    for fname in ("README.md",):
+        ctx.run(f"mdl --style mdl-style.rb {fname}")
+
+
+@task
 def format_changed(ctx, check=False, untracked=False):
     """Run yapf formatter on currently modified python files.
 
@@ -82,6 +94,51 @@ def format_changed(ctx, check=False, untracked=False):
         ctx.run(f'{PYTHONBIN} -m yapf --style setup.cfg {option} {" ".join(files)}')
     else:
         print("No changed python files.")
+
+
+@task
+def changed(ctx, untracked=False):
+    """Show any changed files.
+    """
+    files = get_modified_files(untracked)
+    if files:
+        for filename in files:
+            print(filename)
+    else:
+        print("No changed python files.")
+
+
+@task
+def typecheck(ctx, pathname="devtest"):
+    """Perform static type checking on packages or files.
+    """
+    ctx.run(f"{PYTHONBIN} -m mypy --disable-error-code import {pathname}", hide=False, pty=True)
+
+
+@task
+def typecheck_changed(ctx, untracked: bool = False):
+    """Run mypy type checker on changed files.
+    """
+    files = get_modified_files(untracked)
+    if files:
+        ctx.run(f'{PYTHONBIN} -m mypy {" ".join(files)}')
+    else:
+        print("No changed python files.")
+
+
+@task
+def presubmit(ctx):
+    """Run all pre-submit checks, in preparation for code review."""
+    print("style check...")
+    ctx.run(f"{PYTHONBIN} -m yapf --style setup.cfg --diff --recursive devtest",
+            hide=False,
+            pty=True)
+    print("lint check...")
+    ctx.run(f"{PYTHONBIN} -m flake8 devtest", hide=False)
+    print("typing check...")
+    ctx.run(f"{PYTHONBIN} -m mypy --disable-error-code import devtest", hide=False, pty=True)
+    print("Unit tests...")
+    ctx.run(f"{PYTHONBIN} -m pytest tests", hide=False, pty=True)
 
 
 @task
@@ -317,19 +374,20 @@ def docker_build(ctx):
 
 
 # Helper functions follow.
-def get_virtualenv():
+def get_virtualenv() -> str | None:
     venv = os.environ.get("VIRTUAL_ENV")
     if venv and os.path.isdir(venv):
         return venv
     return None
 
 
-def get_tags():
+def get_tags() -> list[semver.VersionInfo]:
     rv = run('git tag -l "v*"', hide="out")
+    assert rv is not None
     vilist = []
     for line in rv.stdout.split():
         try:
-            vi = semver.parse_version_info(line[1:])
+            vi = semver.Version.parse(line[1:])
         except ValueError:
             pass
         else:
@@ -345,20 +403,22 @@ def get_pypi_token(ctx):
     return cred.password
 
 
-def get_suffix():
-    return run(
+def get_suffix() -> str:
+    rv = run(
         f"{PYTHONBIN} -c 'import sysconfig;"
         ' print(sysconfig.get_config_vars()["EXT_SUFFIX"])\'',
         hide=True,
-    ).stdout.strip()  # noqa
+    )
+    assert rv is not None
+    return rv.stdout.strip()  # noqa
 
 
-def resolve_path(base, p):
+def resolve_path(base: Path, p: str | Path) -> str:
     p = Path(p)
     return str(base / p)
 
 
-def find_git_base():
+def find_git_base() -> Path:
     """Find the base directory of this git repo.
 
     The git status output is always relative to this directory.
@@ -371,7 +431,7 @@ def find_git_base():
     raise Exit("Not able to find git repo base.")
 
 
-def get_modified_files(untracked):
+def get_modified_files(untracked: bool) -> list[str]:
     """Find the list of modified and, optionally, untracked Python files.
 
     If `untracked` is True, also include untracked Python files.
@@ -379,6 +439,7 @@ def get_modified_files(untracked):
     filelist = []
     gitbase = find_git_base()
     gitout = run("git status --porcelain=1 -z", hide=True)
+    assert gitout is not None
     for line in gitout.stdout.split("\0"):
         if line:
             if not line.endswith(".py"):

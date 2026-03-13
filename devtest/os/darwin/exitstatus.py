@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -27,7 +25,7 @@ class ExitStatus:
     STOPPED = 2
     SIGNALED = 3
 
-    def __init__(self, sts, name="unknown", returncode=None):
+    def __init__(self, sts: int | None, name: str = "unknown", returncode: int | None = None):
         """Common exit status object.
 
         Args:
@@ -45,6 +43,7 @@ class ExitStatus:
                 self._status = returncode
                 self._signal = 0
             return
+        assert sts is not None
         if os.WIFEXITED(sts):
             self.state = 1
             self._status = os.WEXITSTATUS(sts)
@@ -94,6 +93,3 @@ class ExitStatus:
             return "{} exited by signal {:d}. ".format(self.name, self.signal)
         else:
             raise RuntimeError("FIXME! unknown state in ExitStatus")
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

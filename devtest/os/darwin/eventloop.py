@@ -13,15 +13,10 @@
 Generic interface to system async event loop.
 """
 
-from __future__ import generator_stop
-
 import selectors
 
 EventLoop = selectors.DefaultSelector
 
 
-def get_event_loop():
+def get_event_loop() -> EventLoop:
     return EventLoop()
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

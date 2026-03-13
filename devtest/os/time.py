@@ -13,8 +13,6 @@
 Timing related functions that also work with the asynchronous core framework.
 """
 
-from __future__ import generator_stop
-
 import time
 import signal
 from functools import wraps
@@ -126,5 +124,3 @@ if __name__ == "__main__":
         iotimeout(ioop, timeout=5.0)
     except TimeoutError as to:
         print("got expected timeout:", to)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

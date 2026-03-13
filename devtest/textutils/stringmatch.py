@@ -21,6 +21,10 @@ keeping a consistent interface.
 
 
 class StringMatchObject:
+    """A match object consistent with the interface of the RE MatchObject.
+
+    This is returned by the StringExpression.
+    """
 
     def __init__(self, start, end, string, pos, endpos, re):
         self._start = start
@@ -75,8 +79,10 @@ class StringMatchObject:
 
 
 # an object that looks like a compiled regular expression, but does exact
-# string matching. This is usually much faster in that case.
+# string matching. This is usually much faster in that case (10x).
 class StringExpression:
+    """A string "expression" that works like the RE expression but only matches strings.
+    """
 
     def __init__(self, patt, flags=0):
         self.pattern = patt
@@ -130,8 +136,11 @@ class StringExpression:
         return string.replace(self.pattern, repl, count), N
 
 
-# factory function to "compile" EXACT patterns (which are strings)
 def compile_exact(string, flags=0):
+    """Make a StringExpression from a string.
+
+    similar to re.compile(...) except it only takes a plain string.
+    """
     return StringExpression(string, flags)
 
 

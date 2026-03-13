@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -25,21 +23,21 @@ def run_as(pwent, umask=0o22):
     environment. Assumes the parent process has root privileges.
     """
     os.umask(umask)
-    home = pwent.home
+    home = pwent.pw_dir
     try:
         os.chdir(home)
     except OSError:
         os.chdir("/")
     # drop privs to user
-    os.setgroups(pwent.groups)
-    os.setgid(pwent.gid)
-    os.setegid(pwent.gid)
-    os.setuid(pwent.uid)
-    os.seteuid(pwent.uid)
+    # os.setgroups(pwent.groups)
+    os.setgid(pwent.pw_gid)
+    os.setegid(pwent.pw_gid)
+    os.setuid(pwent.pw_uid)
+    os.seteuid(pwent.pw_uid)
     os.environ["HOME"] = home
-    os.environ["USER"] = pwent.name
-    os.environ["LOGNAME"] = pwent.name
-    os.environ["SHELL"] = pwent.shell
+    os.environ["USER"] = pwent.pw_name
+    os.environ["LOGNAME"] = pwent.pw_name
+    os.environ["SHELL"] = pwent.pw_shell
     os.environ["PATH"] = "/bin:/usr/bin:/usr/local/bin"
 
 

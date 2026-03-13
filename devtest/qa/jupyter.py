@@ -101,6 +101,3 @@ class JupyterInterface:
         if testlist:
             rnr = runner.TestRunner(cf)
             return rnr.runall(testlist)
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

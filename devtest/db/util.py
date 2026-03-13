@@ -40,11 +40,11 @@ def create_db(url):
     url = urllib.parse.urlparse(url)
     scheme = url.scheme
     if scheme.startswith("postgres"):
-        cmd = ('{}createuser --host {} --port {} '
+        cmd = ('{}createuser -w --host {} --port {} '
                '--createdb --no-superuser --no-createrole {}{}'.format(
                    prefix, url.hostname, url.port or 5432, url.username, postfix))
         os.system(cmd)
-        cmd = ('{}createdb --host {} --port {} --owner {} --encoding utf-8 {}{}'.format(
+        cmd = ('{}createdb -w --host {} --port {} --owner {} --encoding utf-8 {}{}'.format(
             prefix, url.hostname, url.port or 5432, url.username, url.path[1:], postfix))
         os.system(cmd)
     elif scheme.startswith("sqlite"):
@@ -88,6 +88,3 @@ def get_database(url, autocommit=False):
     else:
         kwargs['database'] = url.path
     return dbclass(**kwargs)
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

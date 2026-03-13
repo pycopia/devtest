@@ -2,8 +2,6 @@
 namespace. The default namespace package is called "testcases".
 """
 
-from __future__ import generator_stop
-
 import re
 import sys
 import pkgutil

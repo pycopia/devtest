@@ -97,16 +97,19 @@ class FiniteStateMachine:
 
     def add_transition(self, input_symbol, state, action, next_state):
         """This adds an association between inputs and outputs.
+
+        Example:
                 (input_symbol, current_state) --> (action, next_state)
+
         The action may be set to None.
         The input_symbol may be set to None.
         """
         self._transitions[(input_symbol, state)] = (action, next_state)
 
     def add_expression(self, expression, state, action, next_state, flags=0):
-        """Adds a transition that activates if the input symbol matches the
-        regular expression. The action callable gets a match object instead of
-        the symbol.
+        """Adds a transition that activates if the input symbol matches the regular expression.
+
+        The action callable gets a match object instead of the symbol.
         """
         cre = re.compile(expression, flags)
         self._expressions.append((cre, state, action, next_state))
@@ -122,7 +125,8 @@ class FiniteStateMachine:
 
     def add_transition_list(self, input_symbols, state, action, next_state):
         """This adds lots of the same transitions for different input symbols.
-        You can pass a list or a string.
+
+        input_symbol can be a list or a string.
         """
         for input_symbol in input_symbols:
             self.add_transition(input_symbol, state, action, next_state)
@@ -144,8 +148,9 @@ class FiniteStateMachine:
                         raise FSMError('Undefined transition {!r}.'.format(input_symbol))
 
     def process(self, input_symbol):
-        """This causes the fsm to change state and call an action:
-        `(input_symbol, current_state) --> (action, next_state)`.
+        """This causes the fsm to change state and call an action.
+
+        ``(input_symbol, current_state) --> (action, next_state)``.
         """
         action, next_state = self.get_transition(input_symbol, self.current_state)
         if action is not None:

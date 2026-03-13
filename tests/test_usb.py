@@ -24,6 +24,26 @@ NOT_LINUX = UNAME.sysname != "Linux"
 NO_PIXEL = (subprocess.run(["lsusb", "-d", "18d1:5026"], check=False).returncode != 0)
 
 
+class DummyUSBDevice():
+    """For a dummy USB fixture."""
+    DUMMY_VID = 0x1209
+    DUMMY_PID = 0x1001
+
+    def create(self):
+        pass
+
+    def destroy(self):
+        pass
+
+
+@pytest.fixture(scope="module")
+def dummy_usb():
+    dev = DummyUSBDevice()
+    dev.create()
+    yield dev
+    dev.destroy()
+
+
 def test_libusberror_str():
     assert str(usb.LibusbError(-2)) == "Invalid parameter"
 
@@ -76,7 +96,7 @@ def test_find_device():
     print(dev)
 
 
-@pytest.mark.skipif(HOSTNAME != "mercury", reason="Needs author's host.")
+@pytest.mark.skipif(HOSTNAME != "sol", reason="Needs author's host.")
 def test_parent():
     session = usb.UsbSession()
     dev = session.find(0x0A12, 0x0001)  # Cambridge Silicon Radio, Ltd Bluetooth Dongle (HCI mode)
@@ -88,7 +108,7 @@ def test_parent():
     del session
 
 
-@pytest.mark.skipif(HOSTNAME != "mercury", reason="Needs author's host.")
+@pytest.mark.skipif(HOSTNAME != "sol", reason="Needs author's host.")
 def test_device_class():
     session = usb.UsbSession()
     dev = session.find(0x0A12, 0x0001)  # Cambridge Silicon Radio, Ltd Bluetooth Dongle (HCI mode)
@@ -98,10 +118,10 @@ def test_device_class():
     assert isinstance(dev.Class, usb.DeviceClass)
 
 
-@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
-def test_open():
+# @pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+def test_open(dummy_usb):
     session = usb.UsbSession()
-    dev = session.find(0x18D1, 0x5026)  # Google Pixel XL
+    dev = session.find(dummy_usb.DUMMY_VID, dummy_usb.DUMMY_PID)
     assert dev is not None
     dev.open()
     conf = dev.configuration

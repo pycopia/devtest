@@ -1,10 +1,12 @@
-setuptools
 cython
 flake8
-yapf
+mypy
 pytest
 pytest-runner
+setuptools
 setuptools_scm
-wheel
 sphinx
 sphinx-autodoc-annotation
+types-PyYAML
+wheel
+yapf

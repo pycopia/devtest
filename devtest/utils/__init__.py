@@ -15,7 +15,9 @@ Small functions can go right in here. Larger collections are found in modules
 contained in the package.
 """
 
-ViewType = type({}.keys())
+from typing import Type
+
+ViewType: Type = type({}.keys())
 
 
 def flatten(alist):

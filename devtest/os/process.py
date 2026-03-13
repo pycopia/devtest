@@ -30,8 +30,7 @@ import inspect
 import psutil
 
 from subprocess import (  # noqa
-    CompletedProcess, Popen, SubprocessError, CalledProcessError, PIPE, STDOUT, DEVNULL,
-)
+    CompletedProcess, Popen, SubprocessError, CalledProcessError, PIPE, STDOUT, DEVNULL)
 
 from devtest import logging
 from devtest.textutils import shparser
@@ -172,7 +171,7 @@ class PipeProcess(Process):
         self._init(self._popen.pid, _ignore_nsp=True)
 
     def __dir__(self):
-        return list(set(dir(PipeProcess) + dir(subprocess.Popen)))
+        return list(set(dir(PipeProcess) + dir(Popen)))
 
     def __getattribute__(self, name):
         try:
@@ -181,8 +180,11 @@ class PipeProcess(Process):
             try:
                 return object.__getattribute__(self._popen, name)
             except AttributeError:
-                raise AttributeError("{} has no attribute {!r}".format(
-                    self.__class__.__name__, name))
+                try:
+                    return object.__getattribute__(self._popen._popen, name)
+                except AttributeError:
+                    raise AttributeError("{} has no attribute {!r}".format(
+                        self.__class__.__name__, name))
 
     def poll(self):
         if self._popen._popen.returncode is None:
@@ -406,7 +408,7 @@ async def _coprocess_server_coro(conn):
                     if inspect.iscoroutine(rv):
                         task = await spawn(rv)
                         rv = await task.join()
-                except (KeyboardInterrupt, SystemExit) as ex:
+                except (KeyboardInterrupt, SystemExit):
                     await conn.send((False, None))
                     await conn.close()
                     break
@@ -435,7 +437,7 @@ def _close_stdin():
         fd = os.open(os.devnull, os.O_RDONLY)
         try:
             sys.stdin = open(fd, closefd=False)
-        except:
+        except Exception:  # noqa
             os.close(fd)
             raise
     except (OSError, ValueError):
@@ -557,23 +559,23 @@ class ProcessManager:
             if proc is None:
                 continue
             try:
-                sts = proc.status()
+                status = proc.status()
             except psutil.NoSuchProcess:
                 self._procs.pop(pid, None)
                 # Already waited on somewhere else...
                 logging.notice("SIGCHLD no such process: {}({})".format(proc.progname, proc.pid))
                 return
-            if sts == psutil.STATUS_ZOMBIE:
+            if status == psutil.STATUS_ZOMBIE:
                 self._procs.pop(pid, None)
                 self._zombies[pid] = proc
                 try:
-                    es = proc.poll()
+                    exitstatus = proc.poll()
                 except ChildProcessError:
                     logging.notice("Already waited: {}({})".format(proc.progname, proc.pid))
                     return
-                if es < 0:  # signaled
-                    es = signal.Signals(-es)
-                logging.notice("Exited: {}({}): {}".format(proc.progname, proc.pid, es))
+                if exitstatus < 0:  # signaled
+                    exitstatus = signal.Signals(-exitstatus)
+                logging.notice("Exited: {}({}): {}".format(proc.progname, proc.pid, exitstatus))
 
     def run_exit_handlers(self):
         """Run any exit handler.
@@ -610,13 +612,13 @@ class ProcessManager:
         proc = self.start(cmd, directory=directory)
         return self.run_process(proc, timeout=timeout, input=input)
 
-    def run_process(self, proc, timeout=None, input=None):
+    def run_process(self, proc, timeout=None, input=None, check=False):
         """Take a Process instance and communicate with it.
         """
-        coro = _run_proc(proc, input)
+        coroutine = _run_proc(proc, input, check)
         if timeout:
-            coro = timeout_after(float(timeout), coro)
-        output = get_kernel().run(coro)
+            coroutine = timeout_after(float(timeout), coroutine)
+        output = get_kernel().run(coroutine)
         if isinstance(output, Exception):
             raise output
         return output
@@ -633,7 +635,7 @@ class ProcessManager:
         return exitstatus.ExitStatus(0, name=proc.progname, returncode=retcode)
 
 
-async def _run_proc(proc, input):
+async def _run_proc(proc, input, check):
     await sleep(0.1)
     try:
         stdout, stderr = await proc.communicate(input)
@@ -644,9 +646,9 @@ async def _run_proc(proc, input):
             pass
         raise err
     retcode = proc.poll()
-    if retcode:
+    if check and retcode:
         return CalledProcessError(retcode, proc.args, output=stdout, stderr=stderr)
-    return stdout, stderr
+    return stdout, stderr, proc.exitstatus
 
 
 async def _call_proc(proc):
@@ -722,6 +724,35 @@ def check_output(cmd, shell=False, timeout=None, input=None, cwd=None, encoding=
         return b"".join(stdout)
 
 
+def run(cmd, input=None, capture_output=False, timeout=None, check=False, **kwargs):
+    """Run command with arguments and return a CompletedProcess instance.
+
+    Args:
+        cmd: str or argv with command to run.
+        input: bytes for sending to process's stdin.
+        capture_output: whether or not to capture stdout and stderr.
+        timeout: timeout for command.
+        check: if True, raise exception when non-zero exit status is returned.
+
+    Raises:
+        CalledProcessError if *check* is True
+    """
+    pm = get_manager()
+    if input is not None:
+        stdin = PIPE
+    else:
+        stdin = DEVNULL
+    if capture_output:
+        stdout = PIPE
+        stderr = PIPE
+    else:
+        stdout = None
+        stderr = None
+    proc = pm.start(cmd, stdin=stdin, stdout=stdout, stderr=stderr, directory=None)
+    out, errout, status = pm.run_process(proc, timeout=timeout, input=input, check=check)
+    return CompletedProcess(proc.args, int(status), out, errout)
+
+
 def run_process(proc, timeout=None):
     return get_manager().run_process(proc, timeout=timeout)
 
@@ -743,19 +774,21 @@ if __name__ == "__main__":
     import time
     import math
 
-    output, errout = run_command("ls /bin")
+    output, errout, sts = run_command("ls /bin")
     assert output
+    assert isinstance(sts, exitstatus.ExitStatus)
     print(repr(output))
+    print(sts)
 
     try:
-        output, errout = run_command("ls /binX")
+        output, errout, sts = run_command("ls /binX")
     except CalledProcessError as cpe:
         print(cpe)
         assert cpe.stderr
         print(repr(cpe.stderr))
 
     try:
-        output, errout = run_command("sleep 10", timeout=5)
+        output, errout, sts = run_command("sleep 10", timeout=5)
     except TaskTimeout as to:
         print(to, "as expected")
     else:
@@ -763,10 +796,10 @@ if __name__ == "__main__":
 
     start_time = time.time()
     proc = start_process(["/bin/sh"], delaytime=3.0)
-    end_times = time.time()
-    proc.kill()
-    print("delaytime", end_times - start_time)
-    assert math.isclose(end_times - start_time, 3.0, rel_tol=0.005)
+    end_time = time.time()
+    proc.terminate()
+    print("delaytime", end_time - start_time)
+    assert math.isclose(end_time - start_time, 3.0, rel_tol=0.005)
 
     proc = start_process(["/bin/cat", "-u", "-"])
     proc.write(b"echo me\n")
@@ -775,8 +808,18 @@ if __name__ == "__main__":
     assert resp == b"echo me"
     proc.close()
 
-    print("Coprocess:")
-    pm = get_manager()
-    coproc = pm.coprocess()
-    coproc.start(os.listdir, "/tmp")
-    print(coproc.wait())
+    coprocess = run("ls /bin", capture_output=True)
+    print(coprocess)
+
+    coprocess = run("/bin/true")
+    print(coprocess)
+
+    coprocess = run("/bin/false")
+    print(coprocess)
+
+    try:
+        coprocess = run("/bin/false", check=True)
+    except CalledProcessError:
+        print("Got CalledProcessError as expected")
+    else:
+        raise AssertionError("check for false didn't raise CalledProcessError")

@@ -37,6 +37,13 @@ class OptionSet:
     def __repr__(self):
         return "{}({!r}, {!r})".format(self.__class__.__name__, self.argument, self.options)
 
+    def __str__(self):
+        if not self.options:
+            return str(self.argument)
+        else:
+            opts = " ".join(f"--{n}={v}" for (n, v) in self.options.items())
+            return f"{self.argument} {opts}"
+
 
 class ArgumentList(list):
     """Ordered container of OptionSet objects.

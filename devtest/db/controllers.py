@@ -1,21 +1,11 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """Controllers and helpers for managing the model.
 """
 
 from functools import wraps
+from datetime import datetime
 from ast import literal_eval
 
-from devtest.core import constants
+from devtest.core import constants, exceptions
 
 from . import models
 
@@ -65,7 +55,7 @@ class TestBedController(Controller):
     def all(like=None):
         q = models.TestBed.select().order_by(models.TestBed.name)
         if like:
-            q = q.where(models.TestBed.name.contains(like))
+            q = q.where(models.TestBed.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -75,7 +65,7 @@ class TestBedController(Controller):
 
     @staticmethod
     def get_equipment(testbedname):
-        TE = models.Testequipment
+        TE = models._Testequipment
         EQ = models.Equipment
         tb = TestBedController.get(testbedname)
         return list(EQ.select().join(TE).where(TE.testbed == tb))
@@ -85,10 +75,12 @@ class TestBedController(Controller):
         return models.TestBed.get_or_create(name=testbedname, defaults={"notes": notes})
 
     @staticmethod
-    def update(testbedname, notes=None):
+    def update(testbedname, notes=None, newname=None):
         inst = TestBedController.get(testbedname)
         if inst:
             with models.database.atomic():
+                if newname:
+                    inst.name = newname
                 inst.notes = notes
                 inst.save()
         return inst
@@ -117,10 +109,80 @@ class TestBedController(Controller):
         return tb.get_equipment_with_role(rolename)
 
     @staticmethod
+    def get_all_equipment_with_role(testbedname, rolename):
+        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
+        return tb.get_all_equipment_with_role(rolename)
+
+    @staticmethod
     def get_all_roles_for_equipment(testbedname, eqname):
         eq = models.Equipment.select().where(models.Equipment.name == eqname).get()
         tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
         return tb.get_all_roles_for_equipment(eq)
+
+    @staticmethod
+    def claim(name, username):
+        if name == "default":
+            return
+        tb = TestBedController.get(name)
+        if not tb:
+            raise ValueError(str(tb))
+        current_user_val = tb.attribute_get("current_user")
+        if current_user_val:
+            current_user, timestamp = current_user_val
+            if current_user != username:
+                raise exceptions.ConfigError(
+                    f"Testbed {tb.name} in use by {current_user} at {timestamp}")
+        else:
+            tb.attribute_set("current_user", (username, datetime.now().strftime("%Y%m%d_%H%M%S")))
+
+    @staticmethod
+    def release(name, username, force=False):
+        if name == "default":
+            return
+        tb = TestBedController.get(name)
+        if not tb:
+            raise ValueError(str(tb))
+        current_user_val = tb.attribute_get("current_user")
+        if current_user_val:
+            current_user, timestamp = current_user_val
+            if current_user == username:
+                tb.attribute_del("current_user")
+            else:
+                if force:
+                    tb.attribute_del("current_user")
+                else:
+                    raise exceptions.ConfigError(
+                        f"Can't release: expected current user of {username}, "
+                        f"got {current_user}. Use force option to force release.")
+
+    @staticmethod
+    def is_claimed(name):
+        if name == "default":
+            return False
+        tb = TestBedController.get(name)
+        if not tb:
+            raise ValueError(str(tb))
+        current_user_val = tb.attribute_get("current_user")
+        if current_user_val:
+            username, timestamp = current_user_val
+            return username, datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        else:
+            return None, None
+
+    @staticmethod
+    def clear_old_claim(name):
+        if name == "default":
+            return False
+        tb = TestBedController.get(name)
+        if not tb:
+            raise ValueError(str(tb))
+        current_user_val = tb.attribute_get("current_user")
+        if current_user_val:
+            username, timestamp = current_user_val
+            timestamp = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+            delta = datetime.now() - timestamp
+            if delta.days >= 1:
+                tb.attribute_del("current_user")
 
     @staticmethod
     def attribute_list(name):
@@ -134,7 +196,7 @@ class TestBedController(Controller):
         if inst:
             return inst.attribute_get(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_set(name, attrname, attrvalue):
@@ -142,7 +204,7 @@ class TestBedController(Controller):
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_del(name, attrname):
@@ -150,7 +212,7 @@ class TestBedController(Controller):
         if inst:
             return inst.attribute_del(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attributes_export(testbedname):
@@ -181,13 +243,14 @@ class EquipmentController(Controller):
         "jtag": constants.ConnectionType.JTAG,
         "bluetooth": constants.ConnectionType.Bluetooth,
         "power": constants.ConnectionType.Power,
+        "CAN": constants.ConnectionType.CAN,
     }
 
     @staticmethod
     def all(like=None):
         q = models.Equipment.select().order_by(models.Equipment.name)
         if like:
-            q = q.where(models.Equipment.name.contains(like))
+            q = q.where(models.Equipment.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -207,13 +270,14 @@ class EquipmentController(Controller):
                accountid=None,
                userid=None,
                partof=None,
+               partofeq=None,
                notes=None,
                location=None,
                attributes=None,
                manufacturer="Acme Inc."):
         eqmodel = EquipmentModelController.get(modelname, manufacturer)
         if not eqmodel:
-            return eqmodel  # NoSuchObject
+            return eqmodel, False  # NoSuchObject
         if accountid:
             account = AccountIdsController.get(accountid) or None
         else:
@@ -223,15 +287,15 @@ class EquipmentController(Controller):
         else:
             user = None
         if partof:
-            partofeq = EquipmentController.get(partof) or None
+            partofeq_ = EquipmentController.get(partof) or None
         else:
-            partofeq = None
+            partofeq_ = partofeq
         defaults = {
             "serno": serno,
             "notes": notes,
             "account": account,
             "user": user,
-            "partof": partofeq,
+            "partof": partofeq_,
             "location": location,
             "attributes": attributes,
         }
@@ -240,6 +304,8 @@ class EquipmentController(Controller):
     @staticmethod
     def update(modelname,
                name,
+               newname=None,
+               newmodel=None,
                serno=None,
                accountid=None,
                userid=None,
@@ -249,7 +315,17 @@ class EquipmentController(Controller):
                attributes=None):
         eq = EquipmentController.get(name, modelname)
         if eq:
+            if newmodel is not None:
+                neweqmodel = EquipmentModelController.get(newmodel, eq.model.manufacturer)
+                if not neweqmodel:
+                    return neweqmodel  # NoSuchObject
+            else:
+                neweqmodel = None
             with models.database.atomic():
+                if neweqmodel is not None:
+                    eq.model = neweqmodel
+                if newname:
+                    eq.name = newname
                 if serno:
                     eq.serno = serno
                 if accountid:
@@ -286,7 +362,7 @@ class EquipmentController(Controller):
         if inst:
             return inst.attribute_get(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_set(name, attrname, attrvalue):
@@ -294,7 +370,17 @@ class EquipmentController(Controller):
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
         else:
-            print(inst)
+            raise ValueError(str(inst))
+
+    @staticmethod
+    def attribute_set_from_file(name, attrname, filename):
+        inst = EquipmentController.get(name)
+        if inst:
+            with open(filename) as fo:
+                attrvalue = fo.read()
+            return inst.attribute_set(attrname, attrvalue)
+        else:
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_del(name, attrname):
@@ -302,7 +388,7 @@ class EquipmentController(Controller):
         if inst:
             return inst.attribute_del(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attributes_export(name, modelname=None):
@@ -339,6 +425,27 @@ class EquipmentController(Controller):
         return eq
 
     @staticmethod
+    def update_interface(name,
+                         iface,
+                         modelname=None,
+                         newname=None,
+                         ifindex=None,
+                         macaddr=None,
+                         ipaddr=None,
+                         ipaddr6=None,
+                         network=None):
+        eq = EquipmentController.get(name, modelname)
+        if eq:
+            eq.update_interface(iface,
+                                ifindex=ifindex,
+                                newname=newname,
+                                macaddr=macaddr,
+                                ipaddr=ipaddr,
+                                ipaddr6=ipaddr6,
+                                network=network)
+        return eq
+
+    @staticmethod
     def del_interface(name, iface, modelname=None):
         eq = EquipmentController.get(name, modelname)
         if eq:
@@ -370,7 +477,7 @@ class EquipmentModelController(Controller):
     def all(like=None):
         q = models.EquipmentModel.select().order_by(models.EquipmentModel.name)
         if like:
-            q = q.where(models.EquipmentModel.name.contains(like))
+            q = q.where(models.EquipmentModel.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -404,10 +511,13 @@ class EquipmentModelController(Controller):
                picture=None,
                specs=None,
                attributes=None,
+               newname=None,
                newmanufacturer=None):
         inst = EquipmentModelController.get(name, manufacturer)
         if inst:
             with models.database.atomic():
+                if newname:
+                    inst.name = newname
                 if newmanufacturer:
                     inst.manufacturer = newmanufacturer
                 if note:
@@ -434,7 +544,7 @@ class EquipmentModelController(Controller):
         if inst:
             return inst.attribute_get(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_list(modelname, manufacturer="Acme Inc."):
@@ -448,7 +558,7 @@ class EquipmentModelController(Controller):
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_del(modelname, attrname, manufacturer="Acme Inc."):
@@ -456,7 +566,7 @@ class EquipmentModelController(Controller):
         if inst:
             return inst.attribute_del(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attributes_export(modelname, manufacturer="Acme Inc."):
@@ -479,6 +589,7 @@ class NetworksController(Controller):
     NET_TYPE_MAP = {
         None: constants.NetworkType.Unknown,
         'unknown': constants.NetworkType.Unknown,
+        'other': constants.NetworkType.Other,
         'ethernet': constants.NetworkType.Ethernet,
         'fibrechannel': constants.NetworkType.FibreChannel,
         'wifi': constants.NetworkType.Wifi,
@@ -494,7 +605,7 @@ class NetworksController(Controller):
     def all(like=None):
         q = models.Networks.select().order_by(models.Networks.name)
         if like:
-            q = q.where(models.Networks.name.contains(like))
+            q = q.where(models.Networks.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -550,12 +661,17 @@ class NetworksController(Controller):
                 nw.delete_instance()
 
     @staticmethod
+    def interfaces_get(name):
+        inst = NetworksController.get(name)
+        return inst.interfaces
+
+    @staticmethod
     def attribute_get(netname, attrname):
         inst = NetworksController.get(netname)
         if inst:
             return inst.attribute_get(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_list(netname):
@@ -569,7 +685,7 @@ class NetworksController(Controller):
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attribute_del(netname, attrname):
@@ -577,7 +693,7 @@ class NetworksController(Controller):
         if inst:
             return inst.attribute_del(attrname)
         else:
-            print(inst)
+            raise ValueError(str(inst))
 
     @staticmethod
     def attributes_export(netname):
@@ -601,7 +717,7 @@ class AccountIdsController(Controller):
     def all(like=None):
         q = models.AccountIds.select().order_by(models.AccountIds.identifier)
         if like:
-            q = q.where(models.AccountIds.identifier.contains(like))
+            q = q.where(models.AccountIds.identifier.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -650,7 +766,7 @@ class FunctionController(Controller):
     def all(like=None):
         q = models.Function.select().order_by(models.Function.name)
         if like:
-            q = q.where(models.Function.name.contains(like))
+            q = q.where(models.Function.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -692,7 +808,7 @@ class ScenarioController(Controller):
     def all(like=None):
         q = models.Scenario.select().order_by(models.Scenario.name)
         if like:
-            q = q.where(models.Scenario.name.contains(like))
+            q = q.where(models.Scenario.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -711,7 +827,7 @@ class TestSuitesController(Controller):
     def all(like=None):
         q = models.TestSuites.select().order_by(models.TestSuites.name)
         if like:
-            q = q.where(models.TestSuites.name.contains(like))
+            q = q.where(models.TestSuites.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -730,7 +846,7 @@ class TestCasesController(Controller):
     def all(like=None):
         q = models.TestCases.select().order_by(models.TestCases.name)
         if like:
-            q = q.where(models.TestCases.name.contains(like))
+            q = q.where(models.TestCases.name.regexp(like))
         return list(q.execute())
 
     @staticmethod
@@ -771,14 +887,26 @@ class TestResultsController(Controller):
             return models.TestResults.select().where(models.TestResults.testcase == tc).count()
 
     @staticmethod
+    def valid_count(testcasename):
+        tc = TestCasesController.get(testcasename)
+        if tc:
+            return models.TestResults.select().where((models.TestResults.testcase == tc) & (
+                models.TestResults.valid == True)).count()  # noqa
+
+    @staticmethod
     def get_by_id(resultid):
         return models.TestResults.get(id=resultid)
 
     @staticmethod
-    def results_for(testcasename, limit=100, offset=0):
+    def results_for(testcasename, limit=100, offset=0, testbed=None):
         tc = TestCasesController.get(testcasename)
         if tc:
-            return list(models.TestResults.for_testcase(tc, limit=limit, offset=offset))
+            tb = None
+            if testbed is not None:
+                tb = TestBedController.get(testbed)
+                if not tb:
+                    raise ValueError("Testbed named {} not found.".format(testbed))
+            return list(models.TestResults.for_testcase(tc, limit=limit, offset=offset, testbed=tb))
         else:
             raise ValueError("TestCase named {} not found.".format(testcasename))
 
@@ -793,6 +921,14 @@ class TestResultsController(Controller):
     @staticmethod
     def latest():
         return models.TestResults.get_latest_run()
+
+    @staticmethod
+    def recent_for(testcasename, number=10):
+        tc = TestCasesController.get(testcasename)
+        if tc:
+            return list(models.TestResults.get_recent_for_testcase(tc, number=number))
+        else:
+            raise ValueError("TestCase named {} not found.".format(testcasename))
 
     @staticmethod
     def subresults(testresult, failures=False):
@@ -842,5 +978,3 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

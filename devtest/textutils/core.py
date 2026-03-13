@@ -18,9 +18,9 @@ import binascii
 import hashlib
 import collections
 import io
-from typing import BinaryIO, TextIO
+from typing import Type
 
-ViewType = type({}.keys())
+ViewType: Type = type({}.keys())
 
 
 def cut_string(s, maxlen=800):
@@ -61,9 +61,9 @@ Returns all given objects as a single string."""
 def tac(*args):
     """tac(obj...)
 Combines all objects lines into one list and returns them in reverse order."""
-    l = _allargs(args)
-    l.reverse()
-    return l
+    alist = _allargs(args)
+    alist.reverse()
+    return alist
 
 
 def head(*args, n=10):
@@ -136,12 +136,12 @@ def uniq(*args):
 
 def wc(*args):
     "Word count - returns a tuple of (lines, words, characters) of the objects."
-    c = w = l = 0
+    c = w = lines = 0
     for line in _allargs(args):
         c += len(line)
         w += len(line.split())
-        l += 1
-    return l, w, c
+        lines += 1
+    return lines, w, c
 
 
 def nl(*args):
@@ -194,7 +194,7 @@ def removedups(s):
     except TypeError:
         del u  # move on to the next method
     else:
-        return list(u.keys())
+        return list(u.keys())  # noqa: F821
     # We can't hash all the elements.  Second fastest is to sort,
     # which brings the equal elements together; then duplicates are
     # easy to weed out in a single pass.
@@ -205,14 +205,14 @@ def removedups(s):
         del t  # move on to the next method
     else:
         assert n > 0
-        last = t[0]
+        last = t[0]  # noqa: F821
         lasti = i = 1
         while i < n:
-            if t[i] != last:
-                t[lasti] = last = t[i]
+            if t[i] != last:  # noqa: F821
+                t[lasti] = last = t[i]  # noqa: F821
                 lasti = lasti + 1
             i = i + 1
-        return t[:lasti]
+        return t[:lasti]  # noqa: F821
     # Brute force is all that's left.
     u = []
     for x in s:

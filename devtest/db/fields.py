@@ -23,14 +23,13 @@ extras.register_default_json(globally=True, loads=json.loads)
 extras.register_default_jsonb(globally=True, loads=json.loads)
 del extras, json
 
-from peewee import Field
-from playhouse.postgres_ext import (
-    BinaryJSONField,
-    TSVectorField,  # noqa
-    DateTimeTZField,
+from peewee import Field  # noqa: E402,F401
+from playhouse.postgres_ext import (  # noqa: E402,F401
+    BinaryJSONField, TSVectorField,  # noqa: F401
+    DateTimeTZField,  # noqa: F401
     ArrayField)
 
-from devtest.core import types
+from devtest.core import types  # noqa: E402
 
 JSONField = BinaryJSONField
 

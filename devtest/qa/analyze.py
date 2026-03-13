@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.6
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -188,7 +186,7 @@ class Analyzer:
         self.set_resultslocation_from_testresult(result)
         return result
 
-    def get_latest_data(self, use_local: bool = None):
+    def get_latest_data(self, use_local: bool | None = None):
         """Get most recent data object from local store (resultsdir) or database
         depending on use_local flag.
 
@@ -270,6 +268,3 @@ class Analyzer:
             tr = tr.parent
             resultslocation = tr.resultslocation
         self.resultslocation = resultslocation
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

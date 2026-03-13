@@ -12,8 +12,6 @@
 """Minimal terminal responder implemented as a filter.
 """
 
-from __future__ import generator_stop
-
 import sys
 import struct
 from functools import partial
@@ -250,4 +248,3 @@ Pass count:   7\r
     LINE = DATA.splitlines()[1] + b'\r\n'
     assert len(LINE) == len(line)
     assert line == LINE
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

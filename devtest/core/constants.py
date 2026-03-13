@@ -102,6 +102,7 @@ class ConnectionType(Enum):
     JTAG = 7
     Bluetooth = 8
     Power = 9
+    CAN = 10
 
 
 class NetworkType(Enum):
@@ -109,6 +110,7 @@ class NetworkType(Enum):
     Values match IANA defined types (ifType) in IANAifType-MIB.
     """
     Unknown = 0
+    Other = 1
     Ethernet = 6
     FibreChannel = 56
     Wifi = 71
@@ -119,6 +121,3 @@ class NetworkType(Enum):
     # BSD derived
     Dummy = 241
     Bluetooth = 248
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

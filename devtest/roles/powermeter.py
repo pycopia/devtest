@@ -1,5 +1,3 @@
-# python3
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -92,5 +90,3 @@ if __name__ == "__main__":
     result = dev.measure_average_power(passthrough="on")
     print("Main power: {:10.4f} W, USB power: {:10.4f} W".format(result.main_power,
                                                                  result.usb_power))
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

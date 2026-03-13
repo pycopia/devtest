@@ -261,10 +261,10 @@ def list_testbeds(verbose):
 def pick_testbed():
     """Present a radio-button list to choose a test bed.
     """
-    from devtest.ui import ptui
+    from devtest.ui import simpleui
     from devtest.db import models
 
-    ui = ptui.PromptToolkitUserInterface()
+    ui = simpleui.SimpleUserInterface()
     models.connect()
     tblist = models.TestBed.get_list()
     return ui.choose(tblist, defidx=tblist.index("default"), prompt="Choose testbed")
@@ -273,9 +273,9 @@ def pick_testbed():
 def pick_tests(argumentlist):
     """Present a checkbox list with scenarios grouped up front, and colored differently.
     """
-    from devtest.ui import ptui
+    from devtest.ui import simpleui
 
-    ui = ptui.PromptToolkitUserInterface()
+    ui = simpleui.SimpleUserInterface()
     modlist = []
     scenariolist = []
     testlist = []

@@ -39,7 +39,7 @@ def connect(url=None, autocommit=False):
     if not url:
         from devtest import config
         cf = config.get_config()
-        url = cf["database"]["url"]
+        url = cf["database"][cf["database"]["select"]]["url"]
     database = util.get_database(url, autocommit=autocommit)
     return database
 
@@ -52,5 +52,3 @@ def get_migrator(url=None):
 
 if __name__ == "__main__":
     db, migrator = get_migrator()
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

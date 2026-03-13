@@ -141,6 +141,7 @@ class DefaultReport(BaseReport):
 
     def on_test_start(self, testcase, time=None):
         name = testcase.test_name
+        self._current_start_time = time
         ts = time.astimezone(self.timezone).timetz().isoformat()
         nw = WIDTH - len(ts) - 1
         print("\n{W}{0:{width}s} {B}{1}{R}".format(name,
@@ -153,11 +154,14 @@ class DefaultReport(BaseReport):
 
     def on_test_end(self, testcase, time=None):
         ts = time.astimezone(self.timezone).timetz().isoformat()
-        print("{U}{}{R} ended at {B}{:s}{R}".format(testcase.test_name,
-                                                    ts,
-                                                    B=BLUE,
-                                                    R=RESET,
-                                                    U=UNDERLINE_ON),
+        elapsed = time - self._current_start_time
+        self._current_start_time = None
+        print("{U}{}{R} ended at {B}{:s}{R} elapsed: {B}{}{R}".format(testcase.test_name,
+                                                                      ts,
+                                                                      elapsed,
+                                                                      B=BLUE,
+                                                                      R=RESET,
+                                                                      U=UNDERLINE_ON),
               file=self._file)
 
     def on_test_passed(self, testcase, message=None):
@@ -182,11 +186,14 @@ class DefaultReport(BaseReport):
         print(yellow(" warning:"), message, file=self._file)
 
     def on_test_diagnostic(self, testcase, message=None):
-        print(magenta("diagnostic:"), message, file=self._file)
+        print(magenta("diagnostic:"), end=" ", file=self._file)
+        print(str(message), file=self._file)
 
     def on_test_arguments(self, testcase, arguments=None):
-        if arguments:
-            print(cyan("    arguments:"), arguments, file=self._file)
+        print("{C}  Arguments:{R} {0}".format(arguments, C=MAGENTA, R=RESET), file=self._file)
+
+    def on_test_version(self, testcase, version=None):
+        print("{C}  Version: {0}{R}".format(version, C=CYAN, R=RESET), file=self._file)
 
     def on_suite_start(self, testsuite, time=None):
         ts = time.astimezone(self.timezone).timetz().isoformat()
@@ -223,6 +230,9 @@ class DefaultReport(BaseReport):
 
     def on_dut_version(self, device, build=None, variant=None):
         print(("DUT version: {!s} ({})").format(build, variant), file=self._file)
+        fpath = os.path.join(self._logdir, "dutbuild.txt")
+        with open(fpath, "w") as fo:
+            fo.write(f"{build} ({variant})\n")
 
     def on_logdir_location(self, runner, path=None):
         self._logdir = path
@@ -253,6 +263,12 @@ class DefaultReport(BaseReport):
 
     def on_run_comment(self, runner, message=None):
         print("NOTE:", str(message), file=self._file)
+
+    def on_report_testbed(self, runner, testbed=None):
+        if testbed:
+            fpath = os.path.join(self._logdir, "testbed.txt")
+            with open(fpath, "w") as fo:
+                print(testbed, file=fo)
 
 
 class DefaultReportUnicode(DefaultReport):

@@ -15,7 +15,6 @@ This is a multi-device, multi-interface, multi-role framework. It can manage
 small scale testing of one device, up to large and complex test scenarios with
 many heterogeneous devices and servers.
 
-
 ## Basic Installation
 
 This is just a quick cheatsheet on getting setup so that it basically runs.
@@ -44,7 +43,7 @@ dependencies, but the base framework has relatively few.
 You'll need the PostgreSQL server.
 
 ```console
-$ sudo apt-get install postgresql
+sudo apt-get install postgresql
 ```
 
 Configure it to listen on _localhost_ with _trust_ authorization.
@@ -54,7 +53,7 @@ Configure it to listen on _localhost_ with _trust_ authorization.
 You'll need the libusb dev package to compile the usb extension module.
 
 ```console
-$ sudo apt-get install libusb-1.0-0-dev
+sudo apt-get install libusb-1.0-0-dev
 ```
 
 #### OSX/MacOS
@@ -65,10 +64,10 @@ that is installed first.
 After installing, make sure to install, as follows:
 
 ```console
-$ brew install git
-$ brew install libusb
-$ brew install postgresql
-$ brew services start postgresql
+brew install git
+brew install libusb
+brew install postgresql
+brew services start postgresql
 ```
 
 ### Python
@@ -81,7 +80,7 @@ use to install it.
 On many Linux distros you can do this:
 
 ```console
-$ sudo apt-get install python3.6-dev
+sudo apt-get install python3.6-dev
 ```
 
 #### MacOS
@@ -89,7 +88,7 @@ $ sudo apt-get install python3.6-dev
 On MacOS with homebrew:
 
 ```console
-$ brew install python      # default is latest Python 3 now (3.7), which is good.
+brew install python      # default is latest Python 3 now (3.7), which is good.
 ```
 
 That will get you everything you need to start.
@@ -100,19 +99,17 @@ To make sure we use the Python version we want, we can set PYTHONBIN to point to
 it.
 
 ```console
-$ export PYTHONBIN=/usr/bin/python3.6  # or wherever your installation is.
+export PYTHONBIN=/usr/bin/python3.12  # or wherever your installation is.
 ```
-
-That will probably be python3.7 on MacOS, as of this writing. That's fine.
 
 Now install some necessary Python packages.
 
 ```console
 # With brew on MacOS, everything is installed as regular user.
-$ [[ $(uname) = Darwin ]] && SUDO="" || SUDO=sudo
-$ $SUDO $PYTHONBIN -m pip install -U setuptools
-$ $SUDO $PYTHONBIN -m pip install cython
-$ $SUDO $PYTHONBIN -m pip install flake8
+[[ $(uname) = Darwin ]] && SUDO="" || SUDO=sudo
+$SUDO $PYTHONBIN -m pip install -U setuptools
+$SUDO $PYTHONBIN -m pip install cython
+$SUDO $PYTHONBIN -m pip install flake8
 ```
 
 ### Devtest
@@ -129,25 +126,25 @@ $ git clone https://github.com/kdart/devtest.git
 Now change into the new directory.
 
 ```console
-$ cd devtest
+cd devtest
 ```
 
 Then verify we have the right Python, and set up *developer mode* for the framework source.
 
 ```console
-$ make info
+make info
 ```
 
 Verify that it will use the Python you want (3.6 or greater) If it looks good:
 
 ```console
-$ make develop
+make develop
 ```
 
 Initialize the database.
 
 ```console
-$ $PYTHONBIN -m devtest.db.models_init
+$PYTHONBIN -m devtest.db.models_init
 ```
 
 This should create a PostgreSQL user named *devtest* and a database named
@@ -158,9 +155,8 @@ Test that the installation and initialization worked. If it doesn't, check your
 PostgreSQL installation and verify that it is listening on *localhost* and has
 *trust* access in the _pghba.conf_ file.
 
-
 ```console
-$ devtestadmin testbed list
+devtestadmin testbed list
 default
 ```
 
@@ -177,22 +173,22 @@ name. A basic template to get started can be installed from
 Install it as follows.
 
 ```console
-$ cd ~/src
-$ git clone https://github.com/kdart/devtest-testcases
-$ cd devtest-testcases
-$ $PYTHONBIN setup.py develop --user
+cd ~/src
+git clone https://github.com/kdart/devtest-testcases
+cd devtest-testcases
+$PYTHONBIN setup.py develop --user
 ```
 
 Now, try running a demo test case.
 
 ```console
-$ devtester testcases.examples.demo.PassCheck
+devtester testcases.examples.demo.PassCheck
 ```
 
 List available test cases with the `-l` option.
 
 ```console
-$ devtester -l
+devtester -l
 
 Runnable objects:
       test testcases.examples.demo.BasicReadinessCheck
@@ -209,8 +205,7 @@ Runnable objects:
 
 The *testcases* package is a namespace package. The *devtest-testcases* setup
 can be used as a template for your own packages of test cases. It will also be
-rooted in the *testcases* base package, but distributed separately. 
-
+rooted in the *testcases* base package, but distributed separately.
 
 ### Data Model
 
@@ -219,7 +214,7 @@ which includes testbeds, networks, interfaces, and connections.  Right now, the
 *devtestadmin* tool is the only way to do that. Crude, but effective.
 
 ```console
-$ devtestadmin
+devtestadmin
 ```
 
 Will show the rather large usage. A better, possibly web based, UI is in the
@@ -281,12 +276,12 @@ You can select a *Scenario* object that you define, or a single test cases. You
 may also construct on the command-line a series of tests as an *ac hoc* test suite.
 
 ```console
-$ devtester -h
+devtester -h
 ```
 
 Shows the help screen.
 
-```
+```console
 devtester [options] [-c <configfile>]
     [<globalconfig>...] [<testname> [<testconfig>]] ...
 
@@ -330,14 +325,12 @@ through the environment variable *PYTHON\_DEBUGGER*. It defaults to the built-in
 *pdb* module. For a better debugging experience set it to "elicit.debugger".
 
 ```console
-$ export PYTHON_DEBUGGER=elicit.debugger
+export PYTHON_DEBUGGER=elicit.debugger
 ```
 
 Better put that in your *.bashrc* or *.zshrc* file.
 
-
-## Continuing on...
+## Continuing on
 
 That's the basics. There is much more to it than that. Feel free to contact the
 author if you want to get started with it.
-

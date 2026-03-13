@@ -13,8 +13,6 @@
 Run programs with elevated privileges using sudo.
 """
 
-from __future__ import generator_stop
-
 from devtest.os import procutils
 
 from . import process

@@ -16,13 +16,16 @@ interconnections. They may also have user-specified attributes attached. This
 information is made available to test cases using simple attribute accessors.
 """
 
+from typing import Optional
 from datetime import datetime
 
 from pytz import timezone
+from peewee import (BlobField, BooleanField, CharField, Check, CompositeKey, Database, DoesNotExist,
+                    fn, ForeignKeyField, IntegerField, IntegrityError, Model, Proxy, SQL, TextField,
+                    UUIDField, ModelSelect)
 
-from peewee import *  # noqa
-from .fields import *  # noqa
-
+from .fields import (IPv4Field, IPv6Field, CIDRField, MACField, EnumField, IntervalField,
+                     TSVectorField, DateTimeTZField, ArrayField, BinaryJSONField)
 from .. import json
 from ..core import constants
 from ..core.exceptions import ModelError
@@ -49,8 +52,8 @@ def time_now():
     return datetime.now(UTC)
 
 
-database_proxy = Proxy()
-database = None
+database_proxy: Proxy = Proxy()
+database: Optional[Database] = None
 
 
 class BaseModel(Model):
@@ -69,6 +72,8 @@ class AccountIds(BaseModel):
     password = CharField(max_length=80, null=True)
     admin = BooleanField(default=True)
     note = TextField(null=True)
+    private_key = BlobField(null=True)  # Should have a passphrase.
+    public_key = BlobField(null=True)  # May also be an OpenSSH certificate.
 
     class Meta:
         table_name = 'account_ids'
@@ -80,6 +85,7 @@ class AccountIds(BaseModel):
     @classmethod
     def create_or_get(cls, identifier=None, login=None, password=None):
         try:
+            assert database is not None
             with database.atomic():
                 return cls.create(identifier=identifier, login=login, password=password), True
         except IntegrityError:
@@ -188,6 +194,8 @@ class Equipment(BaseModel):
                       ipaddr=None,
                       ipaddr6=None,
                       network=None):
+        """Add a new interface attached to this Equipment.
+        """
         if network is not None and isinstance(network, str):
             network = Networks.select().where(Networks.name == network).get()
         with database.atomic():
@@ -198,6 +206,36 @@ class Equipment(BaseModel):
                               ipaddr=ipaddr,
                               ipaddr6=ipaddr6,
                               network=network)
+
+    def update_interface(self,
+                         name,
+                         ifindex=None,
+                         newname=None,
+                         macaddr=None,
+                         ipaddr=None,
+                         ipaddr6=None,
+                         network=None):
+        """Update existing attached interface with new field information.
+        """
+        if network is not None and isinstance(network, str):
+            network = Networks.select().where(Networks.name == network).get()
+        iface = Interfaces.select().where((Interfaces.name == name) &
+                                          (Interfaces.equipment == self)).get()
+        if iface:
+            with database.atomic():
+                if ifindex:
+                    iface.ifindex = ifindex
+                if newname:
+                    iface.name = newname
+                if macaddr:
+                    iface.macaddr = macaddr
+                if ipaddr:
+                    iface.ipaddr = ipaddr
+                if ipaddr6:
+                    iface.ipaddr6 = ipaddr6
+                if network:
+                    iface.network = network
+                iface.save()
 
     def attach_interface(self, **selectkw):
         """Attach an existing interface entry that is currently detached."""
@@ -211,6 +249,8 @@ class Equipment(BaseModel):
             intf.equipment = self
 
     def del_interface(self, name):
+        """Delete an interface on this Equipment.
+        """
         with database.atomic():
             intf = self.interfaces.where(Interfaces.name == name).get()
             intf.delete_instance()
@@ -380,10 +420,24 @@ class TestBed(BaseModel):
                 roles.add(te.function.name)
         return roles
 
+    @property
+    def owner(self):
+        """Owner, or manager, of this testbed.
+        """
+        return self.attribute_get("owner")
+
+    @owner.setter
+    def owner(self, name: str):
+        return self.attribute_set("owner", name)
+
+    @owner.deleter
+    def owner(self):
+        return self.attribute_del("owner")
+
     @classmethod
     def get_list(cls):
         """Return list of defined TestBed names."""
-        return [t[0] for t in cls.select(cls.name).tuples()]
+        return [t[0] for t in cls.select(cls.name).order_by(cls.name).tuples()]
 
     def get_DUT(self):
         return self.get_equipment_with_role("DUT")
@@ -550,7 +604,7 @@ class Networks(BaseModel):
         elif self.layer == 3 and self.ipnetwork is not None:
             return "{} ({})".format(self.name, self.ipnetwork)
         else:
-            return "{}[{}]".format(self.name, self.layer)
+            return "{}|{}".format(self.name, self.type.name)
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -568,7 +622,7 @@ class Interfaces(BaseModel):
     physical interface to the virtual one.
     """
     name = CharField(max_length=64)
-    alias = CharField(max_length=64, null=True)
+    ifalias = CharField(max_length=64, null=True, column_name="alias")
     status = IntegerField(null=True)
     ipaddr = IPv4Field(null=True)  # inet
     ipaddr6 = IPv6Field(null=True)  # inet
@@ -591,12 +645,14 @@ class Interfaces(BaseModel):
                               null=True,
                               model=Networks,
                               field='id',
+                              backref="interfaces",
                               on_update="CASCADE",
                               on_delete="SET NULL")
 
     class Meta:
         table_name = 'interfaces'
         constraints = [Check('vlan >= 0 AND vlan < 4096')]
+        indexes = ((("name", "equipment"), True),)
 
     def __str__(self):
         return "{} (ip:{}, mac:{})".format(self.name, self.ipaddr, self.macaddr)
@@ -636,6 +692,7 @@ class TestCases(BaseModel):
     passcriteria = TextField(null=True)  # a.k.a expectedResult
     startcondition = TextField(null=True)
     endcondition = TextField(null=True)
+    reference = TextField(null=True)
     procedure = TextField(null=True)  # a.k.a instructions
 
     # Extra data
@@ -772,26 +829,11 @@ class TestResults(BaseModel):
         table_name = 'test_results'
 
     def __str__(self):
-        name = ""
-        if self.resulttype == constants.TestResultType.Test:
-            if self.testcase:
-                name = "TestCase : {}".format(self.testcase.name)
-            else:
-                name = "TestCase : not imported!"
-        elif self.resulttype == constants.TestResultType.TestSuite:
-            if self.testsuite:
-                name = "TestSuite: {}".format(self.testsuite.name)
-            else:
-                name = "TestSuite: generic"
-        elif self.resulttype == constants.TestResultType.TestRunSummary:
-            name = "run id: {} on {}, artifacts: {}".format(
-                self.id, self.testbed.name if self.testbed else "no testbed", self.resultslocation)
-        else:
-            name = "{!r} id: {}".format(self.resulttype, self.id)
-        return "TestResult: {:10.10s} {}".format(self.result.name, name)
+        return "[{}: {} {}]".format(self.testcase, self.resulttype, self.result)
 
     @classmethod
     def get_latest_run(cls):
+        """Get most recent run record."""
         r = cls.select().where((cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
             (cls.resulttype == constants.TestResultType.TestRunSummary) &
             (cls.valid == True))) &  # noqa
@@ -799,29 +841,119 @@ class TestResults(BaseModel):
         return r
 
     @classmethod
-    def for_testcase(cls, testcase, limit=100, offset=0):
-        return cls.select().where((cls.testcase == testcase) & (cls.valid == True)).order_by(
-            cls.starttime).limit(limit).offset(offset).execute()  # noqa
+    def _get_modelselect(cls, q):
+        return ModelSelect(cls, (
+            q.c.id,
+            q.c.result.converter(constants.TestResult),
+            q.c.resulttype.converter(constants.TestResultType),
+            q.c.rdb_uuid,
+            q.c.diagnostic,
+            q.c.resultslocation,
+            q.c.data,
+            q.c.starttime,
+            q.c.endtime,
+            q.c.note,
+            q.c.valid.converter(bool),
+            q.c.testversion,
+            q.c.arguments,
+            q.c.target,
+            q.c.dutbuild,
+            q.c.parent_id,
+            q.c.testcase_id,
+            q.c.testsuite_id,
+            q.c.testbed_id,
+        ))
+
+    @classmethod
+    def for_testcase(cls, testcase, limit=100, offset=0, testbed=None, dutbuild=None):
+        """Get results for a test case, optionally filtered by testbed or dutbuild, or both."""
+        # simple case, use direct query if no testbed specified.
+        if testbed is None and dutbuild is None:
+            return cls.select().where(
+                (cls.testcase == testcase) & (cls.valid == True)).order_by(  # noqa
+                    cls.starttime).limit(limit).offset(offset).execute()  # noqa
+        else:  # Also filter by testbed and/or dutbuild, which is in root record.
+            # Need recursive common table expression to get testbed from root record.
+            Root = cls.alias("tr_root")
+            root_query = Root.select().where(Root.parent.is_null())
+            if testbed is not None:
+                root_query = root_query.where(Root.testbed == testbed)
+            if dutbuild is not None:
+                root_query = root_query.where(Root.dutbuild.like(f'{dutbuild}%'))
+            root_query = root_query.cte('results', recursive=True)
+            # Define the recursive terms.
+            RTerm = cls.alias("tr_rec")
+            recursive = (RTerm.select().from_(root_query,
+                                              RTerm).where(RTerm.parent_id == root_query.c.id))
+            cte = root_query.union_all(recursive)
+            q = cls._get_modelselect(root_query)
+            q = (
+                q.from_(cte).with_cte(cte).where(
+                    (cte.c.testcase_id == testcase) & (cte.c.valid == True))  # noqa
+                .order_by(cte.c.starttime))
+            return q.execute()
 
     @classmethod
     def get_runs(cls, limit=20, offset=0):
+        """Get run results with paging."""
         return cls.select().where((cls.resulttype == constants.TestResultType.TestRunSummary) &
-                                  (cls.valid == True)  # noqa
-                                 ).order_by(
-                                     cls.starttime.desc()).limit(limit).offset(offset).execute()
+                                  (cls.valid == True)).order_by(cls.starttime.desc()).limit(  # noqa
+                                      limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
+        """Return only the data associated with a test case."""
         return cls.select(cls.data).where((cls.resulttype == constants.TestResultType.Test) &
                                           (cls.testcase == testcase) & (cls.valid == True)  # noqa
-                                         ).order_by(cls.starttime).limit(limit).execute()
+                                          ).order_by(cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_latest_for_testcase(cls, testcase):
-        r = cls.select().where(cls.starttime == cls.select(fn.MAX(
-            cls.starttime)).where((cls.resulttype == constants.TestResultType.Test) &
-                                  (cls.valid == True) & (cls.testcase == testcase))).get()
+        """Get latest valid result for a test case."""
+        r = cls.select().where(cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
+            (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &  # noqa
+            (cls.testcase == testcase))).get()
         return r
+
+    @classmethod
+    def get_recent_for_testcase(cls, testcase, number=10):
+        """Fetch most recent number of results for given test case.
+        """
+        # A top-N query by start time, using window function RANK.
+        TRAlias = cls.alias()
+        tcq = (TRAlias.select(
+            SQL("*"),
+            fn.RANK().over(partition_by=TRAlias.testcase, order_by=TRAlias.starttime.desc()).alias(
+                "rnk")).where((TRAlias.testcase == testcase) &
+                              (TRAlias.resulttype == constants.TestResultType.Test) &
+                              (TRAlias.valid == True)).alias("tcq"))  # noqa
+        q = cls.select(SQL("*")).from_(tcq).where((tcq.c.rnk <= number)).order_by(tcq.c.starttime)
+        return q.execute()
+
+    @classmethod
+    def get_latest_for_testbed(cls, testbed):
+        """Get latest run result for a testbed."""
+        r = cls.select().where(cls.starttime == cls.select(fn.MAX(
+            cls.starttime)).where((cls.resulttype == constants.TestResultType.TestRunSummary) &
+                                  (cls.valid == True) &  # noqa
+                                  (cls.testbed == testbed))).get()
+        return r
+
+    @classmethod
+    def resultset(cls, runresult):
+        """Full result set from a run, or root, result.
+        """
+        # Non-recursive CTE term
+        TRRoot = cls.alias("tr_root")
+        tr_root = TRRoot.select().where(TRRoot.id == runresult.id).cte('results', recursive=True)
+        # Recursive CTE terms.
+        RTerm = cls.alias("tr_rec")
+        rterm = RTerm.select().from_(tr_root, RTerm).where(RTerm.parent_id == tr_root.c.id)
+        cte = tr_root.union_all(rterm)
+        # Main query
+        q = cls._get_modelselect(tr_root)
+        q = q.from_(cte).with_cte(cte).where(cte.c.valid == True).order_by(cte.c.starttime)  # noqa
+        return q.execute()
 
 
 def _attribute_get(inst, attrname, default=None):
@@ -850,7 +982,7 @@ def connect(url=None, autocommit=False):
     """Initialize the database object to a backend database using the given URL,
     or what is configured if not provided.
     """
-    global database, database_proxy
+    global database
     from .util import get_database
     if database is not None:
         return

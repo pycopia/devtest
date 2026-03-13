@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.6
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -39,7 +37,7 @@ class ImageDisplayer(BaseRole):
             $ devtestadmin testbed <testbed> add <mydisplayandroid> displayer
     """
 
-    DESTINATION_DEFAULT = "/sdcard/Pictures"  # TODO(dart) query device
+    DESTINATION_DEFAULT = "/sdcard/Pictures"
     BRIGHTNESS_DEFAULT = 64
 
     def initialize(self):
@@ -99,5 +97,3 @@ if __name__ == "__main__":
     displayer = ImageDisplayer(MockEquipment(SERNO))
     displayer.display(IMAGE)
     displayer.close()
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

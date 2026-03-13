@@ -15,40 +15,41 @@
 """
 
 import os
+import pwd
 
 from devtest.os.exitstatus import ExitStatus
 
 
-def run_as(pwent, umask=0o22):
+def run_as(pwent: pwd.struct_passwd, umask: int = 0o22) -> None:
     """Drop privileges to given user's password entry, and set up
     environment. Assumes the parent process has root privileges.
     """
     os.umask(umask)
-    home = pwent.home
+    home = pwent.pw_dir
     try:
         os.chdir(home)
     except OSError:
         os.chdir("/")
     # drop privs to user
-    os.setgroups(pwent.groups)
-    os.setgid(pwent.gid)
-    os.setegid(pwent.gid)
-    os.setuid(pwent.uid)
-    os.seteuid(pwent.uid)
+    # os.setgroups(pwent.groups)
+    os.setgid(pwent.pw_gid)
+    os.setegid(pwent.pw_gid)
+    os.setuid(pwent.pw_uid)
+    os.seteuid(pwent.pw_uid)
     os.environ["HOME"] = home
-    os.environ["USER"] = pwent.name
-    os.environ["LOGNAME"] = pwent.name
-    os.environ["SHELL"] = pwent.shell
+    os.environ["USER"] = pwent.pw_name
+    os.environ["LOGNAME"] = pwent.pw_name
+    os.environ["SHELL"] = pwent.pw_shell
     os.environ["PATH"] = "/bin:/usr/bin:/usr/local/bin"
 
 
-def system(cmd):
+def system(cmd: str) -> ExitStatus:
     """Like os.system(), except returns ExitStatus object."""
     sts = os.system(cmd)
     return ExitStatus(sts, name=cmd.split()[0])
 
 
-def which(basename):
+def which(basename: str) -> str | None:
     """Returns the fully qualified path name (by searching PATH) of the given
     program name.
     """
@@ -62,6 +63,3 @@ def which(basename):
         if os.access(testname, os.F_OK | os.X_OK):
             return testname
     return None
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

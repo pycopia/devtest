@@ -47,16 +47,16 @@ SERVICES = {
 SERVICES_REVERSE = dict((v, k) for k, v in list(SERVICES.items()))
 
 # from rfc2396 appendix B:
-URI_RE_STRICT = r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
-URI_RE_STRICT = re.compile(URI_RE_STRICT)
+URI_RE_STRICT_PATTERN = r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
+URI_RE_STRICT = re.compile(URI_RE_STRICT_PATTERN)
 
 # But, this is better for finding URL embedded in a string.
-URI_RE = (r"((\w+)://){1}"
-          r"([^/?#]*)"
-          r"(/[;/:@&=+$,._%A-Za-z0-9]*)"
-          r"(\?([;/?:@&=+$,-_.!~*'()%A-Za-z0-9]*))?"
-          r"(#(\w*))?")
-URI_RE = re.compile(URI_RE)
+URI_RE_PATTERN = (r"((\w+)://){1}"
+                  r"([^/?#]*)"
+                  r"(/[;/:@&=+$,._%A-Za-z0-9]*)"
+                  r"(\?([;/?:@&=+$,-_.!~*'()%A-Za-z0-9]*))?"
+                  r"(#(\w*))?")
+URI_RE = re.compile(URI_RE_PATTERN)
 
 # char-classes:
 # uric        = r";/?:@&=+$,-_.!~*'()A-Za-z0-9%"
@@ -474,5 +474,3 @@ if __name__ == "__main__":
     del url.query
     del url2.query
     assert str(url2) == str(url)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

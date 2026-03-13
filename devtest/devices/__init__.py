@@ -15,12 +15,31 @@
 from __future__ import generator_stop
 
 import abc
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from devtest.db.testbeds import EquipmentRuntime
+else:
+    EquipmentRuntime = Any
 
 
 class Controller(metaclass=abc.ABCMeta):
 
-    def __init__(self, equipment):
+    def __init__(self, equipment: EquipmentRuntime):
         self._equipment = equipment
+        self.initialize()
+
+    def __del__(self):
+        self.close()
+
+    def initialize(self):
+        return NotImplemented
+
+    def reset(self):
+        return NotImplemented
+
+    def close(self):
+        return NotImplemented
 
 
 class Software(metaclass=abc.ABCMeta):

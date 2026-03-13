@@ -23,17 +23,19 @@ from devtest.textutils import colors
 
 from . import scanner
 from . import loader
+from . import analyze
 
 ModuleType = type(sys)
 
 
-def iter_all_analyzers(package="testcases", onerror=None, include=None, exclude=None):
-    for mod in scanner.iter_modules(package=package,
+def iter_all_analyzers(onerror=None):
+    for mod in scanner.iter_modules(package="testcases",
                                     onerror=onerror,
-                                    include=include,
-                                    exclude=exclude):
+                                    include="analyze",
+                                    exclude=["resources"]):
         if hasattr(mod, "run"):
             yield mod
+        yield from scanner.iter_module_classes(mod, analyze.Analyzer)
 
 
 class UsageError(Exception):
@@ -96,9 +98,9 @@ class ShellInterface:
                 _print_exception(exc)
         if not runlist:
             _usage("Nothing to run.")
-        for module in runlist:
+        for obj in runlist:
             try:
-                module.run()
+                obj.run(self.config)
             except:  # noqa
                 exclass, exc, tb = sys.exc_info()
                 if self.config.flags.debug:
@@ -114,16 +116,18 @@ def do_list():
     def _onerror(err):
         errlist.append(err)
 
-    print(colors.white("Analyzer objects:"))
-    for obj in iter_all_analyzers(onerror=_onerror, include="analyze"):
+    print(colors.white("Runnable analyzers:"))
+    for obj in iter_all_analyzers(onerror=_onerror):
         if type(obj) is ModuleType:
             print("    module", colors.cyan("{}".format(obj.__name__)))
+        elif issubclass(obj, analyze.Analyzer):
+            print("  analyzer", colors.green("{}.{}".format(obj.__module__, obj.__name__)))
         else:
             print(colors.red("  Unknown: {!r}".format(obj)))
     if errlist:
         print("These could not be scanned:")
         for errored in errlist:
-            print("  ", errored)
+            print(colors.magenta(errored))
 
 
 def _usage(err=None):
@@ -156,5 +160,3 @@ def devtestanalyze(argv):
 
 if __name__ == "__main__":
     devtestanalyze(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

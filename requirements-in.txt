@@ -5,11 +5,14 @@ docopt
 docutils
 elicit
 h11
-peewee
+ifaddr
+keyring
+peewee < 4.0.0
 portpicker
 psutil
 psycopg2
 pygments
+pymodbus<3
 pyyaml
 pytz
 rfc3986

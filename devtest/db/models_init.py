@@ -10,6 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Create and initialize the equipment models database.
+
+Example config file line:
+
+    url: "postgresql://devtest:devtest@localhost/devtest"
+
+Depending on your database configuration it could be helpful to have the following line in your
+pg_hba.conf:
+
+    # TYPE  DATABASE        USER         ADDRESS                 METHOD
+    host    devtest         devtest      127.0.0.1/32            trust
 """
 
 import sys
@@ -77,7 +87,7 @@ def init_database(url):
 def _get_db_url():
     from devtest import config
     s = config.get_config()
-    return s["database"]["url"]
+    return s["database"][s["database"]["select"]]["url"]
 
 
 def main(argv):
@@ -88,5 +98,3 @@ def main(argv):
 
 if __name__ == "__main__":
     main(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

@@ -22,33 +22,33 @@ All voltages are RMS values.
 import math
 
 
-def dBVToVolts(dbv):
+def dBVtoV(dbv):
     return 10.0**(dbv / 20.0)
 
 
-def VoltsTodBV(v):
+def VtodBV(v):
     return 20.0 * math.log10(v / 1.0)
 
 
-def VoltsTodBu(v):
+def VtodBu(v):
     return 20.0 * math.log10(v / 0.77459667)
 
 
-def dBuToVolts(dbu):
+def dButoV(dbu):
     return 0.77459667 * 10.0**(dbu / 20.0)
 
 
-def dBmToWatts(dbm):
+def dBmtoW(dbm):
     return 0.001 * 10.0**(dbm / 10.0)
 
 
-def WattsTodBm(w):
+def WtodBm(w):
     return 10.0 * math.log10(w / 0.001)
 
 
-def degCToDegF(t):
+def CtoF(t):
     return (t * 9) / 5 + 32
 
 
-def degFToDegC(t):
+def FtoC(t):
     return (t - 32) * 5 / 9

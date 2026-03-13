@@ -105,6 +105,31 @@ cdef class RingBuffer:
     def flush(self):
         return NotImplemented
 
+    def isatty(self):
+        return False
+
+    def writable(self):
+        return True
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return False
+
+    def seek(self, offset, whence=0):
+        raise OSError("RingBuffer is not seekable.")
+
+    def tell(self):
+        raise OSError("RingBuffer is not seekable.")
+
+    def truncate(self, size=None):
+        raise OSError("RingBuffer is not seekable.")
+
+    @property
+    def closed(self):
+        return False
+
     @property
     def freespace(self):
         return <int> _space(self._head, self._tail, self._size)
@@ -127,5 +152,3 @@ cdef class RingBuffer:
         if index >= _count(self._head, self._tail, self._size):
             raise IndexError("index out of range of current buffer size.")
         return <int> self._buf[(self._tail + index) & (self._size - 1)]
-
-

@@ -326,7 +326,7 @@ class AutomatorServer:
 
     def install(self):
         cf = config.get_config()
-        base_dir = os.path.dirname(__file__)
+        # base_dir = os.path.dirname(__file__)
         for apk in cf.uiautomator[self.source].apks:
             print(apk)  # XXX use resource api
             # self._adb.install(os.path.join(base_dir, "lib", apk))
@@ -938,11 +938,11 @@ class AutomatorDeviceUiObject:
 
         def to(obj, *args, **kwargs):
             if len(args) >= 2 or "x" in kwargs or "y" in kwargs:
-                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps
-                                                                     )  # noqa
+                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps  # noqa
+                                                                      )
             else:
-                drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(
-                    self.selector, Selector(**kwargs), steps)  # noqa
+                drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(  # noqa
+                    self.selector, Selector(**kwargs), steps)
             return drag_to(*args, **kwargs)
 
         return type("Drag", (object,), {"to": to})()
@@ -955,8 +955,7 @@ class AutomatorDeviceUiObject:
     """
 
         def to(obj_self, end1, end2, steps=100):
-            ctp = lambda pt: point(*pt) if isinstance(pt, tuple
-                                                     ) else pt  # noqa convert tuple to point
+            ctp = lambda pt: point(*pt) if isinstance(pt, tuple) else pt  # noqa
             s1, s2, e1, e2 = ctp(start1), ctp(start2), ctp(end1), ctp(end2)
             return self.jsonrpc.gesture(self.selector, s1, s2, e1, e2, steps)
 

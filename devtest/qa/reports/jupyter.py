@@ -151,6 +151,3 @@ class JupyterReport(BaseReport):
             json.dump(data, fo)
         self._display_html("Data: {} {!r}<br/>".format("added to" if olddata else "available in",
                                                        fname))
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

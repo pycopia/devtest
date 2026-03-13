@@ -1,4 +1,3 @@
-#!/usr/bin/env python3.7
 """Memory info for Darwin.
 """
 # TODO
@@ -22,7 +21,4 @@ class Maps(list):
 
     @classmethod
     def from_text(cls, bytesblob):
-        pass
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
+        pass  # TODO

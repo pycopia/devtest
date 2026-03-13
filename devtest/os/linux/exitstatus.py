@@ -27,11 +27,11 @@ class ExitStatus:
     STOPPED = 2
     SIGNALED = 3
 
-    def __init__(self, sts, name="unknown", returncode=None):
+    def __init__(self, sts: int | None, name: str = "unknown", returncode: int | None = None):
         """Common exit status object.
 
         Args:
-            sts: raw status value from OS.
+            sts: raw status value from OS, or None if `returncode` is provided.
             name: name of the process to report when stringified.
             returncode: optional, pre-cooked returncode from subprocess module.
                         overrides sts if used.
@@ -46,6 +46,7 @@ class ExitStatus:
                 self._status = returncode
                 self._signal = 0
             return
+        assert sts is not None
         if os.WIFEXITED(sts):
             self.state = 1
             self._status = os.WEXITSTATUS(sts)
@@ -60,30 +61,30 @@ class ExitStatus:
             self._status = self._signal = os.WTERMSIG(sts)
 
     @property
-    def status(self):
+    def status(self) -> int:
         return self._status
 
     @property
-    def signal(self):
+    def signal(self) -> signal.Signals:
         return signal.Signals(self._signal)
 
-    def exited(self):
+    def exited(self) -> bool:
         return self.state == 1
 
-    def stopped(self):
+    def stopped(self) -> bool:
         return self.state == 2
 
-    def signalled(self):
+    def signalled(self) -> bool:
         return self.state == 3
 
-    def __int__(self):
+    def __int__(self) -> int:
         return self._status
 
     # exit status truth value is True if normal exit, and False otherwise.
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return (self.state == 1) and not self._status
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.state == 1:
             if self._status == 0:
                 return "{}: Exited normally.".format(self.name)
@@ -95,6 +96,3 @@ class ExitStatus:
             return "{} exited by signal {:d}. ".format(self.name, self.signal)
         else:
             raise RuntimeError("FIXME! unknown state in ExitStatus")
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

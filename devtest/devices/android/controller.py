@@ -289,7 +289,7 @@ class AndroidController(devices.Controller):
     """
         return MemoryMonitor(self.adb, pid)
 
-    def processinfo(self, name: str = None, pid: int = None) -> 'ProcessInfo':
+    def processinfo(self, name: str | None = None, pid: int | None = None) -> 'ProcessInfo':
         """Access information about a process on device.
 
     Args:
@@ -312,7 +312,7 @@ class AndroidController(devices.Controller):
         result = []
 
         def cb(_, name):
-            nonlocal result
+            nonlocal result  # noqa
             result.append(name)
 
         self.adb.list(path, cb)

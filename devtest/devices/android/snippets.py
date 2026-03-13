@@ -226,18 +226,3 @@ class SnippetsInterface:
             else:
                 self._protos[name] = proto = _OldSnippetsProtocol(self._adb, self._serial, package)
             _get_kernel().run(proto.connect)
-
-
-if __name__ == '__main__':
-    import os
-    import time
-
-    snippets = SnippetsInterface(os.environ['ANDROID_SERIAL'])
-    print('loading')
-    snippets.load('mbs', 'com.google.android.mobly.snippet.bundled')
-    print('waiting')
-    time.sleep(5)
-    print(snippets.mbs.getTelephonyCallState())
-    print(snippets.mbs.getLine1Number())
-    print('closing')
-    snippets.close()

@@ -17,6 +17,8 @@
 #     Extended PhysicalQuantity constructor to allow easier and faster "casting".
 #     Make compatible with python 3
 #     Remove other external dependencies.
+
+# mypy: disable_error_code=union-attr
 """Physical quantities with units.
 
 This module provides a data type that represents a physical
@@ -36,10 +38,12 @@ guarantee for the correctness of all entries in the unit
 table, so use this at your own risk!
 """
 
-import re
-from functools import reduce
+from __future__ import annotations
 
-from numpy.core import umath
+import re
+import math
+from functools import reduce
+from typing import List, Tuple, Dict, Union, cast
 
 from . import numberdict
 
@@ -102,6 +106,9 @@ class PhysicalQuantity:
     def __str__(self):
         return "{}{}{}".format(str(self.value), self._space, self.unit.name)
 
+    def __format__(self, fmt):
+        return "{}{}{}".format(format(self.value, fmt), self._space, self.unit.name)
+
     def __repr__(self):
         return "%s(%r, %r, %r)" % (self.__class__.__name__, self.value, self.unit.name, self._space)
 
@@ -115,9 +122,18 @@ class PhysicalQuantity:
     def __float__(self):
         return self.value
 
+    def __int__(self):
+        return int(self.value)
+
     def _sum(self, other, sign1, sign2):
         if not isPhysicalQuantity(other):
-            raise TypeError('Incompatible types')
+            if isinstance(other, str):
+                try:
+                    other = PhysicalQuantity(other)
+                except (TypeError, ValueError):
+                    return NotImplemented
+            else:
+                return NotImplemented
         new_value = (sign1 * self.value +
                      sign2 * other.value * other.unit.conversion_factor_to(self.unit))
         return self.__class__(new_value, self.unit, self._space)
@@ -282,19 +298,19 @@ class PhysicalQuantity:
 
     def sin(self):
         if self.unit.is_angle():
-            return umath.sin(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
+            return math.sin(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of sin must be an angle')
 
     def cos(self):
         if self.unit.is_angle():
-            return umath.cos(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
+            return math.cos(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of cos must be an angle')
 
     def tan(self):
         if self.unit.is_angle():
-            return umath.tan(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
+            return math.tan(self.value * self.unit.conversion_factor_to(_unit_table['rad']))
         else:
             raise TypeError('Argument of tan must be an angle')
 
@@ -386,15 +402,13 @@ class PhysicalUnit:
                                 [x * other for x in self.powers])
         if type(other) is float:
             inv_exp = 1. / other
-            rounded = int(umath.floor(inv_exp + 0.5))
+            rounded = int(math.floor(inv_exp + 0.5))
             if abs(inv_exp - rounded) < 1.e-10:
-                if reduce(lambda a, b: a and b,
-                          list(map(lambda x, e=rounded: x % e == 0, self.powers))):
+                if reduce(lambda a, b: a and b, map(lambda x, e=rounded: x % e == 0, self.powers)):
                     f = pow(self.factor, other)
                     p = [x / rounded for x in self.powers]
                     if reduce(lambda a, b: a and b,
-                              list(map(lambda x, e=rounded: x % e == 0,
-                                       list(self.names.values())))):
+                              map(lambda x, e=rounded: x % e == 0, self.names.values())):
                         names = self.names / rounded
                     else:
                         names = numberdict.NumberDict(default=0)
@@ -497,10 +511,10 @@ def _find_unit(unit):
 
 
 def _round(x):
-    if umath.greater(x, 0.):
-        return umath.floor(x)
+    if x > 0.:
+        return math.floor(x)
     else:
-        return umath.ceil(x)
+        return math.ceil(x)
 
 
 def _convert_value(value, src_unit, target_unit):
@@ -524,7 +538,7 @@ _base_units = [
     ('sr', PhysicalUnit('sr', 1., [0, 0, 0, 0, 0, 0, 0, 0, 1])),
 ]
 
-_prefixes = [
+_prefixes: List[Tuple[str, float]] = [
     ('Y', 1.e24),
     ('Z', 1.e21),
     ('E', 1.e18),
@@ -549,13 +563,13 @@ _prefixes = [
     ('y', 1.e-24),
 ]
 
-_unit_table = {}
+_unit_table: Dict[str, Union[PhysicalUnit, float]] = {}
 
 for unit in _base_units:
     _unit_table[unit[0]] = unit[1]
 
 
-def _add_unit(name, unit):
+def _add_unit(name: str, unit: Union[PhysicalUnit, str]):
     if name in _unit_table:
         raise KeyError('Unit ' + name + ' already defined')
     if isinstance(unit, str):
@@ -566,13 +580,13 @@ def _add_unit(name, unit):
             except KeyError:
                 pass
     unit.name = name
-    _unit_table[name] = unit
+    _unit_table[name] = cast(PhysicalUnit, unit)
 
 
-def _add_prefixed(unit):
+def _add_prefixed(unit: str):
     for prefix in _prefixes:
         name = prefix[0] + unit
-        _add_unit(name, prefix[1] * _unit_table[unit])
+        _add_unit(name, cast(PhysicalUnit, prefix[1] * _unit_table[unit]))
 
 
 # SI derived units; these automatically get prefixes
@@ -600,12 +614,12 @@ _add_unit('Sv', 'J/kg')  # Sievert
 
 del _unit_table['kg']
 
-for unit in list(_unit_table.keys()):
-    _add_prefixed(unit)
+for unit in list(_unit_table.keys()):  # type: ignore
+    _add_prefixed(cast(str, unit))
 
 # Fundamental constants
 
-_unit_table['pi'] = umath.pi
+_unit_table['pi'] = math.pi
 _add_unit('c', '299792458.*m/s')  # speed of light
 _add_unit('mu0', '4.e-7*pi*N/A**2')  # permeability of vacuum
 _add_unit('eps0', '1/mu0/c**2')  # permittivity of vacuum
@@ -738,7 +752,7 @@ if __name__ == '__main__':
     print("add us:", p("1.0", "us") + p("1.0", "us"))  # "µs") )
     e = p('2.7 Hartree*Nav')
     e.to_unit('kcal/mol')
-    print(e)
+    print(f'{e:.2f}')  # also checks format.
     print(e.in_base_units())
 
     freeze = p('0 degC')

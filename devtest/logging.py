@@ -372,16 +372,16 @@ class Logger:
     def addHandler(self, *args, **kwargs):
         """Add a handler.
 
-    Purposely a no-op to block modules from overriding logging policy.
-    """
+        Purposely a no-op to block modules from overriding logging policy.
+        """
 
 
 def get_logger(name=None, usestderr=USESTDERR, facility=FACILITY, priority=PRIORITY):
     """Get a :py:class:`Logger` object.
 
-  May return cached logger object. Global logger configuration reflects the last
-  one created.
-  """
+    May return cached logger object. Global logger configuration reflects the last
+    one created.
+    """
     name = name or os.path.basename(sys.argv[0])
     if name in Logger._LOGGERS:
         return Logger._LOGGERS[name]
@@ -393,8 +393,8 @@ def get_logger(name=None, usestderr=USESTDERR, facility=FACILITY, priority=PRIOR
 class LogLevel:
     """Context manager to run a block of code at a specific log level.
 
-  Supply the level name as a string.
-  """
+    Supply the level name as a string.
+    """
 
     def __init__(self, level):
         self._level = PRIORITIES[level.upper()]

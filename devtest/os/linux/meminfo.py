@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.7
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,6 +10,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Information about process memory usage.
+
+Memory area attributes reflect recent Linux kernels. May not work with older kernels.
 """
 
 import os
@@ -19,34 +19,36 @@ import pathlib
 from itertools import zip_longest
 from collections import namedtuple
 
+from typing import Optional, NamedTuple
+
 
 class VmFlags:
 
-    def __init__(self, flags):
+    def __init__(self, flags: str):
         self._flags = flags  # TODO break out flags to attributes
 
     def __repr__(self):
         return "VmFlags({!r})".format(self._flags)
 
     @property
-    def flags(self):
+    def flags(self) -> str:
         return self._flags
 
     @classmethod
-    def from_string(cls, bytestring):
+    def from_string(cls, bytestring: bytes):
         return cls(bytestring.decode("ascii"))
 
 
-MemUsage = namedtuple("MemUsage", [
-    "Size", "KernelPageSize", "MMUPageSize", "Rss", "Pss", "Uss", "Shared_Clean", "Shared_Dirty",
-    "Private_Clean", "Private_Dirty", "Referenced", "Anonymous", "LazyFree", "AnonHugePages",
-    "ShmemPmdMapped", "Shared_Hugetlb", "Private_Hugetlb", "Swap", "SwapPss", "Locked", "VmFlags"
-])
+MemUsage: NamedTuple = namedtuple("MemUsage", [
+    "Size", "KernelPageSize", "MMUPageSize", "Rss", "Pss", "Uss", "Pss_Dirty", "Shared_Clean",
+    "Shared_Dirty", "Private_Clean", "Private_Dirty", "Referenced", "Anonymous", "KSM", "LazyFree",
+    "AnonHugePages", "ShmemPmdMapped", "FilePmdMapped", "Shared_Hugetlb", "Private_Hugetlb", "Swap",
+    "SwapPss", "Locked", "THPeligible", "VmFlags"])
 
 
-# Not using Python 3.7 defaults to keep compatible with Python 3.6
 def _MemUsage_defaults():
     d = dict(zip_longest(MemUsage._fields, [0], fillvalue=0))
+    d["THPeligible"] = False
     d["VmFlags"] = None
     return d
 
@@ -80,7 +82,7 @@ class VirtualMemoryArea:
                  perms: str,
                  device: str,
                  inode: int,
-                 usage: MemUsage = None):
+                 usage: Optional[MemUsage] = None):
         self.name = name
         self.start = start
         self.end = end
@@ -129,7 +131,7 @@ class Maps(list):
     SMAPS = "/proc/{pid}/smaps"
 
     @classmethod
-    def from_text(cls, bytesblob):
+    def from_text(cls, bytesblob: bytes):
         units = {b"kB": 1024}
         currentvma = None
         currentusage = _MemUsage_defaults()
@@ -152,10 +154,12 @@ class Maps(list):
                 name, rest = line.split(b':')
                 if name == b'VmFlags':
                     currentusage["VmFlags"] = VmFlags.from_string(rest.strip())
+                elif name == b'THPeligible':
+                    currentusage["THPeligible"] = bool(int(rest))
                 else:
                     val, unit = rest.split()
-                    val = int(val) * units[unit]
-                    currentusage[name.decode("ascii")] = val
+                    intval = int(val) * units[unit]
+                    currentusage[name.decode("ascii")] = intval
         if currentvma is not None:
             currentusage["Uss"] = (currentusage["Private_Clean"] + currentusage["Private_Dirty"])
             currentvma.usage = MemUsage(**currentusage)
@@ -210,7 +214,7 @@ class MemoryMonitor:
 
     CLEAR_REFS = "/proc/{pid}/clear_refs"
 
-    def __init__(self, pid=None):
+    def __init__(self, pid: int | None = None):
         if pid is None:
             pid = os.getpid()
         self._pid = pid
@@ -238,7 +242,7 @@ class MemoryMonitor:
         memstop = self._stopmap.rollup()._asdict()
         memstart = self._startmap.rollup()._asdict()
         for fname in MemUsage._fields:
-            if fname == "VmFlags":
+            if fname in ("VmFlags", ""):
                 continue
             new[fname] = memstop[fname] - memstart[fname]
         return MemUsage(**new)
@@ -273,7 +277,5 @@ if __name__ == "__main__":
     mon.stop()
     print("Memory monitor stopped.")
     diff = mon.difference()
-    print("Change is Uss:", diff.Uss)
+    print("Change in Uss:", diff.Uss)
     print("Referenced pages:", mon.referenced_pages())
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

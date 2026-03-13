@@ -13,8 +13,6 @@
 Common certificate operations.
 """
 
-from __future__ import generator_stop
-
 import os
 from datetime import datetime, timedelta
 
@@ -165,5 +163,3 @@ if __name__ == "__main__":
                                             organization_unit="Eng",
                                             passphrase=None)
     print("See: {}.crt.pem".format(CN))
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

@@ -12,7 +12,7 @@ from devtest import logging
 from .. import importlib
 from .. import services
 from .. import debugger
-from ..ui import ptui
+from ..ui import simpleui
 from ..core.constants import TestResult
 
 from . import bases
@@ -181,7 +181,7 @@ class TestRunner:
         cf.timezone = get_local_timezone()
         cf.resultsdir = os.path.expandvars(os.path.expanduser(cf.resultsdir))
         cf.username = os.environ["USER"]
-        self._ui = ptui.PromptToolkitUserInterface()
+        self._ui = simpleui.SimpleUserInterface()
         self.logger = logging.Logger("devtest", usestderr=cf.flags.stderr)
         self.initialize_report()
         cf.start_time = datetime.now(timezone.utc)

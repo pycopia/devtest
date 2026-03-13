@@ -14,8 +14,6 @@
 """Asynchronous core. Unify the asynchronous functions here.
 """
 
-from __future__ import generator_stop
-
 import os
 import fcntl
 import signal
@@ -25,22 +23,8 @@ from devtest import logging  # This must be first
 from devtest.os import eventloop
 
 # Re-exported curio objects.
-from curio import (
-    AWAIT,
-    Kernel,
-    sleep,
-    spawn,
-    CancelledError,
-    TaskError,
-    TaskTimeout,
-    Queue,  # noqa
-    UniversalEvent,
-    Event,
-    Lock,
-    RLock,
-    timeout_after,
-    TaskGroup,
-    run_in_thread)
+from curio import (AWAIT, Kernel, sleep, spawn, CancelledError, TaskError, TaskTimeout, Queue,
+                   UniversalEvent, Event, Lock, RLock, timeout_after, TaskGroup, run_in_thread)
 
 __all__ = [
     "AWAIT",
@@ -86,14 +70,13 @@ class SignalEvent(UniversalEvent):
                 pass
 
 
-def get_kernel(selector=None, with_monitor=False):
+def get_kernel(selector=None, with_monitor=False, debug=False):
     """Return an curio.Kernel object with our selector.
 
     This is a singleton object.
     """
-    global _default_kernel
     if _default_kernel is None:
-        _get_kernel(selector=selector)
+        _get_kernel(selector=selector, debug=debug)
         if with_monitor or 'CURIOMONITOR' in os.environ:
             from curio.monitor import Monitor
             m = Monitor(_default_kernel)
@@ -105,10 +88,10 @@ def shutdown_kernel():
     _shutdown_kernel()
 
 
-def _get_kernel(selector=None):
+def _get_kernel(selector=None, debug=False):
     global _default_kernel
     selector = selector or eventloop.EventLoop()
-    _default_kernel = Kernel(selector=selector)
+    _default_kernel = Kernel(selector=selector, debug=debug)
     atexit.register(_shutdown_kernel)
 
 
@@ -180,5 +163,3 @@ def _test(argv):
 if __name__ == "__main__":
     import sys
     _test(sys.argv)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

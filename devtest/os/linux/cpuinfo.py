@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.6
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -16,12 +14,12 @@
 
 import re
 import time
-import typing
+from typing import NamedTuple
 
 _ALLNUMBERS_RE = re.compile(rb'(\d+)(?(1)[ \n]|\(.*\))')
 
 
-class ProcStat(typing.NamedTuple):
+class ProcStat(NamedTuple):
     """Process status.
 
     From /proc/PID/stat, with a few fields elided.
@@ -97,17 +95,19 @@ class CPUUtilizationMonitor:
 
     def __init__(self, pid: int):
         self.pid = int(pid)
-        self._starttime = None
-        self._start_tics = None
+        self._starttime: float | None = None
+        self._start_tics: int | None = None
 
     def start(self):
         """Start monitor by recording current state.
+
+        Always call this first before the other methods.
         """
         self._starttime = time.time()
         ps = ProcStat.from_pid(self.pid)
         self._start_tics = ps.stime + ps.utime
 
-    def current(self):
+    def current(self) -> float:
         """Current CPU utilization.
 
         Returns:
@@ -116,23 +116,27 @@ class CPUUtilizationMonitor:
         ps = ProcStat.from_pid(self.pid)
         now = time.time()
         tics = ps.stime + ps.utime
+        assert self._start_tics is not None
+        assert self._starttime is not None
         return float(tics - self._start_tics) / (now - self._starttime)
 
-    def elapsed(self):
+    def elapsed(self) -> float:
         """Time since start of monitoring.
 
         Return:
             elapsed time in seconds, as float.
         """
-        return time.time() - self._startime
+        assert self._starttime is not None
+        return time.time() - self._starttime
 
-    def end(self):
+    def end(self) -> float:
         """Stop monitor.
 
         Returns:
             Elapsed time of run, in seconds (float).
         """
         st = self._starttime
+        assert st is not None
         self._starttime = None
         self._start_tics = None
         return time.time() - st
@@ -142,11 +146,11 @@ if __name__ == "__main__":
     import os
     ps = ProcStat.from_pid(os.getpid())
     mon = CPUUtilizationMonitor(os.getpid())
+    print("CPU utilization for busy loop with sleep period:")
     mon.start()
     time.sleep(2.9)
     for i in range(10000000):
         x = i**2
-    print(mon.current())
+    print(mon.current(), "%")
     mon.end()
     del mon
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

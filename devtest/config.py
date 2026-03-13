@@ -33,10 +33,11 @@ Windows:
 
 from copy import deepcopy
 from collections import ChainMap
+from typing import Optional
 
 from devtest.third_party import confuse
 
-_CONFIG = None  # singleton instance.
+_CONFIG: Optional["Config"] = None  # singleton instance.
 
 
 class Config(ChainMap):
@@ -162,10 +163,12 @@ def get_config(initdict=None, _filename=None, **kwargs):
         cf = confuse.Configuration("devtest", "devtest.config")
         if _filename:
             cf.set_file(_filename)
-        if isinstance(initdict, dict):
-            cf.add(initdict)
-        cf.add(kwargs)
         _CONFIG = Config(cf.flatten(dclass=ConfigDict))
+        assert _CONFIG is not None
+        if isinstance(initdict, dict):
+            _CONFIG.update(initdict)
+        if kwargs:
+            _CONFIG.update(kwargs)
     return _CONFIG
 
 

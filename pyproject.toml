@@ -12,7 +12,6 @@ authors = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
 maintainers = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
 requires-python = ">=3.12"
 classifiers = [
-    "Operating System :: MacOS :: MacOS X",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
@@ -20,3 +19,14 @@ classifiers = [
 
 
 [tool.setuptools_scm]
+
+[tool.mypy]
+warn_unused_configs = true
+allow_untyped_defs = true
+
+[tool.pylsp-mypy]
+enabled = true
+live_mode = true
+strict = false
+allow_untyped_defs = true
+exclude = ["tests/*"]

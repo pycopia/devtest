@@ -123,6 +123,3 @@ def load(fp):
 
 def loads(s):
     return _decoder.decode(s)
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

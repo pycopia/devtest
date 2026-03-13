@@ -24,16 +24,24 @@ def factorial(x):
     return x <= 0 or reduce(lambda a, b: a * b, range(1, x + 1))
 
 
-def prune_end(n, l):
-    return l[:n]
+def prune_end(n, alist):
+    return alist[:n]
 
 
 class ListCounter:
-    """An iterator that counts through its list of lists."""
+    """An iterator that counts through its list of lists.
+
+    Args:
+        a list containing other lists.
+
+    Yields:
+        A list containing one item from each of the given lists.
+
+    """
 
     def __init__(self, lists):
         self._lists = lists
-        self._lengths = [len(l) for l in lists]
+        self._lengths = [len(alist) for alist in lists]
         if self._lengths.count(0) > 0:
             raise ValueError("All lists must have at least one element.")
         self._places = len(self._lengths)
@@ -61,13 +69,31 @@ class ListCounter:
         return carry
 
     def fetch(self):
-        return [l[i] for l, i in zip(self._lists, self._counters)]
+        return [alist[i] for alist, i in zip(self._lists, self._counters)]
 
     def get_number(self):
         return reduce(lambda a, b: a * b, self._lengths, 1)
 
 
 class KeywordCounter:
+    """An iterator that counts through lists given as keyword arguments.
+
+    Yields:
+        dictionary with keys identical to keyword arugment names, and values taken from keyword
+        values, which should all be lists.
+
+
+    Example:
+
+        To call a function with the six permutations of arguments. ::
+
+            def afunction(arg1: int = None, arg2: str = None):
+                do_something()
+
+            combiner = combinatorics.KeywordCounter(arg1=[1, 2, 3], arg2=["string1", "string2"])
+            for kwargs in combiner:
+                afunction(**kwargs)
+    """
 
     def __init__(self, **kwargs):
         self._names = list(kwargs.keys())
@@ -106,7 +132,7 @@ def prune(maxN, sets, chooser=prune_end):
     chooser implements the pruning policy. It should be a function taking a
     number, N, and a list and returning a new list with N elements.
     """
-    lenlist = [len(l) for l in sets]
+    lenlist = [len(aset) for aset in sets]
     while reduce(lambda a, b: a * b, lenlist, 1) > maxN:
         lv, li = maxi(lenlist)
         lenlist[li] -= 1
@@ -143,5 +169,3 @@ if __name__ == "__main__":
     print(kc.get_number())
     for kwargs in kc:
         print(kwargs)
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

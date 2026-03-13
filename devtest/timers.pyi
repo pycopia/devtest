@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple
+from typing import Union, Tuple
 
 CLOCK_REALTIME: int = 0
 CLOCK_MONOTONIC: int = 1

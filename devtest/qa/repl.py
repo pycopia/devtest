@@ -12,7 +12,7 @@ from jedi import Interpreter
 
 from devtest import debugger
 from devtest.ui.simpleui import ConsoleIO
-from devtest.utils import colors
+from devtest.textutils import colors
 
 
 class InteractiveConsole:
