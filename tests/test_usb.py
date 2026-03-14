@@ -30,10 +30,10 @@ class DummyUSBDevice():
     DUMMY_PID = 0x1001
 
     def create(self):
-        pass
+        pass  # TODO
 
     def destroy(self):
-        pass
+        pass  # TODO
 
 
 @pytest.fixture(scope="module")
@@ -118,7 +118,7 @@ def test_device_class():
     assert isinstance(dev.Class, usb.DeviceClass)
 
 
-# @pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
+@pytest.mark.skipif(NO_PIXEL, reason="Needs attached Pixel XL.")
 def test_open(dummy_usb):
     session = usb.UsbSession()
     dev = session.find(dummy_usb.DUMMY_VID, dummy_usb.DUMMY_PID)

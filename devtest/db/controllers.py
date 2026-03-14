@@ -5,6 +5,7 @@ from functools import wraps
 from datetime import datetime
 from ast import literal_eval
 
+from peewee import JOIN
 from devtest.core import constants, exceptions
 
 from . import models
@@ -306,6 +307,7 @@ class EquipmentController(Controller):
                name,
                newname=None,
                newmodel=None,
+               newmanufacturer=None,
                serno=None,
                accountid=None,
                userid=None,
@@ -316,7 +318,8 @@ class EquipmentController(Controller):
         eq = EquipmentController.get(name, modelname)
         if eq:
             if newmodel is not None:
-                neweqmodel = EquipmentModelController.get(newmodel, eq.model.manufacturer)
+                neweqmodel = EquipmentModelController.get(newmodel, newmanufacturer or
+                                                          eq.model.manufacturer)
                 if not neweqmodel:
                     return neweqmodel  # NoSuchObject
             else:
@@ -726,18 +729,31 @@ class AccountIdsController(Controller):
         return models.AccountIds.select().where(models.AccountIds.identifier == identifier).get()
 
     @staticmethod
-    def create(identifier, login=None, password=None, note=None, admin=True):
+    def create(identifier,
+               login=None,
+               password=None,
+               note=None,
+               admin=True,
+               private_key=None,
+               public_key=None):
         defaults = {
             "login": login,
             "password": password,
             "admin": admin,
             "note": note,
+            "private_key": private_key,
+            "public_key": public_key,
         }
         return models.AccountIds.get_or_create(identifier=identifier, defaults=defaults)
 
     @staticmethod
-    def update(identifier, login=None, password=None, note=None, admin=None):
-
+    def update(identifier,
+               login=None,
+               password=None,
+               note=None,
+               admin=None,
+               private_key=None,
+               public_key=None):
         inst = AccountIdsController.get(identifier)
         if inst:
             with models.database.atomic():
@@ -745,10 +761,16 @@ class AccountIdsController(Controller):
                     inst.login = login
                 if password:
                     inst.password = password
+                if password == "None":  # Remove password if setting to None as string.
+                    inst.password = None
                 if note:
                     inst.note = note
                 if admin is not None:
                     inst.admin = bool(admin)
+                if private_key is not None:
+                    inst.private_key = private_key
+                if public_key is not None:
+                    inst.public_key = public_key
                 inst.save()
         return inst
 
@@ -842,12 +864,71 @@ class TestSuitesController(Controller):
 
 class TestCasesController(Controller):
 
+    STATUSES = {
+        None: constants.TestCaseStatus.Unknown,
+        "unknown": constants.TestCaseStatus.Unknown,
+        "new": constants.TestCaseStatus.New,
+        "reviewed": constants.TestCaseStatus.Reviewed,
+        "preproduction": constants.TestCaseStatus.Preproduction,
+        "production": constants.TestCaseStatus.Production,
+        "deprecated": constants.TestCaseStatus.Deprecated,
+        "obsolete": constants.TestCaseStatus.Obsolete,
+    }
+
     @staticmethod
     def all(like=None):
         q = models.TestCases.select().order_by(models.TestCases.name)
         if like:
             q = q.where(models.TestCases.name.regexp(like))
         return list(q.execute())
+
+    @staticmethod
+    def findall(valid=True, has_implementation=True, **criteria):
+        """Find all valid test cases.
+
+        By default, search for those that have implementations. Other criteria (for equality only)
+        can be added as additional keyword arguments.
+        """
+        TC = models.TestCases
+        q = TC.select().where(TC.valid == valid,
+                              TC.testimplementation.is_null(is_null=not has_implementation),
+                              TC.status != constants.TestCaseStatus.Obsolete)
+        for name, value in criteria.items():
+            col = getattr(TC, name)
+            q = q.where(col == value)
+        return q.execute()
+
+    @staticmethod
+    def invalidate(*names, i_mean_it=False):
+        """Mark invalid one or more test cases by name."""
+        if not names:
+            raise ValueError("must supply at least one name.")
+        TC = models.TestCases
+        if i_mean_it:
+            q = TC.update({TC.valid: False}).where(TC.name.in_(names))
+            with models.database.atomic():
+                return q.execute()
+        else:
+            q = TC.select().where((TC.valid == True) & (TC.name.in_(names)))  # noqa
+            return q.execute()
+
+    @staticmethod
+    def status(*names, status="unknown", i_mean_it=False):
+        """Change the status of one or more test cases by name."""
+        if not names:
+            raise ValueError("must supply at least one name.")
+        status = TestCasesController.STATUSES.get(status.lower())
+        if status is None:
+            raise ValueError('status must be one of '
+                             f'{", ".join(str(o) for o in TestCasesController.STATUSES.keys())}')
+        TC = models.TestCases
+        if i_mean_it:
+            q = TC.update({TC.status: status}).where(TC.name.in_(names))
+            with models.database.atomic():
+                return q.execute()
+        else:
+            q = TC.select().where(TC.name.in_(names))  # noqa
+            return q.execute()
 
     @staticmethod
     def search(phrase):
@@ -868,16 +949,20 @@ class TestResultsController(Controller):
     }
 
     @staticmethod
-    def all(resulttype=None, failures=False):
-        q = models.TestResults.select().order_by(models.TestResults.starttime)
-        if resulttype:
-            rt = TestResultsController.RESULT_TYPE_MAP.get(resulttype)
-            if rt is None:
-                raise ValueError("Result type one of: {}".format(", ".join(
-                    TestResultsController.RESULT_TYPE_MAP.keys())))
-            q = q.where(models.TestResults.resulttype == rt)
+    def all(resulttype="summary", failures=False, latest=50):
+        TRAlias = models.TestResults.alias()
+        rt = TestResultsController.RESULT_TYPE_MAP.get(resulttype)
+        if rt is None:
+            raise ValueError("Result type one of: {}".format(", ".join(
+                TestResultsController.RESULT_TYPE_MAP.keys())))
+        tcq = (TRAlias.select(models.SQL("*"),
+                              models.fn.RANK().over(order_by=TRAlias.starttime.desc()).alias(
+                                  "rnk")).where((TRAlias.resulttype == rt) &
+                                                (TRAlias.valid == True)).alias("tcq"))  # noqa
         if failures:
-            q = q.where(models.TestResults.result != constants.TestResult.PASSED)
+            tcq = tcq.where(TRAlias.result != constants.TestResult.PASSED)
+        q = models.TestResults.select(models.SQL("*")).from_(tcq).where(
+            (tcq.c.rnk <= latest)).order_by(tcq.c.starttime)
         return list(q.execute())
 
     @staticmethod
@@ -898,7 +983,7 @@ class TestResultsController(Controller):
         return models.TestResults.get(id=resultid)
 
     @staticmethod
-    def results_for(testcasename, limit=100, offset=0, testbed=None):
+    def results_for(testcasename, limit=100, offset=0, testbed=None, dutbuild=None):
         tc = TestCasesController.get(testcasename)
         if tc:
             tb = None
@@ -906,7 +991,12 @@ class TestResultsController(Controller):
                 tb = TestBedController.get(testbed)
                 if not tb:
                     raise ValueError("Testbed named {} not found.".format(testbed))
-            return list(models.TestResults.for_testcase(tc, limit=limit, offset=offset, testbed=tb))
+            return list(
+                models.TestResults.for_testcase(tc,
+                                                limit=limit,
+                                                offset=offset,
+                                                testbed=tb,
+                                                dutbuild=dutbuild))
         else:
             raise ValueError("TestCase named {} not found.".format(testcasename))
 
@@ -921,6 +1011,10 @@ class TestResultsController(Controller):
     @staticmethod
     def latest():
         return models.TestResults.get_latest_run()
+
+    @staticmethod
+    def runs(limit=20, offset=0):
+        return models.TestResults.get_runs(limit=limit, offset=offset)
 
     @staticmethod
     def recent_for(testcasename, number=10):
@@ -938,6 +1032,11 @@ class TestResultsController(Controller):
         return q
 
     @staticmethod
+    def subresults_by_id(root_id):
+        testresult = TestResultsController.get_by_id(root_id)
+        return TestResultsController.subresults_for_run(testresult)
+
+    @staticmethod
     def latest_run_for_testcase(testcasename):
         res = TestResultsController.latest_result_for(testcasename)
         while res.resulttype != constants.TestResultType.TestRunSummary:
@@ -945,21 +1044,54 @@ class TestResultsController(Controller):
         return res
 
     @staticmethod
-    def all_results_for_run(runresult, testcase, _results=None):
-        if _results is None:
-            _results = []
-        if isinstance(testcase, str):
-            testcase = TestCasesController.get(testcase)
-        if not testcase:
-            raise ValueError("TestCase {} not found.".format(testcase))
-        # Recurse down into result tree to find Test results for desired test.
-        for res in runresult.subresults:
-            if res.resulttype != constants.TestResultType.Test:
-                TestResultsController.all_results_for_run(res, testcase, _results)
-            else:
-                if res.testcase == testcase:
-                    _results.append(res)
-        return _results
+    def latest_run_on(testbedname):
+        testbed = TestBedController.get(testbedname)
+        if not testbed:
+            raise ValueError(f"testbed not found: {testbedname}")
+        return models.TestResults.get_latest_for_testbed(testbed)
+
+    @staticmethod
+    def resultset(rootresult):
+        """Full result set from root record.
+        """
+        return models.TestResults.resultset(rootresult)
+
+    @staticmethod
+    def resulttree(rootresult):
+        """Partial result set (no data) with testbed and test case names.
+        """
+        TR = models.TestResults
+        TB = models.TestBed
+        TC = models.TestCases
+        # CTE parts
+        TRBase = TR.alias("resulttree")
+        RTerm = TR.alias("trr")
+        base_case = TRBase.select(
+            TRBase.id, TRBase.parent, TRBase.starttime, TRBase.endtime, TRBase.resulttype,
+            TRBase.result, TRBase.note, TRBase.diagnostic, TRBase.resultslocation, TRBase.dutbuild,
+            TRBase.testbed, TRBase.testcase, TRBase.arguments, TRBase.testversion,
+            TRBase.valid).where((TRBase.parent.is_null()) & (TRBase.id == rootresult.id)).cte(
+                'base', recursive=True)
+
+        recursive = RTerm.select(RTerm.id, RTerm.parent, RTerm.starttime, RTerm.endtime,
+                                 RTerm.resulttype, RTerm.result, RTerm.note, RTerm.diagnostic,
+                                 RTerm.resultslocation, RTerm.dutbuild, RTerm.testbed,
+                                 RTerm.testcase, RTerm.arguments, RTerm.testversion,
+                                 RTerm.valid).join(base_case, on=(RTerm.parent == base_case.c.id))
+
+        cte = base_case.union_all(recursive)
+        # Main query
+        query = cte.select_from(
+            base_case.c.id, base_case.c.parent_id, base_case.c.starttime, base_case.c.endtime,
+            base_case.c.resulttype, base_case.c.result, base_case.c.note, base_case.c.diagnostic,
+            base_case.c.resultslocation, base_case.c.dutbuild, cte.c.testbed_id,
+            TB.name.alias("testbed_name"), cte.c.testcase_id, TC.name.alias("testcase_name"),
+            base_case.c.arguments, base_case.c.testversion,
+            base_case.c.valid).join(TB, JOIN.LEFT_OUTER, on=(base_case.c.testbed_id == TB.id)).join(
+                TC, JOIN.LEFT_OUTER,
+                on=(base_case.c.testcase_id == TC.id)).where(cte.c.valid == True).order_by(  # noqa
+                    cte.c.starttime)
+        return query.execute()
 
 
 def _eval_value(attrvalue):
@@ -970,11 +1102,11 @@ def _eval_value(attrvalue):
 
 
 def _test(argv):
-    models.connect()
     for tb in TestBedController.all():
         print(TestBedController.get_equipment(tb.name))
 
 
 if __name__ == "__main__":
     import sys
+    models.connect()
     _test(sys.argv)

@@ -31,6 +31,7 @@ import urllib.request
 import xml.dom.minidom
 
 import portpicker
+
 from devtest import config
 from devtest import json
 from devtest import logging
@@ -938,8 +939,8 @@ class AutomatorDeviceUiObject:
 
         def to(obj, *args, **kwargs):
             if len(args) >= 2 or "x" in kwargs or "y" in kwargs:
-                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(self.selector, x, y, steps  # noqa
-                                                                      )
+                drag_to = lambda x, y, steps=100: self.jsonrpc.dragTo(  # noqa
+                    self.selector, x, y, steps)
             else:
                 drag_to = lambda steps=100, **kwargs: self.jsonrpc.dragTo(  # noqa
                     self.selector, Selector(**kwargs), steps)

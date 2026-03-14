@@ -56,8 +56,15 @@ class VirtualMemoryArea:
         p = private (copy on write)
     """
 
-    def __init__(self, name: str, start: int, end: int, offset: int, perms: str, device: str, inode:
-                 int, usage: Optional[MemUsage] = None):
+    def __init__(self,
+                 name: str,
+                 start: int,
+                 end: int,
+                 offset: int,
+                 perms: str,
+                 device: str,
+                 inode: int,
+                 usage: Optional[MemUsage] = None):
         ...
 
 

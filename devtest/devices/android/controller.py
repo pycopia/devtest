@@ -312,7 +312,7 @@ class AndroidController(devices.Controller):
         result = []
 
         def cb(_, name):
-            nonlocal result  # noqa
+            # nonlocal result  # noqa
             result.append(name)
 
         self.adb.list(path, cb)

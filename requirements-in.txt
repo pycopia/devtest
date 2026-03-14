@@ -9,6 +9,7 @@ ifaddr
 keyring
 peewee < 4.0.0
 portpicker
+prompt_toolkit
 psutil
 psycopg2
 pygments

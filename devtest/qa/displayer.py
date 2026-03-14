@@ -115,6 +115,3 @@ class TestReporter:
         print(highlight(head + "\n" + doc, self._doclexer, self._formatter))
         if self.config.flags.verbose:
             print(highlight(inspect.getsource(mod.run), self._pylexer, self._formatter))
-
-
-# vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

@@ -417,7 +417,7 @@ class _AsyncAndroidDeviceClient:
             await self._conn.close()
         return st
 
-    async def push(self, localfiles: list, remotepath: str, sync: bool = False):
+    async def push(self, localfiles: typing.List[str], remotepath: str, sync: bool = False):
         """Push a list of local files to remote file or directory."""
         sp = SyncProtocol(self.serial)
         await sp.connect_with(self._conn)
@@ -429,8 +429,8 @@ class _AsyncAndroidDeviceClient:
         return resp
 
     async def pull(self, remotepath, localpath):
-        async with streams.aopen(localpath, "wb") as afo:
-            await self.pull_file(remotepath, afo)
+        with open(localpath, "wb") as fo:
+            await self.pull_file(remotepath, fo)
             # TODO(dart) directories and symlinks
 
     async def pull_file(self, remotepath: str, filelike: typing.BinaryIO):
@@ -759,7 +759,7 @@ class AndroidDeviceClient:
         coro = self._aadb.stat(path)
         return get_kernel().run(coro)
 
-    def push(self, localfiles: list, remotepath: str, sync: bool = False):
+    def push(self, localfiles: typing.List[str], remotepath: str, sync: bool = False):
         """Push a list of local files to remote file or directory."""
         coro = self._aadb.push(localfiles, remotepath, sync)
         return get_kernel().run(coro)
@@ -1003,12 +1003,12 @@ class SyncProtocol:
         await self.socket.sendall(msg)
 
     async def send_request(self, protoid: int, path_and_mode: str):
-        path_and_mode = path_and_mode.encode("utf-8")
-        length = len(path_and_mode)
+        path_and_mode_b = path_and_mode.encode("utf-8")
+        length = len(path_and_mode_b)
         if length > 1024:
             raise ValueError("Can't send message > 1024")
         hdr = SyncProtocol.SYNCMSG_DATA.pack(protoid, length)
-        await self.socket.sendall(hdr + path_and_mode)
+        await self.socket.sendall(hdr + path_and_mode_b)
 
     async def list(self, path, cb_coro):
         """List a directory on device."""
@@ -1053,7 +1053,7 @@ class SyncProtocol:
         else:
             raise AdbProtocolError("SyncProtocol: invalid response type.")
 
-    async def push(self, localfiles, remotepath, sync=False):
+    async def push(self, localfiles: typing.List[str], remotepath: str, sync: bool = False):
         """Push files to device destination."""
         try:
             dest_st = await self.stat(remotepath)
@@ -1108,7 +1108,7 @@ class SyncProtocol:
                     data = await self.socket.recv(msg_len)
                     while len(data) < msg_len:
                         data += await self.socket.recv(msg_len - len(data))
-                    await filelike.write(data)
+                    filelike.write(data)
                 elif msg_id == SyncProtocol.ID_DONE:
                     break
                 else:

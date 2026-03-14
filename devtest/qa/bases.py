@@ -179,6 +179,8 @@ class TestCase:
 
         Handles the disposition exceptions, and optional debugging. Invokes the
         `initialize` and `finalize` methods.
+
+        The test runner calls this.
         """
         self._initialize()
         # Test elapsed time does not include initializer time.
@@ -585,7 +587,7 @@ class TestCase:
     def currenttime(self) -> datetime:
         """Return current UTC time as datetime.
 
-        Subtrace self.starttime from this to get current test running time as
+        Subtract self.starttime from this to get current test running time as
         timedelta.
         """
         return datetime.now(timezone.utc)
@@ -673,6 +675,8 @@ class _TestEntry:
         """Invoke the test with its arguments. The config argument is passed
         when run directly from a TestRunner, but not from a TestSuite. It is
         ignored here.
+
+        The test runner calls this.
         """
         self.inst.run(self.args, self.kwargs)
         return self.result

@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test timers module.
 """
-
 
 import sys
 import time
@@ -44,7 +42,7 @@ def test_nanosleep():
     timers.nanosleep(5)
     stop = time.time()
     print(stop - start)
-    assert (stop - start) < 5.01 and (stop-start) > 4.999
+    assert (stop - start) < 5.01 and (stop - start) > 4.999
 
 
 def test_nanosleep_with_alarm():
@@ -55,11 +53,11 @@ def test_nanosleep_with_alarm():
     stop = time.time()
     print(stop - start)
     signal.signal(signal.SIGALRM, old)
-    assert (stop - start) < 5.01 and (stop-start) > 4.999
+    assert (stop - start) < 5.01 and (stop - start) > 4.999
     assert _signaled is True
 
 
-def test_nanosleep_with_alarm():
+def test_nanosleep_with_alarm_short():
     old = signal.signal(signal.SIGALRM, _sighandler_exception)
     signal.alarm(2)
     start = time.time()
@@ -68,7 +66,7 @@ def test_nanosleep_with_alarm():
     stop = time.time()
     print(stop - start)
     signal.signal(signal.SIGALRM, old)
-    assert (stop - start) < 2.01 and (stop-start) > 1.999
+    assert (stop - start) < 2.01 and (stop - start) > 1.999
     assert _signaled is True
 
 
@@ -101,11 +99,10 @@ class TestFDTimer:
         stop = time.time()
         t.close()
         assert rkey is key
-        assert (stop - start) < 2.01 and (stop-start) > 1.999
+        assert (stop - start) < 2.01 and (stop - start) > 1.999
 
     def test_stop(self):
         t = timers.FDTimer(nonblocking=True)
-        start = time.time()
         t.settime(2.0)
         timers.nanosleep(1)
         t.stop()
@@ -123,7 +120,6 @@ class TestIntervalTimer:
         assert type(t) is timers.IntervalTimer
         assert t.signo == signal.SIGALRM
         assert t.clockid == timers.CLOCK_MONOTONIC
-
 
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

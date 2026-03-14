@@ -242,15 +242,14 @@ class MultiSSHController(MultiController):
         use_pty: bool = False,
         environment: Optional[dict] = None
     ) -> Tuple[MultiOutput[bytes], MultiOutput[bytes], MultiOutput[exitstatus.ExitStatus]]:
-        # A quirk in the Curio system requires the results iterator be fully consumed in order for
-        # the network connnects to shut down properly. So return a fully realized list so the
-        # results objects and coroutines can be dereferenced, and closed, here.
         self._connect()
         outputs = cast(MultiOutput[bytes], MultiOutput())
         errs = cast(MultiOutput[bytes], MultiOutput())
         statuses = cast(MultiOutput[exitstatus.ExitStatus], MultiOutput())
         kern = reactor.get_kernel()
         results = kern.run(self._arun_command(command, input, use_pty, environment))
+        # The Curio system requires the results iterator be fully consumed in order for
+        # the network connections to be shut down properly.
         for output, err, status in results:
             if not status:
                 raise HostControllerError(err)

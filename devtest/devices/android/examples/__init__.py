@@ -9,18 +9,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""
-Unit test devtest.os modules.
-"""
-
-from __future__ import generator_stop
-
-from .util import run_module
-
-
-def test_os_time():
-    run_module("devtest.os.time")
-
-
-def test_os_process():
-    run_module("devtest.os.process")
+"""This package just contains examples of using the adb modules independently."""

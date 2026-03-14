@@ -186,12 +186,10 @@ class _OldSnippetsProtocol(_SnippetsProtocol):
 
 
 class _NewSnippetsProtocol(_SnippetsProtocol):
+    # TODO(dart)
 
     def _init(self):
         pass
-
-
-#  TODO(dart)
 
 
 class SnippetsInterface:

@@ -293,13 +293,8 @@ class UsbDevice:
     def release_interface(self, interface_number: int):
         ...
 
-    def control_transfer(self,
-                         recipient: RequestRecipient,
-                         rtype: RequestType,
-                         direction: EndpointDirection,
-                         request: int,
-                         value: int,
-                         index: int,
+    def control_transfer(self, recipient: RequestRecipient, rtype: RequestType,
+                         direction: EndpointDirection, request: int, value: int, index: int,
                          data_or_length: bytes | int) -> bytes | int:
         ...
 
@@ -325,6 +320,7 @@ class UsbSession:
     instantiate. All others are obtained from methods here, or other objects
     obtained from here.
     """
+
     @property
     def version(self) -> str:
         ...

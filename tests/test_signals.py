@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for devtest.signals module.
 """
 
@@ -28,9 +27,11 @@ from devtest import signals
 
 
 def _signal_later(delay, sig):
+
     def _sigusr(pid):
         time.sleep(delay)
         os.kill(pid, sig)
+
     t = threading.Thread(target=_sigusr, args=(os.getpid(),))
     t.start()
     return t
@@ -54,7 +55,7 @@ class TestFDSignals:
         siginfo = None
         t = _signal_later(1, signal.SIGUSR1)
         with selectors.DefaultSelector() as sel:
-            rkey = sel.register(sigs, selectors.EVENT_READ)
+            sel.register(sigs, selectors.EVENT_READ)
             resp = sel.select()
         for key, event in resp:
             if event == selectors.EVENT_READ:
@@ -73,7 +74,7 @@ class TestFDSignals:
         t3 = _signal_later(2, signal.SIGUSR1)
         try:
             with selectors.DefaultSelector() as sel:
-                rkey = sel.register(sigs, selectors.EVENT_READ)
+                sel.register(sigs, selectors.EVENT_READ)
                 state = 1
                 while True:
                     resp = sel.select()

@@ -60,6 +60,7 @@ def main(argv):
         devtestadmin eq update <modelname> <name> [--serno=<serno>]
                                                [--newname=<newname>]
                                                [--newmodel=<newmodel>]
+                                               [--newmanufacturer=<newmanufacturer>]
                                                [--account=<accountid>]
                                                [--user=<userid>]
                                                [--partof=<partof>]
@@ -117,52 +118,68 @@ def main(argv):
                                          [--implementation=<implementation>]
         devtestadmin function update <name> [--description=<description>]
                                          [--implementation=<implementation>]
-        devtestadmin function delete <name>
-        devtestadmin account list [-v] [<like>]
-        devtestadmin account show <identifier>
-        devtestadmin account create <identifier> <login> [--note=<note>] [--password=<password>] [--admin | -a]
-        devtestadmin account update <identifier> [--login=<login>] [--note=<note>] [--password=<password>] [--admin | -a]
-        devtestadmin account delete <identifier>
-        devtestadmin scenario list [<like>]
-        devtestadmin scenario show <name>
-        devtestadmin scenario search <words>...
-        devtestadmin suite list [<like>]
-        devtestadmin suite show <name>
-        devtestadmin suite search <words>...
-        devtestadmin testcase list [<like>]
-        devtestadmin testcase show <name>
-        devtestadmin testcase search <words>...
-        devtestadmin testresult list [<resulttype>] [-F]
-        devtestadmin testresult latest [-F] [-s] [-l]
-        devtestadmin testresult latest for <testcases>...
-        devtestadmin testresult recent for [-s] [--limit=<limit>] <testcases>...
-        devtestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] [--testbed=<testbed>] <testcases>...
-        devtestadmin testresult run [-l] <id>...
-        devtestadmin testresult count <testcases>...
+        brttestadmin function delete <name>
+        brttestadmin account list [-v] [<like>]
+        brttestadmin account show <identifier>
+        brttestadmin account create <identifier> <login> [--note=<note>]
+                                                         [--password=<password>]
+                                                         [--private_key_file=<private_key_file>]
+                                                         [--public_key_file=<public_key_file>]
+                                                         [--admin | -a]
+        brttestadmin account update <identifier> [--login=<login>]
+                                                 [--notes=<note>]
+                                                 [--password=<password>]
+                                                 [--private_key_file=<private_key_file>]
+                                                 [--public_key_file=<public_key_file>]
+                                                 [--admin | -a]
+        brttestadmin account delete <identifier>
+        brttestadmin scenario list [<like>]
+        brttestadmin scenario show <name>
+        brttestadmin scenario search <words>...
+        brttestadmin suite list [<like>]
+        brttestadmin suite show <name>
+        brttestadmin suite search <words>...
+        brttestadmin testcase list [<like>]
+        brttestadmin testcase show <name>
+        brttestadmin testcase invalidate <names>... [-y]
+        brttestadmin testcase status <newstatus> <names>... [-y]
+        brttestadmin testcase search <words>...
+        brttestadmin testresult list [<resulttype>] [-F]
+        brttestadmin testresult latest [-F] [-s] [-l]
+        brttestadmin testresult latest for <testcases>...
+        brttestadmin testresult latest on <testbed>
+        brttestadmin testresult recent for [-s] [--limit=<limit>] <testcases>...
+        brttestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] [--testbed=<testbed>]
+                                    [--dutbuild=<dutbuild>] <testcases>...
+        brttestadmin testresult run [-l] <id>...
+        brttestadmin testresult count <testcases>...
 
     Options:
-        --name=<name>                      The name of something.
-        --newname=<newname>                A new name of something.
-        --user=<userid>                    Name of a regular user account.
-        --file=<attrfile>                  Name of file to read value of attribute from.
-        --account=<accountid>              Name of a super user account.
-        --admin, -a                        Specify an admin (superuser) account.  [default: False]
-        --manufacturer=<manufacturer>      The name of a manufacturer [default: Acme Inc.]
-        --serno=<serno>                    A serial number (string).
-        --location=<location>              A specific location or code.
-        --notes=<notes>                    An arbitrary note to attach to an object.
-        --identifier=<identifier>          An identifier in the AccountIds table.
-        --partof=<partof>                  Name of another equipment that this is a part of.
-        --implementation=<implementation>  A Python style path to a Controller class or callable.
-        --ipnetwork=<ipnetwork>            An IPv4 network in any form.
-        --ip6network=<ip6network>          An IPv6 network in any form.
-        --vlanid=<vlanid>                  The VLAN ID number
-        --layer=<layer>                    A network ISO layer number [default: 3]
-        --type=<type>                      A network type name [default: ethernet]
-        --limit=<limit>                    Limit returned results to this [default: 100]
-        --offset=<offset>                  Offset returned results to this [default: 0]
-        --testbed=<testbed>                Name of a test bed.
-
+        --name=<name>                         The name of something.
+        --newname=<newname>                   A new name of something.
+        --user=<userid>                       Name of a regular user account.
+        --file=<attrfile>                     Name of file to read value of attribute from.
+        --account=<accountid>                 Name of a super user account.
+        --admin, -a                           Specify an admin (superuser) account.  [default: False]
+        --manufacturer=<manufacturer>         The name of a manufacturer [default: Acme Inc.]
+        --serno=<serno>                       A serial number (string).
+        --location=<location>                 A specific location or code.
+        --notes=<notes>                       An arbitrary note to attach to an object.
+        --identifier=<identifier>             An identifier in the AccountIds table.
+        --partof=<partof>                     Name of another equipment that this is a part of.
+        --implementation=<implementation>     A Python style path to a Controller class or callable.
+        --ipnetwork=<ipnetwork>               An IPv4 network in any form.
+        --ip6network=<ip6network>             An IPv6 network in any form.
+        --vlanid=<vlanid>                     The VLAN ID number
+        --layer=<layer>                       A network ISO layer number [default: 3]
+        --type=<type>                         A network type name [default: ethernet]
+        --limit=<limit>                       Limit returned results to this [default: 100]
+        --offset=<offset>                     Offset returned results to this [default: 0]
+        --testbed=<testbed>                   Name of a test bed.
+        --dutbuild=<dutbuild>                 Prefix of DUT version or build name.
+        --password=<password>                 A password.
+        --private_key_file=<private_key_file> File name of a private key file.
+        --public_key_file=<public_key_file>   File name of a public key file, or certificate.
         <resulttype> one of summary, test, or suite.
     """  # noqa
     arguments = docopt.docopt(main.__doc__, argv=argv[1:])
@@ -176,7 +193,8 @@ def main(argv):
             controllers.TestBedController.create(name, notes=arguments["--notes"])
         elif arguments["update"]:
             name = arguments["<name>"]
-            controllers.TestBedController.update(name, notes=arguments["--notes"],
+            controllers.TestBedController.update(name,
+                                                 notes=arguments["--notes"],
                                                  newname=arguments["--newname"])
         elif arguments["delete"]:
             name = arguments["<name>"]
@@ -252,7 +270,8 @@ def main(argv):
             specs = arguments["--specs"]
             controllers.EquipmentModelController.update(name,
                                                         manufacturer=manufacturer,
-                                                        note=note, specs=specs,
+                                                        note=note,
+                                                        specs=specs,
                                                         newname=newname,
                                                         newmanufacturer=newmanufacturer)
         elif arguments["delete"]:
@@ -269,20 +288,25 @@ def main(argv):
                     for key, val in attribs:
                         print("  {:25.25s} = {!r}".format(key, val))
             elif arguments["get"]:
-                print(controllers.EquipmentModelController.attribute_get(
-                    name, arguments["<attrname>"], manufacturer=manufacturer))
+                print(
+                    controllers.EquipmentModelController.attribute_get(name,
+                                                                       arguments["<attrname>"],
+                                                                       manufacturer=manufacturer))
             elif arguments["set"]:
                 name = arguments["<name>"]
-                controllers.EquipmentModelController.attribute_set(
-                    name, arguments["<attrname>"], arguments["<attrvalue>"],
-                    manufacturer=manufacturer)
+                controllers.EquipmentModelController.attribute_set(name,
+                                                                   arguments["<attrname>"],
+                                                                   arguments["<attrvalue>"],
+                                                                   manufacturer=manufacturer)
                 print("Set {!r} to {!r}.".format(
                     arguments["<attrname>"],
-                    controllers.EquipmentModelController.attribute_get(
-                        name, arguments["<attrname>"], manufacturer=manufacturer)))
+                    controllers.EquipmentModelController.attribute_get(name,
+                                                                       arguments["<attrname>"],
+                                                                       manufacturer=manufacturer)))
             elif arguments["del"]:
-                controllers.EquipmentModelController.attribute_del(
-                    name, arguments["<attrname>"], manufacturer=manufacturer)
+                controllers.EquipmentModelController.attribute_del(name,
+                                                                   arguments["<attrname>"],
+                                                                   manufacturer=manufacturer)
             elif arguments["export"]:
                 fname = arguments["<file>"]
                 attribs = controllers.EquipmentModelController.attributes_export(
@@ -297,7 +321,8 @@ def main(argv):
                 fname = arguments["<file>"]
                 with open(fname, mode="r", encoding="utf-8") as fo:
                     attribs = json.load(fo)
-                controllers.EquipmentModelController.attributes_import(name, attribs,
+                controllers.EquipmentModelController.attributes_import(name,
+                                                                       attribs,
                                                                        manufacturer=manufacturer)
         elif arguments["list"]:
             termui.list_equipmentmodels(arguments["<like>"], arguments["-v"])
@@ -335,21 +360,23 @@ def main(argv):
             serno = arguments["--serno"]
             newname = arguments["--newname"]
             newmodelname = arguments["--newmodel"]
+            newmanufacturername = arguments["--newmanufacturer"]
             accountid = arguments["--account"]
             userid = arguments["--user"]
             partof = arguments["--partof"]
             notes = arguments["--notes"]
             location = arguments["--location"]
-            neweq = controllers.EquipmentController.update(
-                modelname, name,
-                serno=serno,
-                newname=newname,
-                newmodel=newmodelname,
-                accountid=accountid,
-                userid=userid,
-                partof=partof,
-                notes=notes,
-                location=location)
+            neweq = controllers.EquipmentController.update(modelname,
+                                                           name,
+                                                           serno=serno,
+                                                           newname=newname,
+                                                           newmodel=newmodelname,
+                                                           newmanufacturer=newmanufacturername,
+                                                           accountid=accountid,
+                                                           userid=userid,
+                                                           partof=partof,
+                                                           notes=notes,
+                                                           location=location)
             print(neweq)
         elif arguments["delete"]:
             modelname = arguments["<modelname>"]
@@ -370,18 +397,18 @@ def main(argv):
                     controllers.EquipmentController.attribute_set_from_file(
                         name, arguments["<attrname>"], arguments["--file"])
                 else:
-                    controllers.EquipmentController.attribute_set(
-                        name, arguments["<attrname>"], arguments["<attrvalue>"])
-                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
-                                                 controllers.EquipmentController.attribute_get(
-                                                 name, arguments["<attrname>"])))
+                    controllers.EquipmentController.attribute_set(name, arguments["<attrname>"],
+                                                                  arguments["<attrvalue>"])
+                print("Set {!r} to {!r}.".format(
+                    arguments["<attrname>"],
+                    controllers.EquipmentController.attribute_get(name, arguments["<attrname>"])))
             elif arguments["del"]:
                 controllers.EquipmentController.attribute_del(name, arguments["<attrname>"])
             elif arguments["export"]:
                 modelname = arguments["--modelname"]
                 fname = arguments["<file>"]
-                attribs = controllers.EquipmentController.attributes_export(
-                    name, modelname=modelname)
+                attribs = controllers.EquipmentController.attributes_export(name,
+                                                                            modelname=modelname)
                 if fname == "-":
                     json.dump(attribs, sys.stdout)
                 else:
@@ -393,14 +420,17 @@ def main(argv):
                 fname = arguments["<file>"]
                 with open(fname, mode="r", encoding="utf-8") as fo:
                     attribs = json.load(fo)
-                controllers.EquipmentController.attributes_import(name, attribs,
+                controllers.EquipmentController.attributes_import(name,
+                                                                  attribs,
                                                                   modelname=modelname)
         elif arguments["iface"]:
             if arguments["add"]:
                 name = arguments["<name>"]
                 iface = arguments["<iface>"]
                 modelname = arguments["--modelname"]
-                controllers.EquipmentController.add_interface(name, iface, modelname=modelname,
+                controllers.EquipmentController.add_interface(name,
+                                                              iface,
+                                                              modelname=modelname,
                                                               ifindex=arguments["--ifindex"],
                                                               macaddr=arguments["--macaddr"],
                                                               ipaddr=arguments["--ipaddr"],
@@ -410,7 +440,9 @@ def main(argv):
                 name = arguments["<name>"]
                 iface = arguments["<iface>"]
                 modelname = arguments["--modelname"]
-                controllers.EquipmentController.update_interface(name, iface, modelname=modelname,
+                controllers.EquipmentController.update_interface(name,
+                                                                 iface,
+                                                                 modelname=modelname,
                                                                  newname=arguments["--newname"],
                                                                  ifindex=arguments["--ifindex"],
                                                                  macaddr=arguments["--macaddr"],
@@ -431,7 +463,9 @@ def main(argv):
                 othername = arguments["<othername>"]
                 modelname = arguments["--modelname"]
                 othermodelname = arguments["--othermodelname"]
-                controllers.EquipmentController.add_connection(name, othername, conntype,
+                controllers.EquipmentController.add_connection(name,
+                                                               othername,
+                                                               conntype,
                                                                modelname=modelname,
                                                                othermodelname=othermodelname)
             # devtestadmin eq <name> connection del <type> <othername> ...
@@ -441,7 +475,8 @@ def main(argv):
                 othername = arguments["<othername>"]
                 modelname = arguments["--modelname"]
                 othermodelname = arguments["--othermodelname"]
-                controllers.EquipmentController.del_connection(name, othername,
+                controllers.EquipmentController.del_connection(name,
+                                                               othername,
                                                                conntype,
                                                                modelname=modelname,
                                                                othermodelname=othermodelname)
@@ -468,9 +503,13 @@ def main(argv):
             layer = arguments["--layer"]
             type = arguments["--type"]
             notes = arguments["--notes"]
-            nw, created = controllers.NetworksController.create(
-                name, ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
-                type=type, notes=notes)
+            nw, created = controllers.NetworksController.create(name,
+                                                                ipnetwork=ipnet,
+                                                                ip6network=ip6net,
+                                                                vlanid=vlanid,
+                                                                layer=layer,
+                                                                type=type,
+                                                                notes=notes)
             if created:
                 print("Created.")
             else:
@@ -483,9 +522,13 @@ def main(argv):
             layer = arguments["--layer"]
             type = arguments["--type"]
             notes = arguments["--notes"]
-            nw = controllers.NetworksController.update(
-                name, ipnetwork=ipnet, ip6network=ip6net, vlanid=vlanid, layer=layer,
-                type=type, notes=notes)
+            nw = controllers.NetworksController.update(name,
+                                                       ipnetwork=ipnet,
+                                                       ip6network=ip6net,
+                                                       vlanid=vlanid,
+                                                       layer=layer,
+                                                       type=type,
+                                                       notes=notes)
         elif arguments["delete"]:
             name = arguments["<name>"]
             controllers.NetworksController.delete(name)
@@ -501,9 +544,9 @@ def main(argv):
             elif arguments["set"]:
                 controllers.NetworksController.attribute_set(name, arguments["<attrname>"],
                                                              arguments["<attrvalue>"])
-                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
-                                                 controllers.NetworksController.attribute_get(
-                                                 name, arguments["<attrname>"])))
+                print("Set {!r} to {!r}.".format(
+                    arguments["<attrname>"],
+                    controllers.NetworksController.attribute_get(name, arguments["<attrname>"])))
             elif arguments["del"]:
                 controllers.NetworksController.attribute_del(arguments["<name>"],
                                                              arguments["<attrname>"])
@@ -536,16 +579,16 @@ def main(argv):
             name = arguments["<name>"]
             desc = arguments["--description"]
             impl = arguments["--implementation"]
-            func, created = controllers.FunctionController.create(
-                name, description=desc, implementation=impl)
+            func, created = controllers.FunctionController.create(name,
+                                                                  description=desc,
+                                                                  implementation=impl)
             if created:
                 print("Created.")
         elif arguments["update"]:
             name = arguments["<name>"]
             desc = arguments["--description"]
             impl = arguments["--implementation"]
-            controllers.FunctionController.update(
-                name, description=desc, implementation=impl)
+            controllers.FunctionController.update(name, description=desc, implementation=impl)
         elif arguments["delete"]:
             name = arguments["<name>"]
             controllers.FunctionController.delete(name)
@@ -564,16 +607,50 @@ def main(argv):
             password = arguments["--password"]
             note = arguments["--note"]
             admin = arguments["--admin"]
-            controllers.AccountIdsController.create(
-                name, login=login, password=password, note=note, admin=admin)
+            private_key_file = arguments["--private_key_file"]
+            if private_key_file:
+                with open(private_key_file, "rb") as fo:
+                    private_key = fo.read()
+            else:
+                private_key = None
+            public_key_file = arguments["--public_key_file"]
+            if public_key_file:
+                with open(public_key_file, "rb") as fo:
+                    public_key = fo.read()
+            else:
+                public_key = None
+            controllers.AccountIdsController.create(name,
+                                                    login=login,
+                                                    password=password,
+                                                    note=note,
+                                                    admin=admin,
+                                                    private_key=private_key,
+                                                    public_key=public_key)
         elif arguments["update"]:
             name = arguments["<identifier>"]
             login = arguments["--login"]
             password = arguments["--password"]
             note = arguments["--note"]
             admin = arguments["--admin"]
-            controllers.AccountIdsController.update(
-                name, login=login, password=password, note=note, admin=admin)
+            private_key_file = arguments["--private_key_file"]
+            if private_key_file:
+                with open(private_key_file, "rb") as fo:
+                    private_key = fo.read()
+            else:
+                private_key = None
+            public_key_file = arguments["--public_key_file"]
+            if public_key_file:
+                with open(public_key_file, "rb") as fo:
+                    public_key = fo.read()
+            else:
+                public_key = None
+            controllers.AccountIdsController.update(name,
+                                                    login=login,
+                                                    password=password,
+                                                    note=note,
+                                                    admin=admin,
+                                                    private_key=private_key,
+                                                    public_key=public_key)
         elif arguments["delete"]:
             name = arguments["<identifier>"]
             controllers.AccountIdsController.delete(name)
@@ -610,6 +687,25 @@ def main(argv):
             inst = controllers.TestCasesController.get(arguments["<name>"])
             if inst:
                 termui.show_testcase(inst)
+        elif arguments["invalidate"]:
+            yes = arguments["-y"]
+            resp = controllers.TestCasesController.invalidate(*arguments["<names>"], i_mean_it=yes)
+            if yes:
+                print(f"Invalidated {resp} cases.")
+            else:
+                for tc in resp:
+                    print(f"Would have invalidated {tc.name!r}.")
+        elif arguments["status"]:
+            yes = arguments["-y"]
+            newstatus = arguments["<newstatus>"]
+            resp = controllers.TestCasesController.status(*arguments["<names>"],
+                                                          status=newstatus,
+                                                          i_mean_it=yes)
+            if yes:
+                print(f"Altered {resp} cases.")
+            else:
+                for tc in resp:
+                    print(f"Would have altered {tc.name!r}.")
         elif arguments["search"]:
             for inst in controllers.TestCasesController.search(" ".join(arguments["<words>"])):
                 termui.show_testcase(inst)
@@ -624,19 +720,27 @@ def main(argv):
             limit = int(arguments["--limit"])
             offset = int(arguments["--offset"])
             testbedname = arguments["--testbed"]
+            dutbuild = arguments["--dutbuild"]
             for tcname in arguments["<testcases>"]:
                 results = controllers.TestResultsController.results_for(tcname,
                                                                         limit=limit,
                                                                         offset=offset,
-                                                                        testbed=testbedname)
+                                                                        testbed=testbedname,
+                                                                        dutbuild=dutbuild)
                 for result in results:
                     termui.show_testresult(result, summarize=summarize, testcase_name=tcname)
         elif arguments["latest"]:
             if arguments["for"]:
                 for tcname in arguments["<testcases>"]:
                     inst = controllers.TestResultsController.latest_result_for(tcname)
-                    termui.show_testresult(inst, failures=arguments["-F"],
-                                           summarize=arguments["-s"], testcase_name=tcname)
+                    termui.show_testresult(inst,
+                                           failures=arguments["-F"],
+                                           summarize=arguments["-s"],
+                                           testcase_name=tcname)
+            elif arguments["on"]:
+                testbedname = arguments["<testbed>"]
+                runresult = controllers.TestResultsController.latest_run_on(testbedname)
+                termui.show_run_result(runresult)
             else:
                 inst = controllers.TestResultsController.latest()
                 termui.show_testresult(inst, failures=arguments["-F"], summarize=arguments["-s"])

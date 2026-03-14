@@ -3,6 +3,7 @@
 
 import sys
 import os
+import inspect
 import curses
 import curses.ascii
 import curses.textpad
@@ -200,6 +201,12 @@ class SimpleUserInterface:
 
     def write(self, data):
         self._io.write(data)
+
+    def write_doc(self, docstring):
+        doc = inspect.cleandoc(docstring)
+        self._io.write(doc)
+        self._io.write("\n")
+        self._io.flush()
 
     def user_input(self, prompt=None):
         return self._io.input(prompt)

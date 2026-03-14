@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test devtest.io.terminal
 """
 
@@ -20,5 +19,6 @@ from .util import run_module
 
 def test_io_terminal():
     run_module("devtest.io.terminal")
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab

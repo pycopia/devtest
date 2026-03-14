@@ -16,7 +16,7 @@ The run callable should have the following signature.
 Where:
     `config` is a nested config.ConfigDict object.
     `testbed` is a db.testbeds.TestBedRuntime object.
-    `UI` is a devtest.ui.simpleui.SimpleUserInterface object.
+    `UI` is a devtest.ui.ptui.PromptToolkitUserInterface object.
 """
 
 import sys
@@ -261,10 +261,10 @@ def list_testbeds(verbose):
 def pick_testbed():
     """Present a radio-button list to choose a test bed.
     """
-    from devtest.ui import simpleui
+    from devtest.ui import ptui
     from devtest.db import models
 
-    ui = simpleui.SimpleUserInterface()
+    ui = ptui.PromptToolkitUserInterface()
     models.connect()
     tblist = models.TestBed.get_list()
     return ui.choose(tblist, defidx=tblist.index("default"), prompt="Choose testbed")
@@ -273,9 +273,9 @@ def pick_testbed():
 def pick_tests(argumentlist):
     """Present a checkbox list with scenarios grouped up front, and colored differently.
     """
-    from devtest.ui import simpleui
+    from devtest.ui import ptui
 
-    ui = simpleui.SimpleUserInterface()
+    ui = ptui.PromptToolkitUserInterface()
     modlist = []
     scenariolist = []
     testlist = []

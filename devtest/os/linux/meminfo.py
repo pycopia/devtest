@@ -43,7 +43,8 @@ MemUsage: NamedTuple = namedtuple("MemUsage", [
     "Size", "KernelPageSize", "MMUPageSize", "Rss", "Pss", "Uss", "Pss_Dirty", "Shared_Clean",
     "Shared_Dirty", "Private_Clean", "Private_Dirty", "Referenced", "Anonymous", "KSM", "LazyFree",
     "AnonHugePages", "ShmemPmdMapped", "FilePmdMapped", "Shared_Hugetlb", "Private_Hugetlb", "Swap",
-    "SwapPss", "Locked", "THPeligible", "VmFlags"])
+    "SwapPss", "Locked", "THPeligible", "VmFlags"
+])
 
 
 def _MemUsage_defaults():
@@ -51,6 +52,10 @@ def _MemUsage_defaults():
     d["THPeligible"] = False
     d["VmFlags"] = None
     return d
+
+
+def get_memusage_defaults():
+    return _MemUsage_defaults()
 
 
 class VirtualMemoryArea:

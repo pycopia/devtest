@@ -597,7 +597,7 @@ class ProcessManager:
             pid, proc = self._procs.popitem()
             proc.interrupt()
 
-    def run_command(self, cmd, timeout=None, input=None, directory=None):
+    def run_command(self, cmd, timeout=None, input=None, directory=None, check=False):
         """Take a command line argument and communicate with it.
 
         Return the output, or raise an exception.
@@ -608,9 +608,10 @@ class ProcessManager:
                       timeout.
             input : str of input to send to command.
             directory : optional directory to change to in subprocess.
+            check : if True, check exit status and raise CalledProcessError if abnormal exit.
         """
         proc = self.start(cmd, directory=directory)
-        return self.run_process(proc, timeout=timeout, input=input)
+        return self.run_process(proc, timeout=timeout, input=input, check=check)
 
     def run_process(self, proc, timeout=None, input=None, check=False):
         """Take a Process instance and communicate with it.
@@ -717,7 +718,11 @@ def check_output(cmd, shell=False, timeout=None, input=None, cwd=None, encoding=
         cmd = ["/bin/sh", "-c"] + ([" ".join(cmd)] if isinstance(cmd, list) else [cmd])
         if encoding is None:  # for backwards compatibility
             encoding = "latin1"
-    stdout, stderr = get_manager().run_command(cmd, timeout=timeout, input=input, directory=cwd)
+    stdout, stderr, es = get_manager().run_command(cmd,
+                                                   timeout=timeout,
+                                                   input=input,
+                                                   directory=cwd,
+                                                   check=True)
     if encoding is not None:
         return b"".join(stdout).decode(encoding)
     else:

@@ -31,11 +31,14 @@ class DB:
     def __init__(self):
         os.makedirs(DB.DB_DIR, exist_ok=True)
         subprocess.run(['initdb', '-D', DB.DB_DIR, '-E', 'UTF-8'],
-                       stdout=subprocess.DEVNULL, shell=False)
+                       stdout=subprocess.DEVNULL,
+                       shell=False)
         url = parse.urlparse(DB.DB_URL)
         proc = subprocess.Popen(
-            ['postgres', '-D', DB.DB_DIR, '-h', url.hostname, '-p', str(url.port), '-i'],
-            shell=False, stdout=subprocess.DEVNULL)
+            ['postgres', '-D', DB.DB_DIR, '-h', url.hostname, '-p',
+             str(url.port), '-i'],
+            shell=False,
+            stdout=subprocess.DEVNULL)
         self.pg_proc = proc
         # need some time to bring up new db
         time.sleep(1)
@@ -57,5 +60,6 @@ def db(request):
     db = DB()
     request.addfinalizer(db.close)
     return db
+
 
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab:fileencoding=utf-8

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3.7
-
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -11,14 +9,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test io.streams module.
 """
 
 import os
 import signal
-
-import pytest
 
 from devtest.timers import FDTimer
 from devtest.signals import FDSignals
@@ -58,7 +53,6 @@ async def _signals_test_main():
     task = await reactor.spawn(_signal_test, sigs, os.getpid())
     await task.join()
     sigs.close()
-
 
 
 class TestReadableStreams:

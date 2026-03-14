@@ -34,4 +34,5 @@ class TestConfigUpdate:
         cf = config.get_config(initdict={"base.tree": "value"})
         assert cf.base.tree == "value"
 
+
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
