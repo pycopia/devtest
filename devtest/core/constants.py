@@ -43,6 +43,9 @@ class TestResult(Enum):
     def __bool__(self):
         return self.value == TestResult.PASSED
 
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
 
 class TestResultType(Enum):
     """Types of objects that have test result records."""
@@ -51,6 +54,9 @@ class TestResultType(Enum):
     TestSuite = 2
     Scenario = 3
     TestRunSummary = 4
+
+    def __str__(self):
+        return f"{self.name}({self.value})"
 
 
 class TestCaseType(Enum):
@@ -66,6 +72,9 @@ class TestCaseType(Enum):
     Component = 8
     Utility = 9
 
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
 
 class TestCaseStatus(Enum):
     """Status of a test case itself."""
@@ -77,6 +86,9 @@ class TestCaseStatus(Enum):
     Deprecated = 5
     Obsolete = 6
 
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
 
 class Priority(Enum):
     """Priority of something, such as a test case."""
@@ -86,6 +98,9 @@ class Priority(Enum):
     P3 = 3
     P4 = 4
     P5 = 5
+
+    def __str__(self):
+        return f"{self.name}({self.value})"
 
 
 class ConnectionType(Enum):
@@ -104,6 +119,9 @@ class ConnectionType(Enum):
     Power = 9
     CAN = 10
 
+    def __str__(self):
+        return f"{self.name}({self.value})"
+
 
 class NetworkType(Enum):
     """Type of data network. For Network objects.
@@ -121,3 +139,6 @@ class NetworkType(Enum):
     # BSD derived
     Dummy = 241
     Bluetooth = 248
+
+    def __str__(self):
+        return f"{self.name}({self.value})"

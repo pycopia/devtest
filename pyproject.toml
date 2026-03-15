@@ -1,22 +1,39 @@
 [build-system]
-requires = ["setuptools>=64.0", "cython", "setuptools_scm>=8", "wheel", "build"]
+requires = ["setuptools>=64.0", "cython", "setuptools-scm[simple]>=9.2", "wheel", "build"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "devtest"
 dynamic = ["version", "dependencies", "scripts"]
-description='General purpose device and large system test framework.'
+description='General purpose device and system level test framework.'
 readme = "README.md"
-license = {"file" = "LICENSE"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
 maintainers = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
+keywords = ["qa", "quality"]
 classifiers = [
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Cython",
+    "Framework :: Devtest",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
 ]
 
+[project.urls]
+Homepage = "https://github.com/pycopia/devtest"
+Issues = "https://github.com/pycopia/devtest/issues"
 
 [tool.setuptools_scm]
 

@@ -54,16 +54,30 @@ def do_function(database):
         models.Function.create(name=name, description=desc)
     database.commit()
 
-    for name, desc, impl in ():
-        models.Function.create(name=name, description=desc, role_implementation=impl)
+    for name, desc, impl in (("localhost", "The local Linux PC.",
+                              "devtest.devices.selfcontroller.SelfController"),):
+        models.Function.create(name=name, description=desc, implementation=impl)
     database.commit()
 
 
 def do_equipment_models(database):
-    manufacturer = "Acme Inc."
-    for name, attribs in ():
+    for name, manufacturer, attribs in (("LinuxPC", "GenericPC", {}),):
         models.EquipmentModel.create(name=name, manufacturer=manufacturer, attributes=attribs)
     database.commit()
+
+
+def do_equipment(database):
+    for name, modelname, manufacturer, attribs in (("localhost", "LinuxPC", "GenericPC", None),):
+        eqmodel = models.EquipmentModel.get(name=modelname, manufacturer=manufacturer)
+        models.Equipment.create(name=name, model=eqmodel, attributes=attribs)
+    database.commit()
+
+
+def do_testbed_update(database):
+    for testbedname, equipmentname, rolename in (("default", "localhost", "localhost"),):
+        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
+        eq = models.Equipment.select().where(models.Equipment.name == equipmentname).get()
+        tb.add_testequipment(eq, rolename)
 
 
 def init_database(url):
@@ -79,6 +93,8 @@ def init_database(url):
         do_default_testbed(database)
         do_function(database)
         do_equipment_models(database)
+        do_equipment(database)
+        do_testbed_update(database)
     finally:
         database.close()
         models.database = None

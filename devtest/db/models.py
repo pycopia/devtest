@@ -829,7 +829,15 @@ class TestResults(BaseModel):
         table_name = 'test_results'
 
     def __str__(self):
-        return "[{}: {} {}]".format(self.testcase, self.resulttype, self.result)
+        match self.resulttype:
+            case constants.TestResultType.TestRunSummary:
+                return "[{:5d}: Run at: {}]".format(self.id, self.starttime)
+            case constants.TestResultType.TestSuite:
+                return "[{:5d}: {}: {}]".format(self.id, self.testsuite, self.result)
+            case constants.TestResultType.Test:
+                return "[{:5d}: {}: {}]".format(self.id, self.testcase, self.result)
+            case _:
+                return "[{:5d}: {}: {}]".format(self.id, self.resulttype, self.result)
 
     @classmethod
     def get_latest_run(cls):

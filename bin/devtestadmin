@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """CLI tool for managing the database.
 """
 
@@ -18,10 +17,9 @@ _log = logging.get_logger()
 
 
 def main(argv):
-    """Manage the brttest persistent storage from the command line.
+    """Manage the devtest persistent storage from the command line.
 
     Usage:
-        devtestadmin tui [<args>...]
         devtestadmin testbed list [-v] [<like>]
         devtestadmin testbed show [-v] <name>
         devtestadmin testbed create <name> [--notes=<notes>]
@@ -118,41 +116,41 @@ def main(argv):
                                          [--implementation=<implementation>]
         devtestadmin function update <name> [--description=<description>]
                                          [--implementation=<implementation>]
-        brttestadmin function delete <name>
-        brttestadmin account list [-v] [<like>]
-        brttestadmin account show <identifier>
-        brttestadmin account create <identifier> <login> [--note=<note>]
+        devtestadmin function delete <name>
+        devtestadmin account list [-v] [<like>]
+        devtestadmin account show <identifier>
+        devtestadmin account create <identifier> <login> [--note=<note>]
                                                          [--password=<password>]
                                                          [--private_key_file=<private_key_file>]
                                                          [--public_key_file=<public_key_file>]
                                                          [--admin | -a]
-        brttestadmin account update <identifier> [--login=<login>]
+        devtestadmin account update <identifier> [--login=<login>]
                                                  [--notes=<note>]
                                                  [--password=<password>]
                                                  [--private_key_file=<private_key_file>]
                                                  [--public_key_file=<public_key_file>]
                                                  [--admin | -a]
-        brttestadmin account delete <identifier>
-        brttestadmin scenario list [<like>]
-        brttestadmin scenario show <name>
-        brttestadmin scenario search <words>...
-        brttestadmin suite list [<like>]
-        brttestadmin suite show <name>
-        brttestadmin suite search <words>...
-        brttestadmin testcase list [<like>]
-        brttestadmin testcase show <name>
-        brttestadmin testcase invalidate <names>... [-y]
-        brttestadmin testcase status <newstatus> <names>... [-y]
-        brttestadmin testcase search <words>...
-        brttestadmin testresult list [<resulttype>] [-F]
-        brttestadmin testresult latest [-F] [-s] [-l]
-        brttestadmin testresult latest for <testcases>...
-        brttestadmin testresult latest on <testbed>
-        brttestadmin testresult recent for [-s] [--limit=<limit>] <testcases>...
-        brttestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] [--testbed=<testbed>]
+        devtestadmin account delete <identifier>
+        devtestadmin scenario list [<like>]
+        devtestadmin scenario show <name>
+        devtestadmin scenario search <words>...
+        devtestadmin suite list [<like>]
+        devtestadmin suite show <name>
+        devtestadmin suite search <words>...
+        devtestadmin testcase list [<like>]
+        devtestadmin testcase show <name>
+        devtestadmin testcase invalidate <names>... [-y]
+        devtestadmin testcase status <newstatus> <names>... [-y]
+        devtestadmin testcase search <words>...
+        devtestadmin testresult list (summary|test|suite) [-F]
+        devtestadmin testresult latest [-F] [-s] [-l]
+        devtestadmin testresult latest for <testcases>...
+        devtestadmin testresult latest on <testbed>
+        devtestadmin testresult recent for [-s] [--limit=<limit>] <testcases>...
+        devtestadmin testresult for [-s] [--limit=<limit>] [--offset=<offset>] [--testbed=<testbed>]
                                     [--dutbuild=<dutbuild>] <testcases>...
-        brttestadmin testresult run [-l] <id>...
-        brttestadmin testresult count <testcases>...
+        devtestadmin testresult run [-l] <id>...
+        devtestadmin testresult count <testcases>...
 
     Options:
         --name=<name>                         The name of something.
@@ -180,7 +178,9 @@ def main(argv):
         --password=<password>                 A password.
         --private_key_file=<private_key_file> File name of a private key file.
         --public_key_file=<public_key_file>   File name of a public key file, or certificate.
-        <resulttype> one of summary, test, or suite.
+        -F                                    Only failed cases.
+        -l                                    Also show files in logdir location.
+        -s                                    Summarize.
     """  # noqa
     arguments = docopt.docopt(main.__doc__, argv=argv[1:])
     controllers.connect()
@@ -221,9 +221,9 @@ def main(argv):
             elif arguments["set"]:
                 controllers.TestBedController.attribute_set(name, arguments["<attrname>"],
                                                             arguments["<attrvalue>"])
-                print("Set {!r} to {!r}.".format(arguments["<attrname>"],
-                                                 controllers.TestBedController.attribute_get(
-                                                 name, arguments["<attrname>"])))
+                print("Set {!r} to {!r}.".format(
+                    arguments["<attrname>"],
+                    controllers.TestBedController.attribute_get(name, arguments["<attrname>"])))
             elif arguments["del"]:
                 controllers.TestBedController.attribute_del(arguments["<name>"],
                                                             arguments["<attrname>"])
@@ -247,16 +247,17 @@ def main(argv):
     # EquipmentModel
     elif arguments["eqmodel"]:
         if arguments["show"]:
-            termui.show_equipmentmodel(arguments["<name>"],
-                                       arguments["<manufacturer>"],
+            termui.show_equipmentmodel(arguments["<name>"], arguments["<manufacturer>"],
                                        arguments["-v"])
         elif arguments["create"]:
             name = arguments["<name>"]
             manufacturer = arguments["<manufacturer>"]
             note = arguments["--note"]
             specs = arguments["--specs"]
-            eqm, created = controllers.EquipmentModelController.create(
-                name, manufacturer=manufacturer, note=note, specs=specs)
+            eqm, created = controllers.EquipmentModelController.create(name,
+                                                                       manufacturer=manufacturer,
+                                                                       note=note,
+                                                                       specs=specs)
             if created:
                 print("Created")
             else:
@@ -341,15 +342,15 @@ def main(argv):
             partof = arguments["--partof"]
             notes = arguments["--notes"]
             location = arguments["--location"]
-            eq, created = controllers.EquipmentController.create(
-                modelname, name,
-                manufacturer=manufacturer,
-                serno=serno,
-                accountid=accountid,
-                userid=userid,
-                partof=partof,
-                notes=notes,
-                location=location)
+            eq, created = controllers.EquipmentController.create(modelname,
+                                                                 name,
+                                                                 manufacturer=manufacturer,
+                                                                 serno=serno,
+                                                                 accountid=accountid,
+                                                                 userid=userid,
+                                                                 partof=partof,
+                                                                 notes=notes,
+                                                                 location=location)
             if created:
                 print("Created")
             else:
@@ -667,7 +668,7 @@ def main(argv):
             for sc in controllers.ScenarioController.search(" ".join(arguments["<words>"])):
                 termui.show_scenario(sc)
     # TestSuites
-    elif arguments["suite"]:
+    elif arguments["suite"] and not arguments["testresult"]:
         if arguments["list"]:
             for inst in controllers.TestSuitesController.all(arguments["<like>"]):
                 print(colors.cyan(inst.name))
@@ -712,9 +713,20 @@ def main(argv):
     # Test results
     elif arguments["testresult"]:
         if arguments["list"]:
-            for inst in controllers.TestResultsController.all(arguments["<resulttype>"],
-                                                              arguments["-F"]):
-                print(inst)
+            match arguments["summary"], arguments["test"], arguments["suite"]:
+                case (True, False, False):
+                    resulttype = "summary"
+                    displayer = lambda res: termui.show_run_result(res, summarize=True)  # noqa
+                case (False, True, False):
+                    resulttype = "test"
+                    displayer = print
+                case (False, False, True):
+                    resulttype = "suite"
+                    displayer = print
+                case _:
+                    raise ValueError("invalid test result list type.")
+            for inst in controllers.TestResultsController.all(resulttype, arguments["-F"]):
+                displayer(inst)
         elif arguments["for"] and not (arguments["latest"] or arguments["recent"]):
             summarize = arguments["-s"]
             limit = int(arguments["--limit"])

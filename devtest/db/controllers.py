@@ -953,7 +953,7 @@ class TestResultsController(Controller):
         TRAlias = models.TestResults.alias()
         rt = TestResultsController.RESULT_TYPE_MAP.get(resulttype)
         if rt is None:
-            raise ValueError("Result type one of: {}".format(", ".join(
+            raise ValueError("Result type must be one of: {}".format(", ".join(
                 TestResultsController.RESULT_TYPE_MAP.keys())))
         tcq = (TRAlias.select(models.SQL("*"),
                               models.fn.RANK().over(order_by=TRAlias.starttime.desc()).alias(

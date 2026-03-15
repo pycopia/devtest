@@ -3,6 +3,7 @@
 
 import sys
 import os
+import time
 import textwrap
 from html.parser import HTMLParser
 
@@ -82,6 +83,11 @@ def show_account(acc, verbose):
             print("       login:", acc.login)
         if acc.password:
             print("    password:", colors.red(acc.password))
+        if acc.private_key:
+            print("    has private key.")
+        if acc.public_key:
+            print("    has public key, or certificate.")
+            print(bytes(acc.public_key).decode("ascii"))
 
 
 def list_testbeds(like, verbose):
@@ -119,6 +125,8 @@ def show_testbed_object(tb, verbose=False):
             print("    ", colors.cyan("Location:"), eq.location)
             if eq.account:
                 print("    ", colors.cyan("Accessor account:"), eq.account)
+            if eq.user:
+                print("    ", colors.cyan("    User account:"), eq.user)
             show_attributes(eq.attributes, indent=4)
             if eq.interfaces:
                 print("    ", colors.cyan("Network interfaces:"))
@@ -183,6 +191,8 @@ def _show_equipment(eq, verbose):
     print(colors.cyan("  Location:"), eq.location)
     if eq.account:
         print(colors.cyan("  Accessor account:"), eq.account)
+    if eq.user:
+        print(colors.cyan("      User account:"), eq.user)
     show_attributes(eq.attributes)
     if eq.interfaces:
         print(colors.cyan("  Network interfaces:"))
@@ -431,6 +441,33 @@ def show_testresult(result, failures=False, summarize=False, testcase_name=None)
         _print_testcase_result(result, 0, summarize, testcase_name)
 
 
+def show_run_result(result, summarize=False):
+    if summarize:
+        suitetype = controllers.TestResultsController.RESULT_TYPE_MAP["suite"]
+        srs = []
+        for sr in result.subresults:
+            if sr.resulttype == suitetype:
+                srs.append(f"{sr.testsuite.name} {sr.result}")
+        print(f"Run: {result.id:4d} started: {result.starttime} {' '.join(srs)}")
+        return
+    print(colors.white("Test Run\n========"))
+    print("    Started:", result.starttime)
+    print("      Ended:", result.endtime)
+    if result.endtime:
+        print("  Elapsed:", result.endtime - result.starttime)
+    print("  Testbed: {}".format(result.testbed))
+    if result.dutbuild:
+        print("  DUT build:", result.dutbuild)
+    print("  Artifact location:", result.resultslocation)
+    if result.arguments:
+        print("Arguments:", result.arguments)
+    if result.note:
+        print("  NOTE:", result.note)
+    for result in controllers.TestResultsController.subresults(result):
+        _print_result_other(result, 0, False, True)
+    print()
+
+
 def _print_testcase_result(result, level, summarize, testcase_name=None):
     if result.result.is_passed():
         colorf = colors.green
@@ -502,7 +539,15 @@ def _print_result_other(result, level, failures, summarize):
 def show_testresult_logs(tr):
     rl = tr.resultslocation
     if rl and os.path.isdir(rl):
-        print("Artifact location:", rl)
+        print("Contents of:", rl)
         for de in os.scandir(rl):
-            st = de.stat()
-            print("  {:>10d} {}".format(st.st_size, de.name))
+            print(_format_directory_entry(de))
+    else:
+        print("Results location does not exist.")
+
+
+def _format_directory_entry(de):
+    st = de.stat()
+    ts = time.strftime("%F %H:%M:%S", time.localtime(st.st_mtime))
+    return "  0o{:03o} {:>10d} {} {}{}".format(st.st_mode & 0o777, st.st_size, ts, de.name,
+                                               '/' if de.is_dir() else '')

@@ -22,7 +22,7 @@ More documentation is coming.
 
 ### Dependencies
 
-This framework requires Python 3.6 or greater.
+This framework requires Python 3.10 or greater.
 
 The current default configuration expects a PostgreSQL database to be running
 locally. It's also possible to configure a central, shared database server.
@@ -72,7 +72,7 @@ brew services start postgresql
 
 ### Python
 
-This framework needs Python 3.6 or later.  Use whatever host package manager you
+This framework needs Python 3.10 or later.  Use whatever host package manager you
 use to install it.
 
 #### Linux
@@ -80,7 +80,7 @@ use to install it.
 On many Linux distros you can do this:
 
 ```console
-sudo apt-get install python3.6-dev
+sudo apt-get install python3.10-dev
 ```
 
 #### MacOS
@@ -99,7 +99,7 @@ To make sure we use the Python version we want, we can set PYTHONBIN to point to
 it.
 
 ```console
-export PYTHONBIN=/usr/bin/python3.12  # or wherever your installation is.
+export PYTHONBIN=/usr/bin/python3.10  # or wherever your installation is.
 ```
 
 Now install some necessary Python packages.
@@ -110,6 +110,7 @@ Now install some necessary Python packages.
 $SUDO $PYTHONBIN -m pip install -U setuptools
 $SUDO $PYTHONBIN -m pip install cython
 $SUDO $PYTHONBIN -m pip install flake8
+$SUDO $PYTHONBIN -m pip install invoke
 ```
 
 ### Devtest
@@ -132,13 +133,13 @@ cd devtest
 Then verify we have the right Python, and set up *developer mode* for the framework source.
 
 ```console
-make info
+invoke info
 ```
 
 Verify that it will use the Python you want (3.6 or greater) If it looks good:
 
 ```console
-make develop
+invoke develop
 ```
 
 Initialize the database.
@@ -168,7 +169,7 @@ to set up if you haven't done it before. Ask the author for help if you need to.
 Now you'll need a *testcases* package. The actual test cases are not included in
 devtest. It expects to find a set of packages rooted at a *testcases* package
 name. A basic template to get started can be installed from
-[devtest-testcases](https://github.com/kdart/devtest-testcases).
+[devtest-testcases](https://github.com/pycopia/devtest-testcases).
 
 Install it as follows.
 
@@ -176,7 +177,7 @@ Install it as follows.
 cd ~/src
 git clone https://github.com/kdart/devtest-testcases
 cd devtest-testcases
-$PYTHONBIN setup.py develop --user
+invoke develop
 ```
 
 Now, try running a demo test case.
@@ -285,34 +286,48 @@ Shows the help screen.
 devtester [options] [-c <configfile>]
     [<globalconfig>...] [<testname> [<testconfig>]] ...
 
-Select and run tests or test suites from the command line.
+Select and run tests or test scenarios from the command line.
 
 The globalconfig and testconfig arguments are in long option format
-(e.g. --arg1=val1).
+(e.g. --arg1=val1). The test runner options are all in the short, `-X`, form.
 
 Options:
 
     -h  - This help.
     -l  - List available tests.
-    -v  - Be more verbose, if possible.
+    -v  - Be more verbose, if possible. Increase verbosity for each occurence.
+    -r <x> - Repeat targeted test object this many times. Default 1.
     -c  - Additional YAML config file to merge into configuration.
-    -C  - Show configuration, after overrides applied.
-    -S  - Show information about selected test case (source) and exit.
-    -L  - List available testbeds.
-    -R  - List available reports that may be used to direct output to.
     -d  - Debug mode. Enter a debugger if a test has an error other
           than a failure condition.
     -D  - Debug framework mode. Enter a debugger on uncaught exception within runner.
     -E  - Show stderr during run. By default stderr is redirected to a file.
           Also enables logging to stderr.
+    -I  - Do NOT run any tests marked INTERACTIVE. Default is to run them.
     -K  - Keep any temporary files or directories that modules might create.
     -P  - Interactively pick a test to run.
     -T  - Interactively pick a testbed to run on.
-    -r <x> - Repeat targeted test object this many times. Default 1.
+    -C  - Show configuration, after overrides applied.
+    -S  - Show information about selected test case (source) and exit.
+    -L  - List available testbeds.
+    -R  - List available reports that may be used to direct output to.
+    -s  - Enter a REPL (shell) in the context of a test case procedure. Specified tests are ignored.
 
 Example:
 
-  devtester -d --reportname=default --testbed=mytestbed --global1=globalarg testcases.mytest --mytestopt=arg
+    devtester -d --reportname=default --testbed=mytestbed --global1=globalarg \
+        testcases.system.MyTest --mytestoption=arg
+
+    That will run a test in debug mode (-d), select the report named "default", select the
+    (pre-defined) test bed named "mytestbed", set global option "global1" to "globalarg, and select
+    the testcase "testcases.system.MyTest. That test will get its own option in the `options`
+    attribute with key "mytestoption", and argument "arg".
+
+    If a test case procedure takes arguments, you can specify them with the `--args` option.
+
+    devtester --testbed=mytestbed testcases.dev.CheckMyDevFlubber --args=procedurearg1,procedurearg2
+
+Use the `-l` option to print a list of runnable objects there are found when scanned.
 ```
 
 The *devtest-testcases* package contains a `_template.py` file to start from.
@@ -320,15 +335,9 @@ Copy that to another name, possibly in another subpackage, and edit it.
 
 ### Debugger
 
-The framework allows choosing which debugger you want to use. It's configured
-through the environment variable *PYTHON\_DEBUGGER*. It defaults to the built-in
-*pdb* module. For a better debugging experience set it to "elicit.debugger".
-
-```console
-export PYTHON_DEBUGGER=elicit.debugger
-```
-
-Better put that in your *.bashrc* or *.zshrc* file.
+The framework has a built-in debugger, provided by the [elicit](https://pypi.org/project/elicit/)
+package. When *devtester* is run with the `-d` flag the debugger is automatically invoked for any
+uncaught exception.
 
 ## Continuing on
 

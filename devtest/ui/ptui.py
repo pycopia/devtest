@@ -5,6 +5,9 @@ import inspect
 from textwrap import dedent
 
 from pygments.styles.vim import VimStyle as DevtestStyle
+from pygments.lexers import markup
+from pygments.formatters import terminal
+from pygments import highlight
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit import output
@@ -48,6 +51,8 @@ class PromptToolkitUserInterface:
         self._output = output.create_output()
         self._input = ptinput.create_input(always_prefer_tty=True)
         self._ps = PromptSession(input=self._input, output=self._output, style=STYLE)
+        self._doclexer = markup.RstLexer()
+        self._formatter = terminal.TerminalFormatter()
 
     def print(self, *args):
         print(*args, file=self._output.stdout)
@@ -60,7 +65,7 @@ class PromptToolkitUserInterface:
 
     def write_doc(self, docstring):
         doc = inspect.cleandoc(docstring)
-        self._output.stdout.write(doc.encode("utf8"))
+        self._output.stdout.write(highlight(doc, self._doclexer, self._formatter))
         self._output.stdout.write("\n")
         self._output.stdout.flush()
 

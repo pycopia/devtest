@@ -25,7 +25,7 @@ class SelfController(hostcontroller.LinuxController):
     """
 
     def _run_command(self, command, input, use_pty, timeout, environment):
-        return process.run_command(command, input=input, use_pty=use_pty, environment=environment)
+        return process.run_command(command, input=input, timeout=timeout)
 
     def _read_file(self, path: Union[os.PathLike, str],
                    encoding: Optional[str]) -> Union[str, bytes]:
