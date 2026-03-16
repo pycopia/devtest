@@ -220,10 +220,20 @@ def update_deps(ctx):
     user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
     deps = [s.strip() for s in open("requirements-in.txt").readlines()]
     if deps:
-        deps = [f'"{s}"' for s in deps]
-        ctx.run(f"{PYTHONBIN} -m pip install "
-                f'--index-url "{ctx.config.pypi.index}" --upgrade'
-                f' {user} {" ".join(deps)}')
+        editablesout = ctx.run("pip list --editable --format json", hide="out")
+        editables = json.loads(editablesout.stdout)
+        try:
+            for entry in editables:
+                deps.remove(entry["name"])
+        except ValueError:
+            pass
+        if deps:
+            deplist = [f'"{s}"' for s in deps]
+            ctx.run(f"{PYTHONBIN} -m pip install "
+                    f'--index-url "{ctx.config.pypi.index}" --upgrade'
+                    f' {user} {" ".join(deplist)}', pty=True)
+        else:
+            print("No updatable dependencies.")
 
 
 @task

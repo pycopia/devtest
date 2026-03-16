@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 authors = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
 maintainers = [{name = "Keith Dart", email = "keith.dart@gmail.com"}]
 requires-python = ">=3.10"
-keywords = ["qa", "quality"]
+keywords = ["qa", "quality", "linux", "usb"]
 classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3 :: Only",

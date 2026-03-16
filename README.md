@@ -1,19 +1,39 @@
 # General Purpose Device and System Test Framework
 
-A generalized framework for testing systems of interconnected devices. It's
-called *devtest*, short for device testing.
-
-It provides a developer friendly API, reporting, and advanced debugging.
-
-The framework models device types, equipment models, interfaces, connections,
-and roles.  Group the device models into a Testbed objects for use by
-generalized tests.  Test cases have easy access to this model to know about the
-testbed and device attributes. Test cases may therefore be written more
-abstractly and function properly in many testbed environments without change.
+A generalized framework for testing systems of interconnected devices.
+It's called *devtest*, short for device testing. Note that it is NOT a unit test
+framework for Python. The requirements for a device testing framework are quite
+different from a unit test framework.
 
 This is a multi-device, multi-interface, multi-role framework. It can manage
 small scale testing of one device, up to large and complex test scenarios with
 many heterogeneous devices and servers.
+
+This package provides:
+
+- A developer friendly API for writing test cases and scenarios.
+- Supports large, complex device environments (testbeds).
+- Supports manual tests that require human interaction.
+    - You may mix manual and automated tests in a suite.
+- Flexible result reporting
+- Test case management and documentation generation.
+    - Test case discovery
+    - Automated test case documentation.
+- Advanced debugging
+- Many supporting modules for writing new device controllers.
+    - USB interfaces
+    - Serial interfaces
+    - SSH client
+    - Protocol modules
+- Some built-in device controllers
+    - Android
+    - Linux hosts and servers
+
+The framework models device types, equipment models, interfaces, connections, and roles in a
+database.  Group the device models into Testbed objects for use by generalized tests.  Test cases
+have easy access to this model to know about the testbed and device attributes, often using dynamic
+properties. Test cases may therefore be written more abstractly and function properly in many
+testbed environments without change.
 
 ## Basic Installation
 
@@ -26,19 +46,20 @@ This framework requires Python 3.10 or greater.
 
 The current default configuration expects a PostgreSQL database to be running
 locally. It's also possible to configure a central, shared database server.
-For this basic installation a local server can be used.
-
-Other databases may be used in the future, once appropriate extensions are
-written for the *peewee* ORM.
+For a basic installation a local server can be used.
 
 It is developed on and for Posix type systems, and tested on Linux and
 MacOS/Darwin. It does not require a graphical environment, therefore runs just
 fine on "headless" lab servers. Some test cases may have additional
 dependencies, but the base framework has relatively few.
 
-#### Linux
+## Development
 
-##### Debian or Ubuntu
+Set up a development environment.
+
+### Linux
+
+#### Debian or Ubuntu
 
 You'll need the PostgreSQL server.
 
@@ -48,7 +69,7 @@ sudo apt-get install postgresql
 
 Configure it to listen on _localhost_ with _trust_ authorization.
 
-###### libusb
+##### libusb
 
 You'll need the libusb dev package to compile the usb extension module.
 
@@ -75,7 +96,7 @@ brew services start postgresql
 This framework needs Python 3.10 or later.  Use whatever host package manager you
 use to install it.
 
-#### Linux
+#### Linux Python
 
 On many Linux distros you can do this:
 
@@ -83,46 +104,67 @@ On many Linux distros you can do this:
 sudo apt-get install python3.10-dev
 ```
 
-#### MacOS
+#### MacOS Python
 
-On MacOS with homebrew:
+On MacOS with homebrew install the latest Python 3, which should work here.
 
 ```console
-brew install python      # default is latest Python 3 now (3.7), which is good.
+brew install python
 ```
 
 That will get you everything you need to start.
 
 ### Python Packages
 
-To make sure we use the Python version we want, we can set PYTHONBIN to point to
-it.
+To make sure we use the Python version we want, in case you have multiple versions installed, we can
+set PYTHONBIN to point to it.
 
 ```console
 export PYTHONBIN=/usr/bin/python3.10  # or wherever your installation is.
 ```
 
-Now install some necessary Python packages.
+Now install some necessary Python packages, preferably in a Python virtual environment.
 
 ```console
 # With brew on MacOS, everything is installed as regular user.
 [[ $(uname) = Darwin ]] && SUDO="" || SUDO=sudo
+$SUDO $PYTHONBIN -m pip install -U pip
 $SUDO $PYTHONBIN -m pip install -U setuptools
-$SUDO $PYTHONBIN -m pip install cython
-$SUDO $PYTHONBIN -m pip install flake8
+$SUDO $PYTHONBIN -m pip install -U setuptools_scm
+$SUDO $PYTHONBIN -m pip install keyring
+$SUDO $PYTHONBIN -m pip install semver
 $SUDO $PYTHONBIN -m pip install invoke
 ```
 
 ### Devtest
 
-Here we'll clone from the source so you can stay up to date easily. Right
-now, there is no installable package. You can run from the source tree, after
-cloning it with git.
+Here we'll clone from the source so you can stay up to date easily.
+You can run from the source tree, after cloning it with git.
 
 ```console
-# If you have access to private github repo:
-$ git clone https://github.com/kdart/devtest.git
+git clone https://github.com/pycopia/devtest.git
 ```
+
+You will need a configuration file. The basic configuration is in `~/.config/devtest/config.yaml`.
+You will need at least enough configuration to "bootstrap" the database.
+
+```console
+$EDITOR ~/.config/devtest/config.yaml
+```
+
+Add this content to get started:
+
+```yaml
+database:
+    select:
+        "local"
+    prod:
+        url: "postgresql://devtest:devtest@postgserver/devtest"
+    local:
+        url: "postgresql://localhost/devtest"
+```
+
+You can always alter or move the server location later.
 
 Now change into the new directory.
 
@@ -154,12 +196,13 @@ This should create a PostgreSQL user named *devtest* and a database named
 
 Test that the installation and initialization worked. If it doesn't, check your
 PostgreSQL installation and verify that it is listening on *localhost* and has
-*trust* access in the _pghba.conf_ file.
+*trust* access in the _pg_hba.conf_ file.
 
 ```console
 devtestadmin testbed list
-default
 ```
+
+Should show `default`.
 
 If that works, it should be good to go. If not, well PostgreSQL can be difficult
 to set up if you haven't done it before. Ask the author for help if you need to.
@@ -167,23 +210,17 @@ to set up if you haven't done it before. Ask the author for help if you need to.
 ### Test Cases
 
 Now you'll need a *testcases* package. The actual test cases are not included in
-devtest. It expects to find a set of packages rooted at a *testcases* package
-name. A basic template to get started can be installed from
+devtest. It expects to find one or more namespace packages starting with the *testcases* name.
+A basic template to get started can be installed from
 [devtest-testcases](https://github.com/pycopia/devtest-testcases).
 
-Install it as follows.
+Install it as follows, preferably in your virtual environment.
 
 ```console
 cd ~/src
-git clone https://github.com/kdart/devtest-testcases
+git clone https://github.com/pycopia/devtest-testcases
 cd devtest-testcases
 invoke develop
-```
-
-Now, try running a demo test case.
-
-```console
-devtester testcases.examples.demo.PassCheck
 ```
 
 List available test cases with the `-l` option.
@@ -202,6 +239,12 @@ Runnable objects:
       test testcases.examples.interactive.InteractiveTest
 ```
 
+Now, try running a demo test case.
+
+```console
+devtester testcases.examples.demo.PassCheck
+```
+
 #### Namespace Package
 
 The *testcases* package is a namespace package. The *devtest-testcases* setup
@@ -210,36 +253,53 @@ rooted in the *testcases* base package, but distributed separately.
 
 ### Data Model
 
-Eventually, you'll have to populate the database with your equipment model,
-which includes testbeds, networks, interfaces, and connections.  Right now, the
-*devtestadmin* tool is the only way to do that. Crude, but effective.
+Eventually, you'll have to populate the database with your equipment model, which includes testbeds,
+networks, interfaces, and connections.  Right now, the *devtestadmin* tool is the only way to do
+that. It's also possible to write database "importers" to populate it from existing equipment.
 
 ```console
 devtestadmin
 ```
 
-Will show the rather large usage. A better, possibly web based, UI is in the
-dreaming stage.
+Will show the rather large usage.
 
 #### Example session
 
+Create an equipment model, which is a type of equipment.
+
+Here we will set up a locally attached Android device.
+
 ```console
-# Create an equipment model, which is a type of equipment.
 devtestadmin eqmodel create "Pixel XL" Google
+```
 
-# Create a specific equipment instance.
+##### Create a specific equipment instance
+
+```console
 devtestadmin eq create Google "Pixel XL" my_pixel2xl
+```
 
-# Oops, forgot the serial number. Update the equipment.
+Oops, forgot the serial number. Update the equipment.
+
+```console
 devtestadmin eq update Google my_pixel2xl  --serno=$ANDROID_SERIAL
+```
 
-# Create the DUT role
+##### Create the DUT role
+
+```console
 devtestadmin function create DUT
+```
 
-# Set it to be an Android implementation
+Set it to be an Android implementation:
+
+```console
 devtestadmin function update DUT --implementation=devtest.devices.android.controller.AndroidController
+```
 
-# Add it to the default testbed as the DUT
+Add it to the default testbed as the DUT:
+
+```console
 devtestadmin testbed default add my_pixel2xl DUT
 ```
 
@@ -252,20 +312,20 @@ Now, in a test case implementation, you should be able to refer to it like this.
         self.info(dut)
 ```
 
-That is a "model object". It has information about the device, and you can add
-more. To interact with it requires getting the *device* attribute.
+The `dut` is a "model object". It has information about the device, and you can add
+more attributes. To interact with it requires getting the *device* attribute.
 
 ```python3
     def procedure(self):
         dut = self.testbed.DUT
         self.info(dut)
-        dev = dut.device
-        self.info(dev.shell("ls /"))
-        self.passed("Run ls command")
+        self.info(dut.device.shell("whoami"))
+        self.info(dut.device.listdir("/"))
+        self.passed("Run commands and and listed directory.")
 ```
 
 The Android device also has access to *adb*, *uiautomator*, the SL4A *api*, and
-*snippets* by attribute accessors.
+*snippets* by those attribute names.
 
 ### Running Test Cases
 
