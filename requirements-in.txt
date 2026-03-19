@@ -7,7 +7,7 @@ elicit
 h11
 ifaddr
 keyring
-peewee < 4.0.0
+peewee>=4.0.2
 portpicker
 prompt_toolkit
 psutil

@@ -7,7 +7,7 @@ elicit==1.7.2
 h11==0.16.0
 ifaddr==0.2.0
 keyring==25.7.0
-peewee==3.19.0
+peewee==4.0.2
 portpicker==1.6.0
 prompt_toolkit==3.0.52
 psutil==7.2.2
