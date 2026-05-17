@@ -63,8 +63,9 @@ class BaseModel(Model):
 
 
 class AccountIds(BaseModel):
-    """For lab devices that need authentication for access and control. A good
-    place to keep fictitious account passwords. Don't use this for sensitive or
+    """For lab devices that need authentication for access and control.
+
+    This is a good place to keep fictitious account passwords. Don't use this for sensitive or
     personal passwords.
     """
     identifier = CharField(max_length=80)
@@ -83,18 +84,22 @@ class AccountIds(BaseModel):
         return "AccountId: {}".format(self.identifier)
 
     @classmethod
-    def create_or_get(cls, identifier=None, login=None, password=None):
+    def create_or_get(cls, identifier=None, login=None, password=None, admin=True, note=None,
+                      private_key=None, public_key=None):
         try:
             assert database is not None
             with database.atomic():
-                return cls.create(identifier=identifier, login=login, password=password), True
+                return cls.create(identifier=identifier, login=login, password=password,
+                                  admin=admin, note=note, private_key=private_key,
+                                  public_key=public_key), True
         except IntegrityError:
             return cls.get(cls.identifier == identifier), False
 
 
 class EquipmentModel(BaseModel):
-    """A model, or type of, equipment. This includes components of other
-    equipment.
+    """A model, or type of, equipment.
+
+    Containts attributes that are common to all instances (Equipment) of this equipment model.
     """
     name = CharField(max_length=255)
     manufacturer = CharField(max_length=255)
@@ -102,6 +107,8 @@ class EquipmentModel(BaseModel):
     picture = BlobField(null=True)
     specs = CharField(max_length=255, null=True)  # URL
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+    # backrefs:
+    # equipment: collection of Equipment
 
     class Meta:
         table_name = 'equipment_model'
@@ -120,10 +127,12 @@ class EquipmentModel(BaseModel):
         return _attribute_del(self, attrname)
 
     @classmethod
-    def create_or_get(cls, name=None, manufacturer=None, attributes=None):
+    def create_or_get(cls, name=None, manufacturer=None, note=None, picture=None, specs=None,
+                      attributes=None):
         try:
             with database.atomic():
-                return cls.create(name=name, manufacturer=manufacturer, attributes=attributes), True
+                return cls.create(name=name, manufacturer=manufacturer, note=note,
+                                  picture=picture, specs=specs, attributes=attributes), True
         except IntegrityError:
             return (cls.get(cls.name == name, cls.manufacturer == manufacturer), False)
 
@@ -159,6 +168,12 @@ class Equipment(BaseModel):
     notes = TextField(null=True)
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
     active = BooleanField(default=True)
+    # backrefs:
+    # interfaces: collection of Interfaces
+    # subcomponents: collection of other Equipment that are part of this Equipment
+    # testequipment: collection of TestBeds that this equipment is assigned to.
+    # connections: collection of other Equipment this equipment is a connected source of.
+    # connected: collection of other Equipment this equipment is a destination of.
 
     class Meta:
         table_name = 'equipment'
@@ -339,6 +354,8 @@ class Software(BaseModel):
                                  field='id',
                                  backref="implementations")
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+    # backrefs:
+    # variants: collection of Software variants
 
     class Meta:
         table_name = 'software'
@@ -354,6 +371,10 @@ class Software(BaseModel):
 
 
 class SoftwareVariant(BaseModel):
+    """A variant of a specific Software version.
+
+    Examples are a different platform target or build environment (debug, prod, etc.)
+    """
     branch = CharField(max_length=80)
     target = CharField(max_length=80)
     build = CharField(max_length=80)
@@ -389,6 +410,8 @@ class TestBed(BaseModel):
     name = CharField(max_length=255, unique=True)
     notes = TextField(null=True)
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+    # backrefs:
+    # testequipment: collection of Equipment in the test bed.
 
     class Meta:
         table_name = 'testbeds'
@@ -472,6 +495,27 @@ class TestBed(BaseModel):
                                                _Testequipment.equipment == eq).get()
             te.delete_instance()
 
+    def get_testequipment(self):
+        q = (_Testequipment.select(_Testequipment, Equipment, Function, TestBed)
+             .join_from(_Testequipment, Equipment)
+             .join_from(_Testequipment, Function)
+             .join_from(_Testequipment, TestBed)
+             .where(_Testequipment.testbed == self))
+        return q.peek(n=100)
+
+    def get_equipment(self):
+        q = (Equipment.select(Equipment, Function.name.alias("role"), Function.implementation)
+             .join(_Testequipment)
+             .join(Function)
+             .switch(_Testequipment)
+             .where(_Testequipment.testbed == self)).objects()
+        return q.peek(n=100)
+
+    def get_all_equipment_with_role(self, rolename):
+        q = (Equipment.select().join(_Testequipment).join(Function).where(
+            Function.name == rolename).switch(_Testequipment).where(_Testequipment.testbed == self))
+        return q.peek(n=100)
+
     def get_equipment_with_role(self, rolename):
         res = self.get_all_equipment_with_role(rolename)
         if res:
@@ -479,18 +523,14 @@ class TestBed(BaseModel):
         else:
             raise ModelError("No equipment with role {!r} defined.".format(rolename))
 
-    def get_all_equipment_with_role(self, rolename):
-        q = (Equipment.select().join(_Testequipment).join(Function).where(
-            Function.name == rolename).switch(_Testequipment).where(_Testequipment.testbed == self))
-        return q.peek(n=100)
-
     def get_all_roles_for_equipment(self, eq):
         q = (Function.select().join(_Testequipment).where((_Testequipment.testbed == self) &
                                                           (_Testequipment.equipment == eq)))
         return q.peek(n=100)
 
 
-# Maps a testbed to equipment.
+# Maps a testbed to equipment and its function (role) in the testbed.
+# This is also the M2M association table.
 class _Testequipment(BaseModel):
     testbed = ForeignKeyField(column_name='testbed_id',
                               model=TestBed,
@@ -516,8 +556,9 @@ class _Testequipment(BaseModel):
         indexes = ((("testbed", "equipment", "function"), True),)
 
     def __str__(self):
-        return "{} in TestBed {} as {}".format(self.equipment.name, self.testbed.name,
-                                               self.function.name)
+        return "Equipment {!r} in TestBed {!r} as role {!r}".format(self.equipment.name,
+                                                                    self.testbed.name,
+                                                                    self.function.name)
 
     @classmethod
     def create_or_get(cls, testbed=None, equipment=None, function=None):
@@ -593,6 +634,9 @@ class Networks(BaseModel):
     notes = TextField(null=True)
     # User defined attributes.
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+    # backrefs:
+    # interfaces: collection of connected Interfaces
+    # upper: Upper layer network of this network
 
     class Meta:
         table_name = 'networks'
@@ -648,6 +692,8 @@ class Interfaces(BaseModel):
                               backref="interfaces",
                               on_update="CASCADE",
                               on_delete="SET NULL")
+    # backrefs:
+    # subinterface: lower layer (child) network interface.
 
     class Meta:
         table_name = 'interfaces'
@@ -655,7 +701,8 @@ class Interfaces(BaseModel):
         indexes = ((("name", "equipment"), True),)
 
     def __str__(self):
-        return "{} (ip:{}, mac:{})".format(self.name, self.ipaddr, self.macaddr)
+        return (f"Interface: {self.name!r} (mac:{self.macaddr}, ipv4:{self.ipaddr}, "
+                f"ipv6:{self.ipaddr6})")
 
 
 class TestSuites(BaseModel):
@@ -667,6 +714,9 @@ class TestSuites(BaseModel):
     test_cases = ArrayField(null=True)  # Ordered array of TestCase.id values.
     owners = ArrayField(null=True)  # Array of user IDs
     valid = BooleanField(default=True)
+    # backrefs:
+    # scenarios: collection of Scenarios that this suite is a part of.
+    # testresults: collection of TestResults for this suite.
 
     class Meta:
         table_name = 'test_suites'
@@ -724,6 +774,8 @@ class TestCases(BaseModel):
     related_issues = ArrayField(null=True)  # list of bug IDs
     time_estimate = IntervalField(null=True)
     valid = BooleanField(default=True)
+    # backrefs:
+    # testresults: collection of Test run results for this test case.
 
     class Meta:
         table_name = 'test_cases'
@@ -824,6 +876,8 @@ class TestResults(BaseModel):
                                 field='id',
                                 backref="testresults")
     testbed = ForeignKeyField(column_name='testbed_id', null=True, model=TestBed, field='id')
+    # backrefs:
+    # subresults: collection of child test rusults from a run.
 
     class Meta:
         table_name = 'test_results'

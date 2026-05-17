@@ -65,13 +65,6 @@ class TestBedController(Controller):
         return models.TestBed.select().where(models.TestBed.name == testbedname).get()
 
     @staticmethod
-    def get_equipment(testbedname):
-        TE = models._Testequipment
-        EQ = models.Equipment
-        tb = TestBedController.get(testbedname)
-        return list(EQ.select().join(TE).where(TE.testbed == tb))
-
-    @staticmethod
     def create(testbedname, notes=None):
         return models.TestBed.get_or_create(name=testbedname, defaults={"notes": notes})
 
@@ -90,19 +83,42 @@ class TestBedController(Controller):
     def delete(testbedname):
         with models.database.atomic():
             inst = models.TestBed.select().where(models.TestBed.name == testbedname).get()
-            inst.delete_instance()
+            if inst:
+                inst.delete_instance()
+                return True
+            return False
+
+    @staticmethod
+    def _get_objects(testbedname, equipmentname):
+        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get_or_none()
+        if tb is None:
+            raise ValueError(f"Testbeb {testbedname!r} does not exist.")
+        eq = models.Equipment.select().where(models.Equipment.name == equipmentname).get_or_none()
+        if eq is None:
+            raise ValueError(f"Equipment {equipmentname!r} does not exist.")
+        return tb, eq
 
     @staticmethod
     def add_testequipment(testbedname, equipmentname, rolename):
-        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
-        eq = models.Equipment.select().where(models.Equipment.name == equipmentname).get()
+        tb, eq = TestBedController._get_objects(testbedname, equipmentname)
         tb.add_testequipment(eq, rolename)
 
     @staticmethod
     def remove_testequipment(testbedname, equipmentname, rolename):
-        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
-        eq = models.Equipment.select().where(models.Equipment.name == equipmentname).get()
+        tb, eq = TestBedController._get_objects(testbedname, equipmentname)
         tb.remove_testequipment(eq, rolename)
+
+    @staticmethod
+    def get_testequipment(testbedname):
+        inst = TestBedController.get(testbedname)
+        if not inst:
+            raise ValueError(f"Testbeb {testbedname!r} does not exist.")
+        return inst.get_testequipment()
+
+    @staticmethod
+    def get_equipment(testbedname):
+        tb = TestBedController.get(testbedname)
+        return tb.get_equipment()
 
     @staticmethod
     def get_equipment_with_role(testbedname, rolename):
@@ -115,9 +131,8 @@ class TestBedController(Controller):
         return tb.get_all_equipment_with_role(rolename)
 
     @staticmethod
-    def get_all_roles_for_equipment(testbedname, eqname):
-        eq = models.Equipment.select().where(models.Equipment.name == eqname).get()
-        tb = models.TestBed.select().where(models.TestBed.name == testbedname).get()
+    def get_all_roles_for_equipment(testbedname, equipmentname):
+        tb, eq = TestBedController._get_objects(testbedname, equipmentname)
         return tb.get_all_roles_for_equipment(eq)
 
     @staticmethod
@@ -262,7 +277,7 @@ class EquipmentController(Controller):
             eqmodel = models.EquipmentModel.select().where(
                 models.EquipmentModel.name == modelname).get()
             q = q.where(models.Equipment.model == eqmodel)
-        return q.get()
+        return q.prefetch(models.Interfaces)[0]
 
     @staticmethod
     def create(modelname,
@@ -278,7 +293,7 @@ class EquipmentController(Controller):
                manufacturer="Acme Inc."):
         eqmodel = EquipmentModelController.get(modelname, manufacturer)
         if not eqmodel:
-            return eqmodel, False  # NoSuchObject
+            raise ValueError(f"Equipment model {manufacturer!r} {modelname!r} was not found.")
         if accountid:
             account = AccountIdsController.get(accountid) or None
         else:
@@ -352,6 +367,9 @@ class EquipmentController(Controller):
         if eq:
             with models.database.atomic():
                 eq.delete_instance()
+                return True
+        else:
+            return False
 
     @staticmethod
     def attribute_list(name, modelname=None):
@@ -360,24 +378,24 @@ class EquipmentController(Controller):
             return inst.attributes.items()
 
     @staticmethod
-    def attribute_get(name, attrname):
-        inst = EquipmentController.get(name)
+    def attribute_get(name, attrname, modelname=None):
+        inst = EquipmentController.get(name, modelname)
         if inst:
             return inst.attribute_get(attrname)
         else:
             raise ValueError(str(inst))
 
     @staticmethod
-    def attribute_set(name, attrname, attrvalue):
-        inst = EquipmentController.get(name)
+    def attribute_set(name, attrname, attrvalue, modelname=None):
+        inst = EquipmentController.get(name, modelname)
         if inst:
             return inst.attribute_set(attrname, _eval_value(attrvalue))
         else:
             raise ValueError(str(inst))
 
     @staticmethod
-    def attribute_set_from_file(name, attrname, filename):
-        inst = EquipmentController.get(name)
+    def attribute_set_from_file(name, attrname, filename, modelname=None):
+        inst = EquipmentController.get(name, modelname)
         if inst:
             with open(filename) as fo:
                 attrvalue = fo.read()
@@ -386,8 +404,8 @@ class EquipmentController(Controller):
             raise ValueError(str(inst))
 
     @staticmethod
-    def attribute_del(name, attrname):
-        inst = EquipmentController.get(name)
+    def attribute_del(name, attrname, modelname=None):
+        inst = EquipmentController.get(name, modelname)
         if inst:
             return inst.attribute_del(attrname)
         else:
@@ -540,6 +558,9 @@ class EquipmentModelController(Controller):
         if eqm:
             with models.database.atomic():
                 eqm.delete_instance()
+                return True
+        else:
+            return False
 
     @staticmethod
     def attribute_get(modelname, attrname, manufacturer="Acme Inc."):
@@ -636,7 +657,8 @@ class NetworksController(Controller):
                vlanid=None,
                layer=None,
                type=None,
-               notes=None):
+               notes=None,
+               newname=None):
         inst = NetworksController.get(name)
         if inst:
             with models.database.atomic():
@@ -645,13 +667,15 @@ class NetworksController(Controller):
                 if ip6network:
                     inst.ip6network = ip6network
                 if vlanid is not None:
-                    inst.vlanid = vlanid
+                    inst.vlanid = int(vlanid)
                 if layer is not None:
-                    inst.layer = layer
+                    inst.layer = int(layer)
                 if type is not None:
                     inst.type = NetworksController.NET_TYPE_MAP.get(type)
                 if notes:
                     inst.notes = notes
+                if newname:
+                    inst.name = str(newname)
                 inst.save()
         return inst
 
@@ -662,6 +686,9 @@ class NetworksController(Controller):
         if nw:
             with models.database.atomic():
                 nw.delete_instance()
+                return True
+        else:
+            return False
 
     @staticmethod
     def interfaces_get(name):
@@ -780,6 +807,9 @@ class AccountIdsController(Controller):
         if inst:
             with models.database.atomic():
                 inst.delete_instance()
+            return True
+        else:
+            return False
 
 
 class FunctionController(Controller):
