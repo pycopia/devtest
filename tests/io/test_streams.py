@@ -12,13 +12,13 @@
 """Test io.streams module.
 """
 
+import sys
 import os
 import signal
 
-from devtest.timers import FDTimer
-from devtest.signals import FDSignals
-from devtest.io import reactor
+import pytest
 
+from devtest.io import reactor
 from devtest.io import streams
 
 
@@ -32,6 +32,7 @@ async def _timer_test(timer):
 
 
 async def _timer_test_main():
+    from devtest.timers import FDTimer
     timer = FDTimer(nonblocking=1)
     tt = await reactor.spawn(_timer_test, timer)
     await tt.join()
@@ -49,12 +50,14 @@ async def _signal_test(sigs, mypid):
 
 
 async def _signals_test_main():
+    from devtest.signals import FDSignals
     sigs = FDSignals({signal.SIGUSR1}, nonblocking=True)
     task = await reactor.spawn(_signal_test, sigs, os.getpid())
     await task.join()
     sigs.close()
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="Only available on Linux")
 class TestReadableStreams:
 
     def test_fdtimer(self):

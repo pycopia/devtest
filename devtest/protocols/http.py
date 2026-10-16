@@ -5,7 +5,7 @@ import socket
 import ssl
 import hashlib
 from typing import Any, Callable, Tuple, Optional, Iterable, Union, cast
-from typing.io import BinaryIO
+from typing import BinaryIO
 from http import cookies
 
 import h11
