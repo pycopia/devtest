@@ -85,9 +85,12 @@ def main(argv):
                                               [--ipaddr6=<ipaddr6>]
                                               [--network=<network>]
         devtestadmin eq <name> iface del <iface> [--modelname=<modelname>]
-        devtestadmin eq <name> connection add <type> <othername> [--modelname=<modelname>]
+        devtestadmin eq <name> connection add <type> <othername> [--port=<port>]
+                                                                 [--other_port=<other_port>]
+                                                                 [--modelname=<modelname>]
                                                                  [--othermodelname=<othermodelname>]
         devtestadmin eq <name> connection del <type> <othername> [--modelname=<modelname>]
+                                                                 [--port=<port>]
                                                                  [--othermodelname=<othermodelname>]
         devtestadmin networks list [-v] [<like>]
         devtestadmin networks show [-v] <name>
@@ -462,11 +465,15 @@ def main(argv):
                 name = arguments["<name>"]
                 conntype = arguments["<type>"]
                 othername = arguments["<othername>"]
+                port = arguments["--port"]
+                other_port = arguments["--other_port"]
                 modelname = arguments["--modelname"]
                 othermodelname = arguments["--othermodelname"]
                 controllers.EquipmentController.add_connection(name,
                                                                othername,
                                                                conntype,
+                                                               port=port,
+                                                               other_port=other_port,
                                                                modelname=modelname,
                                                                othermodelname=othermodelname)
             # devtestadmin eq <name> connection del <type> <othername> ...
@@ -474,11 +481,13 @@ def main(argv):
                 name = arguments["<name>"]
                 conntype = arguments["<type>"]
                 othername = arguments["<othername>"]
+                port = arguments["--port"]
                 modelname = arguments["--modelname"]
                 othermodelname = arguments["--othermodelname"]
                 controllers.EquipmentController.del_connection(name,
                                                                othername,
                                                                conntype,
+                                                               port=port,
                                                                modelname=modelname,
                                                                othermodelname=othermodelname)
 

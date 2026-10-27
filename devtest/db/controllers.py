@@ -20,7 +20,7 @@ class NoSuchObject:
     def __init__(self, message):
         self.message = message
 
-    def __getattr__(self, name):
+    def __getattr__(self, _):
         return False
 
     def __str__(self):
@@ -72,7 +72,7 @@ class TestBedController(Controller):
     def update(testbedname, notes=None, newname=None):
         inst = TestBedController.get(testbedname)
         if inst:
-            with models.database.atomic():
+            with models.database.atomic():  # ty: ignore[unresolved-attribute]
                 if newname:
                     inst.name = newname
                 inst.notes = notes
@@ -474,21 +474,25 @@ class EquipmentController(Controller):
         return eq
 
     @staticmethod
-    def add_connection(name, othername, conntype, modelname=None, othermodelname=None):
-        conntype = EquipmentController.CONNECTION_TYPES.get(conntype.lower(), conntype)
+    def add_connection(name, othername, conntype, port=None, other_port=None, modelname=None, othermodelname=None):
+        conntype = EquipmentController.CONNECTION_TYPES.get(conntype.lower())
+        if conntype is None:
+            allowed = list(EquipmentController.CONNECTION_TYPES.keys())
+            raise ValueError(f"Invalid connection type {conntype}. Must be one of {', '.join(allowed)}")
         eq = EquipmentController.get(name, modelname)
         if eq:
             other = EquipmentController.get(othername, othermodelname)
-            eq.add_connection(other, conntype)
+            eq.add_connection(other, conntype, port=port, destination_port=other_port)
         return eq
 
     @staticmethod
-    def del_connection(name, othername, conntype=None, modelname=None, othermodelname=None):
+    def del_connection(name, othername, conntype=None, port=None, modelname=None, othermodelname=None):
         conntype = EquipmentController.CONNECTION_TYPES.get(conntype)
         eq = EquipmentController.get(name, modelname)
         if eq:
             other = EquipmentController.get(othername, othermodelname)
-            eq.remove_connection(other, conntype)
+            if other:
+                eq.remove_connection(other, conntype, port)
         return eq
 
 
@@ -506,7 +510,7 @@ class EquipmentModelController(Controller):
     def get(modelname, manufacturer="Acme Inc."):
         q = models.EquipmentModel.select().where(
             models.EquipmentModel.name == modelname,
-            models.EquipmentModel.manufacturer == manufacturer)  # noqa
+            models.EquipmentModel.manufacturer == manufacturer)
         return q.get()
 
     @staticmethod

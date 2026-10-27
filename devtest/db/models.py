@@ -271,15 +271,17 @@ class Equipment(BaseModel):
             intf.delete_instance()
 
     # Device connection management
-    def add_connection(self, other, connection_type):
+    def add_connection(self, other, connection_type, port=None, destination_port=None):
         if isinstance(other, str):
             other = Equipment.select().where(Equipment.name == other).get()
         with database.atomic():
-            _Connection.create(source=self, destination=other, type=connection_type)
+            _Connection.create(source=self, destination=other, type=connection_type, source_port=port,
+                               destination_port=destination_port)
 
-    def remove_connection(self, other, connection_type=None):
+    def remove_connection(self, other, connection_type=None, port=None):
         with database.atomic():
             q = _Connection.select().where((_Connection.source == self) &
+                                           (_Connection.source_port == port) &
                                            (_Connection.destination == other))
             if connection_type is not None:
                 q = q.where(_Connection.type == connection_type)
@@ -290,15 +292,6 @@ class Equipment(BaseModel):
         """Return equipment on other end of a connection."""
         conn = self.connections.filter(type=connection_type).get()
         return conn.destination
-
-    def set_connection_state(self, connection_type, state):
-        conn = self.connections.filter(type=connection_type).get()
-        with database.atomic():
-            conn.state = int(state)
-
-    def get_connection_state(self, connection_type):
-        conn = self.connections.filter(type=connection_type).get()
-        return conn.state
 
 
 class Function(BaseModel):
@@ -607,13 +600,15 @@ class _Connection(BaseModel):
                                   backref="connected",
                                   on_delete="CASCADE")
     type = EnumField(constants.ConnectionType, default=constants.ConnectionType.Unknown)
+    source_port = CharField(max_length=64, null=True)
+    destination_port = CharField(max_length=64, null=True)
     state = IntegerField(null=True)  # User defined state
 
     class Meta:
         table_name = 'connections'
 
     def __str__(self):
-        return "{} <-<{}>-> {}".format(self.source.name, self.type.name, self.destination.name)
+        return f"{self.source.name} <-({self.type.name}:{self.source_port})-> {self.destination.name}"
 
 
 class Networks(BaseModel):
