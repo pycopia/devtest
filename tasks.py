@@ -8,17 +8,17 @@ Run these tasks with the `invoke` tool.
 # mypy: allow-untyped-defs
 
 import getpass
-from glob import glob
 import json
 import os
-from pathlib import Path
 import shutil
 import sys
-import tomllib
+from glob import glob
+from pathlib import Path
 
-from invoke import Exit, run, task
 import keyring
 import semver
+import tomllib  # ty: ignore[unresolved-import]
+from invoke import Exit, run, task
 from setuptools_scm import get_version
 
 PYTHONBIN = os.environ.get("PYTHONBIN", sys.executable)
@@ -36,7 +36,7 @@ CURRENT_USER = getpass.getuser()
 
 
 @task
-def info(ctx):
+def info(_):
     """Show information about the current Python and environment."""
     version = get_version()
     suffix = get_suffix()
@@ -49,13 +49,17 @@ def info(ctx):
 
 
 @task
+def clean_docs(ctx):
+    with ctx.cd("docs"):
+        ctx.run("rm -f modules/devtest.*.rst")
+        ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M clean . _build")
+
+
+@task(pre=[clean_docs])
 def clean(ctx):
     """Clean out build and cache files. Remove extension modules."""
     ctx.run(r"find . -depth -type d -name __pycache__ -exec rm -rf {} \;")
     ctx.run('find devtest -name "*.so" -delete')
-    with ctx.cd("docs"):
-        ctx.run("rm -f modules/devtest.*.rst")
-        ctx.run(f"{PYTHONBIN} -m sphinx.cmd.build -M clean . _build")
 
 
 @task
@@ -97,7 +101,7 @@ def format_changed(ctx, check=False, untracked=False):
 
 
 @task
-def changed(ctx, untracked=False):
+def changed(_, untracked=False):
     """Show any changed files.
     """
     files = get_modified_files(untracked)
@@ -152,7 +156,7 @@ def set_pypi_token(ctx):
 
 
 @task
-def cleandist(ctx):
+def cleandist(_):
     """Clean out distributably build subdirectory."""
     if os.path.isdir("dist"):
         shutil.rmtree("dist", ignore_errors=True)
@@ -178,7 +182,8 @@ def freeze(ctx):
             fo.write(line + "\n")
         # Add back in dependencies installed as editable.
         editables = json.loads(editablesout.stdout)
-        basereqs = [s.strip() for s in open("requirements-in.txt").readlines()]
+        with open("requirements-in.txt") as fo:
+            basereqs = [s.strip() for s in fo]
         for editable in editables:
             for req in basereqs:
                 if req.startswith(editable["name"]):
@@ -218,7 +223,8 @@ def develop(ctx, uninstall=False):
 def update_deps(ctx):
     """Update the project dependencies to the most recent versions."""
     user = "" if os.environ.get("VIRTUAL_ENV") else "--user"
-    deps = [s.strip() for s in open("requirements-in.txt").readlines()]
+    with open("requirements-in.txt") as fo:
+        deps = [s.strip() for s in fo]
     if deps:
         editablesout = ctx.run("pip list --editable --format json", hide="out")
         editables = json.loads(editablesout.stdout)
@@ -269,8 +275,7 @@ def tag(ctx, tag=None, major=False, minor=False, patch=False):
         else:
             nextver = latest.bump_patch()
     else:
-        if tag.startswith("v"):
-            tag = tag[1:]
+        tag = tag.removeprefix("v")
         try:
             nextver = semver.parse_version_info(tag)
         except ValueError:
@@ -370,7 +375,7 @@ def docker_build(ctx):
     if not version:
         raise Exit("Need to tag a version first.", 2)
     environ = {
-        "PYVER": "{}.{}".format(sys.version_info.major, sys.version_info.minor),
+        "PYVER": f"{sys.version_info.major}.{sys.version_info.minor}",
         "VERSION": version,
         "PYPI_HOST": ctx.config.pypi.server,
         "PYPI_REPO": ctx.config.pypi.index,
@@ -420,7 +425,7 @@ def get_suffix() -> str:
         hide=True,
     )
     assert rv is not None
-    return rv.stdout.strip()  # noqa
+    return rv.stdout.strip()
 
 
 def resolve_path(base: Path, p: str | Path) -> str:

@@ -283,7 +283,7 @@ class AutomatorServer:
         device_port=None,
         adb_server_host="localhost",
         adb_server_port=adb.ADB_PORT,
-        serversource="google",
+        serversource="upstream",
     ):
         self._sdk = 0
         self._uia_device_process = None

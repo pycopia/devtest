@@ -16,19 +16,44 @@ interconnections. They may also have user-specified attributes attached. This
 information is made available to test cases using simple attribute accessors.
 """
 
-from typing import Optional
 from datetime import datetime
 
+from peewee import (
+    SQL,
+    BlobField,
+    BooleanField,
+    CharField,
+    Check,
+    CompositeKey,
+    Database,
+    DoesNotExist,
+    ForeignKeyField,
+    IntegerField,
+    IntegrityError,
+    Model,
+    ModelSelect,
+    Proxy,
+    TextField,
+    UUIDField,
+    fn,
+)
 from pytz import timezone
-from peewee import (BlobField, BooleanField, CharField, Check, CompositeKey, Database, DoesNotExist,
-                    fn, ForeignKeyField, IntegerField, IntegrityError, Model, Proxy, SQL, TextField,
-                    UUIDField, ModelSelect)
 
-from .fields import (IPv4Field, IPv6Field, CIDRField, MACField, EnumField, IntervalField,
-                     TSVectorField, DateTimeTZField, ArrayField, BinaryJSONField)
 from .. import json
 from ..core import constants
 from ..core.exceptions import ModelError
+from .fields import (
+    ArrayField,
+    BinaryJSONField,
+    CIDRField,
+    DateTimeTZField,
+    EnumField,
+    IntervalField,
+    IPv4Field,
+    IPv6Field,
+    MACField,
+    TSVectorField,
+)
 
 TABLES = [
     'AccountIds', 'EquipmentModel', 'Equipment', 'Function', 'Software', 'SoftwareVariant',
@@ -42,7 +67,7 @@ _ASSOC_TABLES = [
     "_Connection",
 ]
 
-__all__ = TABLES + ['time_now', 'connect']
+__all__ = TABLES + ['time_now', 'connect']  # noqa: PLE0605
 
 UTC = timezone('UTC')
 
@@ -53,7 +78,7 @@ def time_now():
 
 
 database_proxy: Proxy = Proxy()
-database: Optional[Database] = None
+database: Database | None = None
 
 
 class BaseModel(Model):
@@ -76,12 +101,12 @@ class AccountIds(BaseModel):
     private_key = BlobField(null=True)  # Should have a passphrase.
     public_key = BlobField(null=True)  # May also be an OpenSSH certificate.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'account_ids'
         indexes = ((("identifier",), True),)
 
     def __str__(self):
-        return "AccountId: {}".format(self.identifier)
+        return f"AccountId: {self.identifier}"
 
     @classmethod
     def create_or_get(cls, identifier=None, login=None, password=None, admin=True, note=None,
@@ -110,12 +135,12 @@ class EquipmentModel(BaseModel):
     # backrefs:
     # equipment: collection of Equipment
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'equipment_model'
         indexes = ((("name", "manufacturer"), True),)
 
     def __str__(self):
-        return "{} {}".format(self.manufacturer, self.name)
+        return f"{self.manufacturer} {self.name}"
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -130,7 +155,7 @@ class EquipmentModel(BaseModel):
     def create_or_get(cls, name=None, manufacturer=None, note=None, picture=None, specs=None,
                       attributes=None):
         try:
-            with database.atomic():
+            with database.atomic():  # ty: ignore[unresolved-attribute]
                 return cls.create(name=name, manufacturer=manufacturer, note=note,
                                   picture=picture, specs=specs, attributes=attributes), True
         except IntegrityError:
@@ -175,7 +200,7 @@ class Equipment(BaseModel):
     # connections: collection of other Equipment this equipment is a connected source of.
     # connected: collection of other Equipment this equipment is a destination of.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'equipment'
 
     def __str__(self):
@@ -184,6 +209,7 @@ class Equipment(BaseModel):
     @classmethod
     def create_or_get(cls, name=None, serno=None, model=None, account=None, attributes=None):
         try:
+            assert database is not None
             with database.atomic():
                 return cls.create(name=name,
                                   serno=serno,
@@ -213,6 +239,7 @@ class Equipment(BaseModel):
         """
         if network is not None and isinstance(network, str):
             network = Networks.select().where(Networks.name == network).get()
+        assert database is not None
         with database.atomic():
             Interfaces.create(name=name,
                               equipment=self,
@@ -237,6 +264,7 @@ class Equipment(BaseModel):
         iface = Interfaces.select().where((Interfaces.name == name) &
                                           (Interfaces.equipment == self)).get()
         if iface:
+            assert database is not None
             with database.atomic():
                 if ifindex:
                     iface.ifindex = ifindex
@@ -259,13 +287,15 @@ class Equipment(BaseModel):
             q = q.where(getattr(Interfaces, attrname) == value)
         intf = q.get()
         if intf.equipment is not None:
-            raise ModelError("Interface already attached to {!r}".format(intf.equipment))
+            raise ModelError(f"Interface already attached to {intf.equipment!r}")
+        assert database is not None
         with database.atomic():
             intf.equipment = self
 
     def del_interface(self, name):
         """Delete an interface on this Equipment.
         """
+        assert database is not None
         with database.atomic():
             intf = self.interfaces.where(Interfaces.name == name).get()
             intf.delete_instance()
@@ -274,11 +304,13 @@ class Equipment(BaseModel):
     def add_connection(self, other, connection_type, port=None, destination_port=None):
         if isinstance(other, str):
             other = Equipment.select().where(Equipment.name == other).get()
+        assert database is not None
         with database.atomic():
             _Connection.create(source=self, destination=other, type=connection_type, source_port=port,
                                destination_port=destination_port)
 
     def remove_connection(self, other, connection_type=None, port=None):
+        assert database is not None
         with database.atomic():
             q = _Connection.select().where((_Connection.source == self) &
                                            (_Connection.source_port == port) &
@@ -290,8 +322,8 @@ class Equipment(BaseModel):
 
     def get_connected(self, connection_type):
         """Return equipment on other end of a connection."""
-        conn = self.connections.filter(type=connection_type).get()
-        return conn.destination
+        return [(conn.destination, conn.source_port) for conn in
+                self.connections.filter(type=connection_type).peek(n=100)]
 
 
 class Function(BaseModel):
@@ -305,15 +337,16 @@ class Function(BaseModel):
     description = TextField(null=True)
     implementation = CharField(max_length=255, null=True)
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'function'
 
     def __str__(self):
-        return "Function: {}".format(self.name)
+        return f"Function: {self.name}"
 
     @classmethod
     def create_or_get(cls, name=None, description=None, implementation=None):
         try:
+            assert database is not None
             with database.atomic():
                 return cls.create(name=name, description=description,
                                   implementation=implementation), True
@@ -325,7 +358,7 @@ class Function(BaseModel):
         try:
             func = cls.select().where(cls.name == str(name)).get()
         except DoesNotExist:
-            raise ModelError("No Function {!r} defined.".format(name))
+            raise ModelError(f"No Function {name!r} defined.")
         return func
 
     @classmethod
@@ -350,7 +383,7 @@ class Software(BaseModel):
     # backrefs:
     # variants: collection of Software variants
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'software'
 
     def attribute_get(self, attrname, default=None):
@@ -372,11 +405,11 @@ class SoftwareVariant(BaseModel):
     target = CharField(max_length=80)
     build = CharField(max_length=80)
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'software_variant'
 
     def __str__(self):
-        return "{}-{}-{}".format(self.branch, self.target, self.build)
+        return f"{self.branch}-{self.target}-{self.build}"
 
 
 class _SoftwareVariants(BaseModel):
@@ -388,7 +421,7 @@ class _SoftwareVariants(BaseModel):
                                       model=SoftwareVariant,
                                       field='id')
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'software_variants'
         primary_key = CompositeKey('software', 'softwarevariant')
 
@@ -406,7 +439,7 @@ class TestBed(BaseModel):
     # backrefs:
     # testequipment: collection of Equipment in the test bed.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'testbeds'
 
     def __str__(self):
@@ -415,6 +448,7 @@ class TestBed(BaseModel):
     @classmethod
     def create_or_get(cls, name=None, notes=None, attributes=None):
         try:
+            assert database is not None
             with database.atomic():
                 return cls.create(name=name, notes=notes, attributes=attributes), True
         except IntegrityError:
@@ -463,7 +497,7 @@ class TestBed(BaseModel):
         if sut:
             return sut[0]
         else:
-            raise ModelError("SUT is not defined in testbed '{}'.".format(self.name))
+            raise ModelError(f"SUT is not defined in testbed '{self.name}'.")
 
     def get_software_with_role(self, rolename):
         q = (Software.select().join(_SoftwareRoles).join(Function).where(
@@ -472,16 +506,19 @@ class TestBed(BaseModel):
 
     def add_software_role(self, software, rolename):
         func = Function.select().where(Function.name == rolename).get()
+        assert database is not None
         with database.atomic():
             _SoftwareRoles.create(testbed=self, software=software, function=func)
 
     def add_testequipment(self, eq, rolename):
         func = Function.select().where(Function.name == rolename).get()
+        assert database is not None
         with database.atomic():
-            te, created = _Testequipment.create_or_get(testbed=self, equipment=eq, function=func)
+            _Testequipment.create_or_get(testbed=self, equipment=eq, function=func)
 
     def remove_testequipment(self, eq, rolename):
         func = Function.select().where(Function.name == rolename).get()
+        assert database is not None
         with database.atomic():
             te = _Testequipment.select().where(_Testequipment.testbed == self,
                                                _Testequipment.function == func,
@@ -514,7 +551,7 @@ class TestBed(BaseModel):
         if res:
             return res[0]
         else:
-            raise ModelError("No equipment with role {!r} defined.".format(rolename))
+            raise ModelError(f"No equipment with role {rolename!r} defined.")
 
     def get_all_roles_for_equipment(self, eq):
         q = (Function.select().join(_Testequipment).where((_Testequipment.testbed == self) &
@@ -544,18 +581,17 @@ class _Testequipment(BaseModel):
                                on_update="CASCADE",
                                on_delete="CASCADE")
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'testequipment'
         indexes = ((("testbed", "equipment", "function"), True),)
 
     def __str__(self):
-        return "Equipment {!r} in TestBed {!r} as role {!r}".format(self.equipment.name,
-                                                                    self.testbed.name,
-                                                                    self.function.name)
+        return f"Equipment {self.equipment.name!r} in TestBed {self.testbed.name!r} as role {self.function.name!r}"
 
     @classmethod
     def create_or_get(cls, testbed=None, equipment=None, function=None):
         try:
+            assert database is not None
             with database.atomic():
                 return cls.create(testbed=testbed, equipment=equipment, function=function), True
         except IntegrityError:
@@ -580,7 +616,7 @@ class _SoftwareRoles(BaseModel):
                                on_update="CASCADE",
                                on_delete="CASCADE")
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'software_roles'
         primary_key = CompositeKey('testbed', 'software', 'function')
 
@@ -604,7 +640,7 @@ class _Connection(BaseModel):
     destination_port = CharField(max_length=64, null=True)
     state = IntegerField(null=True)  # User defined state
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'connections'
 
     def __str__(self):
@@ -633,17 +669,17 @@ class Networks(BaseModel):
     # interfaces: collection of connected Interfaces
     # upper: Upper layer network of this network
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'networks'
-        constraints = [Check('vlanid >= 0 AND vlanid < 4096')]
+        constraints = (Check('vlanid >= 0 AND vlanid < 4096'),)
 
     def __str__(self):
         if self.layer == 2 and self.vlanid is not None:
-            return "{} <{}>".format(self.name, self.vlanid)
+            return f"{self.name} <{self.vlanid}>"
         elif self.layer == 3 and self.ipnetwork is not None:
-            return "{} ({})".format(self.name, self.ipnetwork)
+            return f"{self.name} ({self.ipnetwork})"
         else:
-            return "{}|{}".format(self.name, self.type.name)
+            return f"{self.name}|{self.type.name}"
 
     def attribute_get(self, attrname, default=None):
         return _attribute_get(self, attrname, default)
@@ -690,9 +726,9 @@ class Interfaces(BaseModel):
     # backrefs:
     # subinterface: lower layer (child) network interface.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'interfaces'
-        constraints = [Check('vlan >= 0 AND vlan < 4096')]
+        constraints = (Check('vlan >= 0 AND vlan < 4096'),)
         indexes = ((("name", "equipment"), True),)
 
     def __str__(self):
@@ -713,11 +749,11 @@ class TestSuites(BaseModel):
     # scenarios: collection of Scenarios that this suite is a part of.
     # testresults: collection of TestResults for this suite.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'test_suites'
 
     def __str__(self):
-        return "TestSuite: {}".format(self.name)
+        return f"TestSuite: {self.name}"
 
     @classmethod
     def search(cls, phrase):
@@ -772,7 +808,7 @@ class TestCases(BaseModel):
     # backrefs:
     # testresults: collection of Test run results for this test case.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'test_cases'
         indexes = ((("testimplementation",), False),)
 
@@ -816,7 +852,7 @@ class Scenario(BaseModel):
                                 backref="scenarios",
                                 null=True)
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'scenarios'
 
     def __str__(self):
@@ -874,26 +910,26 @@ class TestResults(BaseModel):
     # backrefs:
     # subresults: collection of child test rusults from a run.
 
-    class Meta:
+    class Meta:  # ty: ignore[invalid-attribute-override]
         table_name = 'test_results'
 
     def __str__(self):
         match self.resulttype:
             case constants.TestResultType.TestRunSummary:
-                return "[{:5d}: Run at: {}]".format(self.id, self.starttime)
+                return f"[{self.id:5d}: Run at: {self.starttime}]"
             case constants.TestResultType.TestSuite:
-                return "[{:5d}: {}: {}]".format(self.id, self.testsuite, self.result)
+                return f"[{self.id:5d}: {self.testsuite}: {self.result}]"
             case constants.TestResultType.Test:
-                return "[{:5d}: {}: {}]".format(self.id, self.testcase, self.result)
+                return f"[{self.id:5d}: {self.testcase}: {self.result}]"
             case _:
-                return "[{:5d}: {}: {}]".format(self.id, self.resulttype, self.result)
+                return f"[{self.id:5d}: {self.resulttype}: {self.result}]"
 
     @classmethod
     def get_latest_run(cls):
         """Get most recent run record."""
         r = cls.select().where((cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
             (cls.resulttype == constants.TestResultType.TestRunSummary) &
-            (cls.valid == True))) &  # noqa
+            (cls.valid == True))) &
                                (cls.resulttype == constants.TestResultType.TestRunSummary)).get()
         return r
 
@@ -927,8 +963,8 @@ class TestResults(BaseModel):
         # simple case, use direct query if no testbed specified.
         if testbed is None and dutbuild is None:
             return cls.select().where(
-                (cls.testcase == testcase) & (cls.valid == True)).order_by(  # noqa
-                    cls.starttime).limit(limit).offset(offset).execute()  # noqa
+                (cls.testcase == testcase) & (cls.valid == True)).order_by(
+                    cls.starttime).limit(limit).offset(offset).execute()
         else:  # Also filter by testbed and/or dutbuild, which is in root record.
             # Need recursive common table expression to get testbed from root record.
             Root = cls.alias("tr_root")
@@ -946,7 +982,7 @@ class TestResults(BaseModel):
             q = cls._get_modelselect(root_query)
             q = (
                 q.from_(cte).with_cte(cte).where(
-                    (cte.c.testcase_id == testcase) & (cte.c.valid == True))  # noqa
+                    (cte.c.testcase_id == testcase) & (cte.c.valid == True))
                 .order_by(cte.c.starttime))
             return q.execute()
 
@@ -954,21 +990,21 @@ class TestResults(BaseModel):
     def get_runs(cls, limit=20, offset=0):
         """Get run results with paging."""
         return cls.select().where((cls.resulttype == constants.TestResultType.TestRunSummary) &
-                                  (cls.valid == True)).order_by(cls.starttime.desc()).limit(  # noqa
+                                  (cls.valid == True)).order_by(cls.starttime.desc()).limit(
                                       limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
         """Return only the data associated with a test case."""
         return cls.select(cls.data).where((cls.resulttype == constants.TestResultType.Test) &
-                                          (cls.testcase == testcase) & (cls.valid == True)  # noqa
+                                          (cls.testcase == testcase) & (cls.valid == True)
                                           ).order_by(cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_latest_for_testcase(cls, testcase):
         """Get latest valid result for a test case."""
         r = cls.select().where(cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
-            (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &  # noqa
+            (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &
             (cls.testcase == testcase))).get()
         return r
 
@@ -983,8 +1019,8 @@ class TestResults(BaseModel):
             fn.RANK().over(partition_by=TRAlias.testcase, order_by=TRAlias.starttime.desc()).alias(
                 "rnk")).where((TRAlias.testcase == testcase) &
                               (TRAlias.resulttype == constants.TestResultType.Test) &
-                              (TRAlias.valid == True)).alias("tcq"))  # noqa
-        q = cls.select(SQL("*")).from_(tcq).where((tcq.c.rnk <= number)).order_by(tcq.c.starttime)
+                              (TRAlias.valid == True)).alias("tcq"))
+        q = cls.select(SQL("*")).from_(tcq).where((tcq.c.rnk <= number)).order_by(tcq.c.starttime)  # noqa: UP034
         return q.execute()
 
     @classmethod
@@ -992,7 +1028,7 @@ class TestResults(BaseModel):
         """Get latest run result for a testbed."""
         r = cls.select().where(cls.starttime == cls.select(fn.MAX(
             cls.starttime)).where((cls.resulttype == constants.TestResultType.TestRunSummary) &
-                                  (cls.valid == True) &  # noqa
+                                  (cls.valid == True) &
                                   (cls.testbed == testbed))).get()
         return r
 
@@ -1009,7 +1045,7 @@ class TestResults(BaseModel):
         cte = tr_root.union_all(rterm)
         # Main query
         q = cls._get_modelselect(tr_root)
-        q = q.from_(cte).with_cte(cte).where(cte.c.valid == True).order_by(cte.c.starttime)  # noqa
+        q = q.from_(cte).with_cte(cte).where(cte.c.valid == True).order_by(cte.c.starttime)
         return q.execute()
 
 
@@ -1022,6 +1058,7 @@ def _attribute_get(inst, attrname, default=None):
 def _attribute_set(inst, attrname, attrvalue):
     if inst.attributes is None:
         inst.attributes = {}
+    assert database is not None
     with database.atomic():
         inst.attributes[attrname] = attrvalue
         inst.save()
@@ -1030,6 +1067,7 @@ def _attribute_set(inst, attrname, attrvalue):
 def _attribute_del(inst, attrname):
     if inst.attributes is None:
         return
+    assert database is not None
     with database.atomic():
         del inst.attributes[attrname]
         inst.save()

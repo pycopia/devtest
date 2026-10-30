@@ -5,16 +5,14 @@ constructs the run-time wrappers of the equipment it contains.
 """
 
 import sys
-from typing import Optional, Callable
+from collections.abc import Callable
 
 import keyring
 
-from devtest import logging
-from devtest import importlib
-from devtest import debugger
+from devtest import debugger, importlib, logging
+from devtest.core.exceptions import ConfigError, TestRunAbort, TestRunnerError
 from devtest.db import models
 from devtest.qa import signals
-from devtest.core.exceptions import ConfigError, TestRunAbort, TestRunnerError
 
 
 class TestBedRuntime:
@@ -49,9 +47,9 @@ class TestBedRuntime:
         return self._attributes.get(name, default)
 
     def __str__(self):
-        s = ["TestBed {} with:".format(self._testbed.name)]
+        s = [f"TestBed {self._testbed.name} with:"]
         for teq in self._testbed.testequipment:
-            s.append("  {}".format(teq.equipment))
+            s.append(f"  {teq.equipment}")
         s.append("  With roles: {}".format(", ".join(self._testbed.get_supported_roles())))
         return "\n".join(s)
 
@@ -60,7 +58,7 @@ class TestBedRuntime:
         try:
             eqrow = models.Equipment.select().where(models.Equipment.name.contains(name)).get()
         except models.DoesNotExist as err:
-            raise ConfigError("Bad equipment name {!r}: {!s}".format(name, err))
+            raise ConfigError(f"Bad equipment name {name!r}: {err!s}")
         return EquipmentRuntime(eqrow, role, debug=self._debug)
 
     @property
@@ -120,7 +118,7 @@ class TestBedRuntime:
 
     def get_all_with_role(self,
                           rolename: str,
-                          key: Optional[Callable[..., bool]] = None) -> "EquipmentList":
+                          key: Callable[..., bool] | None = None) -> "EquipmentList":
         """Return an :ref:`EquipmentList` of all equipment with the given role.
 
         An optional filter function may be given as the *key* parameter.
@@ -191,7 +189,7 @@ class TestBedRuntime:
     def release(self, config):
         if self._testbed.name == "default":
             return
-        current_user, timestamp = self._testbed.attribute_get("current_user")
+        current_user, _ = self._testbed.attribute_get("current_user")
         if current_user != config.username:
             # Probably a race condition in database update. Deal with it later.
             raise TestRunnerError(
@@ -200,7 +198,7 @@ class TestBedRuntime:
 
     def finalize(self):
         while self._eqcache:
-            name, obj = self._eqcache.popitem()
+            _, obj = self._eqcache.popitem()
             obj.finalize()
 
     def clear(self):
@@ -295,7 +293,8 @@ class EquipmentRuntime:
                                     if equipmentrow.user.public_key else b"")
         # Be sure to pre-configure this:
         # keyring.set_password("devtest", "ssh_passphrase", "YOUR_PASS_PHRASE")
-        d["ssh_passphrase"] = keyring.get_credential("devtest", "ssh_passphrase").password
+        if (cred := keyring.get_credential("devtest", "ssh_passphrase")) is not None:
+            d["ssh_passphrase"] = cred.password
         self._attributes = d
         self._equipmentmodel = EquipmentModelRuntime(equipmentrow.model)
         signals.device_change.connect(self._on_device_change)
@@ -313,20 +312,20 @@ class EquipmentRuntime:
         if self._device is not None:
             try:
                 self._device.close()
-            except Exception as err:
-                logging.exception_warning("device close: {!r}".format(self._device), err)
+            except Exception as err:  # noqa: BLE001
+                logging.exception_warning(f"device close: {self._device!r}", err)
             self._device = None
         if self._initializer is not None:
             try:
                 self._initializer.close()
-            except Exception as err:
-                logging.exception_warning("initializer close: {!r}".format(self._initializer), err)
+            except Exception as err:  # noqa: BLE001
+                logging.exception_warning(f"initializer close: {self._initializer!r}", err)
             self._initializer = None
         if self._console is not None:
             try:
                 self._console.close()
-            except Exception as err:
-                logging.exception_warning("console close: {!r}".format(self._initializer), err)
+            except Exception as err:  # noqa: BLE001
+                logging.exception_warning(f"console close: {self._initializer!r}", err)
             self._console = None
 
     def finalize(self):
@@ -344,7 +343,7 @@ class EquipmentRuntime:
             if login:
                 pwd = attribs.get("password")
                 if pwd:
-                    s.append("%s:%s" % (login, pwd))
+                    s.append(f"{login}:{pwd}")
                 else:
                     s.append(login)
                 s.append("@")
@@ -353,7 +352,7 @@ class EquipmentRuntime:
         if port:
             s.append(f":{port}")
         s.append(path or attribs.get("servicepath", "/"))
-        return "".join(s)
+        return "".join(s)  # ty: ignore[no-matching-overload]
 
     def __str__(self):
         return self._equipment.name
@@ -397,6 +396,13 @@ class EquipmentRuntime:
         return InterfaceRuntime(
             self._equipment.interfaces.select().where(models.Interfaces.name == ifacename).get())
 
+    def get_connected(self, connection_type):
+        """Get equipment with connections from this equipment."""
+        connlist = []
+        for eqrow, port in self._equipment.get_connected(connection_type):
+            connlist.append((EquipmentRuntime(eqrow, "connected"), port))
+        return connlist
+
     @property
     def primary_interface(self):
         adminname = self._attributes.get("admin_interface")
@@ -430,12 +436,12 @@ class EquipmentRuntime:
                 role = self._attributes["role"]
                 self._device = _get_controller(self, role)
             except:  # noqa
-                ex, err, tb = sys.exc_info()
+                _, err, tb = sys.exc_info()
                 logging.exception_error("Error in device controller construction", err)
                 if self._debug:
                     debugger.post_mortem(tb)
-                tb = None
-                raise ConfigError("controller for {!r} could not be created.".format(role)) from err
+                del tb
+                raise ConfigError(f"controller for {role!r} could not be created.") from err
         return self._device
 
     @device.deleter
@@ -445,7 +451,7 @@ class EquipmentRuntime:
             self._device = None
             try:
                 dev.close()
-            except Exception as ex:
+            except Exception as ex:  # noqa: BLE001
                 logging.exception_warning("device close", ex)
 
     @property
@@ -463,15 +469,15 @@ class EquipmentRuntime:
                 logging.error(msg)
                 raise ConfigError(msg)
             try:
-                klass = importlib.get_callable(iobjname)
+                klass = importlib.get_callable(str(iobjname))
                 self._initializer = klass(self)
             except:  # noqa
-                ex, err, tb = sys.exc_info()
-                msg = "Initializer {!r} could not be created".format(iobjname)
+                _, err, tb = sys.exc_info()
+                msg = f"Initializer {iobjname!r} could not be created"
                 logging.exception_error(msg, err)
                 if self._debug:
                     debugger.post_mortem(tb)
-                tb = None
+                del tb
                 raise ConfigError(msg) from err
         return self._initializer
 
@@ -482,7 +488,7 @@ class EquipmentRuntime:
             self._initializer = None
             try:
                 dev.close()
-            except Exception as ex:
+            except Exception as ex:  # noqa: BLE001
                 logging.exception_warning("initializer close", ex)
 
     def get_console(self):
@@ -510,12 +516,12 @@ class EquipmentRuntime:
         try:
             return self.get_console()
         except:  # noqa
-            ex, err, tb = sys.exc_info()
+            _, err, tb = sys.exc_info()
             msg = "Console could not be created for {!r}".format(self._attributes["hostname"])
             logging.exception_error(msg, err)
             if self._debug:
                 debugger.post_mortem(tb)
-            tb = None
+            del tb
             raise ConfigError(msg) from err
 
     @console.deleter
@@ -570,14 +576,14 @@ class EquipmentRuntime:
         Return the first non-None response value.
         """
         kwargs.pop("service", None)
-        for handler, rv in signals.service_want.send(self, service=name, **kwargs):
+        for _, rv in signals.service_want.send(self, service=name, **kwargs):
             if rv is not None:
                 return rv
 
     def service_dontwant(self, name, **kwargs):
         """Relinquish a service from the services modules."""
         responses = signals.service_dontwant.send(self, service=name, **kwargs)
-        for handler, rv in responses:
+        for _, rv in responses:
             if rv is not None:
                 return rv
 
@@ -636,7 +642,7 @@ class SoftwareRuntime:
         self._attributes = d
 
     def __str__(self):
-        return "{} (version: {})".format(self._software.name, self._software.version)
+        return f"{self._software.name} (version: {self._software.version})"
 
     def __getattr__(self, name):
         return getattr(self._software, name)
@@ -705,7 +711,7 @@ class EquipmentList(tuple):
         dev0 = self[0].device
         if hasattr(dev0, "MULTI_CONTROLLER") and dev0.MULTI_CONTROLLER:
             klass = importlib.get_callable(dev0.MULTI_CONTROLLER)
-            multidevice = klass.from_equipmentlist(self)
+            multidevice = klass.from_equipmentlist(self)  # ty: ignore[unresolved-attribute]
             self._multidevice = multidevice
             return multidevice
         else:
@@ -737,13 +743,13 @@ def _get_controller(equipmentrt, rolename):
     impl = FM.select(FM.implementation).where(FM.name == rolename).scalar()
     if impl is None:
         raise ConfigError(
-            "No implementation for role {!r} found in Function list.".format(rolename))
+            f"No implementation for role {rolename!r} found in Function list.")
     klass = importlib.get_callable(impl)
     return klass(equipmentrt)
 
 
 def _get_console(console_config, login=None, password=None):
-    from devtest.device import console
+    from devtest.device import console  # ty: ignore[unresolved-import]
     return console.get_console(console_config, account=login, password=password)
 
 
@@ -767,7 +773,7 @@ def get_testbed(name, storageurl=None, debug=False):
     try:
         testbed = models.TestBed.select().where(models.TestBed.name == name).get()
     except models.DoesNotExist as err:
-        raise ConfigError("Bad TestBed name {!r}: {}".format(name, err)) from None
+        raise ConfigError(f"Bad TestBed name {name!r}: {err}") from None
     return TestBedRuntime(testbed, debug=debug)
 
 
