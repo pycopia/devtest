@@ -11,16 +11,17 @@ Messages types are defined in pure Python, and may be structured in any way.
 """
 
 from __future__ import annotations
-# mypy: check-untyped-defs
 
-from time import time
 from abc import ABCMeta, abstractmethod
 from io import BytesIO
-from struct import Struct
 from itertools import count
 from pickle import Pickler, Unpickler
 from socket import SocketType
-from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
+from struct import Struct
+
+# mypy: check-untyped-defs
+from time import time
+from typing import TYPE_CHECKING, Any, ClassVar, Union
 
 from devtest import ringbuffer
 
@@ -39,11 +40,11 @@ _HEADER = Struct("!HH")
 class Error(Exception):
     """An exception class that is also serializable as tlv message."""
 
-    CODE: Optional[int] = None
-    _ERROR_CODES: Dict[int, Any] = {}
+    CODE: int | None = None
+    _ERROR_CODES: ClassVar[dict[int, Any]] = {}
 
     @classmethod
-    def __init_subclass__(cls, *args, **kwargs):
+    def __init_subclass__(cls, *_args, **_kwargs):
         if cls.CODE is None:
             return
         assert cls.CODE is not None
@@ -106,9 +107,9 @@ def get_exception(code, message):
 
 
 class Message(metaclass=ABCMeta):
-    TAG: Optional[int] = None
+    TAG: int | None = None
 
-    _MESSAGE_TAGS: Dict[int, Any] = {}
+    _MESSAGE_TAGS: ClassVar[dict[int, Any]] = {}
 
     def __init__(self, value: Any):
         self.value = value
@@ -117,7 +118,7 @@ class Message(metaclass=ABCMeta):
         return f"{self.__class__.__name__}({self.value!r})"
 
     @classmethod
-    def __init_subclass__(cls, *args, **kwargs):
+    def __init_subclass__(cls, *_args, **_kwargs):
         if cls.TAG is None:
             return
         assert cls.TAG is not None
@@ -130,7 +131,7 @@ class Message(metaclass=ABCMeta):
         return cls._MESSAGE_TAGS.items()
 
     @classmethod
-    def new(cls, *args: Any, **kwargs: Any) -> Any:
+    def new(cls, *args: Any, **_kwargs: Any) -> Any:
         return cls(args[0])
 
     @abstractmethod
@@ -141,7 +142,7 @@ class Message(metaclass=ABCMeta):
 
     @classmethod
     @abstractmethod
-    def decode(cls, data):
+    def decode(cls, data: bytes):
         """Decode a bytes string to Message object.
         """
         raise NotImplementedError()
@@ -248,7 +249,7 @@ class EmptyMessage(Message):
         return b""
 
     @classmethod
-    def decode(cls, data):
+    def decode(cls, _data):
         return cls(None)
 
     @classmethod
@@ -499,7 +500,7 @@ class _MessageFactory:
         self._outstanding.add(seq)
         return Container.new(Version(VERSION), Sequence(seq))
 
-    def _response_message_base(self, message: List[Message]):
+    def _response_message_base(self, message: list[Message]):
         """Return a new Container message with a response to a given received
         message.
         """
@@ -513,7 +514,7 @@ class _MessageFactory:
         """
         return Message.defined_messages()
 
-    def validate(self, msg) -> List:
+    def validate(self, msg) -> list:
         """Check the protocol version and that is has a minimum length.
 
         Returns:
@@ -601,7 +602,7 @@ class ServerMessageFactory(_MessageFactory):
 class _NetworkInterface:
 
     def __init__(self, sock: AnySocket):
-        self._sock = sock
+        self._sock: AnySocket | None = sock
 
     def fileno(self):
         if self._sock is not None:
@@ -617,7 +618,7 @@ class AsyncInterface(_NetworkInterface):
     """
 
     def __init__(self, sock: AsyncSocket):
-        self._sock: AsyncSocket = sock
+        self._sock: AsyncSocket | None = sock
 
     async def close(self):
         if self._sock is not None:
@@ -630,6 +631,7 @@ class AsyncInterface(_NetworkInterface):
         sent = 0
         data = msg.encode()
         ld = len(data)
+        assert self._sock is not None
         await self._sock.send(_HEADER.pack(msg.TAG, ld))
         while sent < ld:
             sent += await self._sock.send(data)
@@ -638,6 +640,7 @@ class AsyncInterface(_NetworkInterface):
     async def receive(self) -> Message:
         """Coroutine to receive bytes on stream and decode to message object.
         """
+        assert self._sock is not None
         h = await self._sock.recv(_HEADER.size)
         if not h:
             raise EOFError()
@@ -657,7 +660,7 @@ class SyncInterface(_NetworkInterface):
     """
 
     def __init__(self, sock: SocketType):
-        self._sock = sock
+        self._sock: SocketType | None = sock
 
     def close(self):
         if self._sock is not None:
@@ -667,10 +670,12 @@ class SyncInterface(_NetworkInterface):
     def send(self, msg: Message):
         value = msg.encode()
         ld = len(value)
+        assert self._sock is not None
         self._sock.send(_HEADER.pack(msg.TAG, ld))
         return self._sock.sendall(value)
 
     def receive(self) -> Message:
+        assert self._sock is not None
         s = self._sock
         s.settimeout(30.0)
         try:

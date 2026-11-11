@@ -41,6 +41,10 @@ Issues = "https://github.com/pycopia/devtest/issues"
 warn_unused_configs = true
 allow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = ["curio.*", "elicit.*"]
+follow_untyped_imports = true
+
 [tool.pylsp-mypy]
 enabled = true
 live_mode = true

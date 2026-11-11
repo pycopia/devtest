@@ -1,11 +1,12 @@
 """Controllers and helpers for managing the model.
 """
 
-from functools import wraps
-from datetime import datetime
 from ast import literal_eval
+from datetime import datetime
+from functools import wraps
 
 from peewee import JOIN
+
 from devtest.core import constants, exceptions
 
 from . import models
@@ -474,11 +475,18 @@ class EquipmentController(Controller):
         return eq
 
     @staticmethod
-    def add_connection(name, othername, conntype, port=None, other_port=None, modelname=None, othermodelname=None):
+    def add_connection(name,
+                       othername,
+                       conntype,
+                       port=None,
+                       other_port=None,
+                       modelname=None,
+                       othermodelname=None):
         conntype = EquipmentController.CONNECTION_TYPES.get(conntype.lower())
         if conntype is None:
             allowed = list(EquipmentController.CONNECTION_TYPES.keys())
-            raise ValueError(f"Invalid connection type {conntype}. Must be one of {', '.join(allowed)}")
+            raise ValueError(
+                f"Invalid connection type {conntype}. Must be one of {', '.join(allowed)}")
         eq = EquipmentController.get(name, modelname)
         if eq:
             other = EquipmentController.get(othername, othermodelname)
@@ -486,7 +494,12 @@ class EquipmentController(Controller):
         return eq
 
     @staticmethod
-    def del_connection(name, othername, conntype=None, port=None, modelname=None, othermodelname=None):
+    def del_connection(name,
+                       othername,
+                       conntype=None,
+                       port=None,
+                       modelname=None,
+                       othermodelname=None):
         conntype = EquipmentController.CONNECTION_TYPES.get(conntype)
         eq = EquipmentController.get(name, modelname)
         if eq:
@@ -508,9 +521,8 @@ class EquipmentModelController(Controller):
     @staticmethod
     @checknotfound(message="EquipmentModel not found.")
     def get(modelname, manufacturer="Acme Inc."):
-        q = models.EquipmentModel.select().where(
-            models.EquipmentModel.name == modelname,
-            models.EquipmentModel.manufacturer == manufacturer)
+        q = models.EquipmentModel.select().where(models.EquipmentModel.name == modelname,
+                                                 models.EquipmentModel.manufacturer == manufacturer)
         return q.get()
 
     @staticmethod

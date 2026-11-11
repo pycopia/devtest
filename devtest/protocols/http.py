@@ -1,12 +1,14 @@
+# ty: ignore[invalid-await]
 """A REST/HTTP for both synchronous and asynchronous clients.
 """
 
+import hashlib
 import socket
 import ssl
-import hashlib
-from typing import Any, Callable, Tuple, Optional, Iterable, Union, cast
-from typing import BinaryIO
-from http import cookies
+from collections.abc import Callable, Iterable
+from http import HTTPStatus, cookies
+from typing import Any, BinaryIO, cast
+from urllib import parse
 
 import h11
 import rfc3986
@@ -14,15 +16,15 @@ from rfc3986 import builder
 
 from devtest import json
 from devtest.core import exceptions
-from devtest.io import ssl as async_ssl
 from devtest.io import socket as async_socket
+from devtest.io import ssl as async_ssl
 
 __all__ = [
-    'HttpControllerError', 'AsyncWebInterface', 'SyncWebInterface', 'HttpProtocolError',
-    'SimpleWebInterface'
+    'AsyncWebInterface', 'HttpControllerError', 'HttpProtocolError', 'SimpleWebInterface',
+    'SyncWebInterface'
 ]
 
-TargetEncoder = Callable[[str, Optional[dict]], str]
+TargetEncoder = Callable[[str, dict | None], str]
 
 
 class HttpControllerError(exceptions.ControllerError):
@@ -30,6 +32,10 @@ class HttpControllerError(exceptions.ControllerError):
 
 
 class HttpProtocolError(Exception):
+    """Raised for any error in the HTTP interface."""
+
+
+class HttpResponseError(HttpProtocolError):
     """Raised for any error in the HTTP interface."""
 
     @property
@@ -41,7 +47,7 @@ class HttpProtocolError(Exception):
         return self.args[1]
 
     @property
-    def body(self) -> Union[bytes, None]:
+    def body(self) -> Any:
         """Body of response indicating an error, if known."""
         try:
             return self._body
@@ -49,19 +55,45 @@ class HttpProtocolError(Exception):
             return None
 
     @body.setter
-    def body(self, body: bytes):
+    def body(self, body: Any):
         self._body = body
 
 
-class HttpResponseError(HttpProtocolError):
-    """Raised for any error in the HTTP interface."""
+class HTTPResponse:
+    """Response from HTTP methods."""
+
+    def __init__(self, status: HTTPStatus, headers: list[tuple], body: Any = None):
+        self._status: HTTPStatus = status
+        self._headers: list[tuple] = headers
+        self.body: Any = body
+
+    def __str__(self):
+        headers = "\n  ".join(f"{n}: {v}" for n, v in self._headers)
+        return f"HTTPResponse: {self._status}\n  {headers}"
+
+    @property
+    def status(self):
+        return self._status
+
+    @property
+    def headers(self):
+        return self._headers[:]
+
+    def raise_for_status(self) -> None:
+        # ty: ignore[unresolved-attribute]
+        if self._status.is_client_error or self._status.is_server_error:
+            error = HttpResponseError(self._status.value, self._status.description)
+            error.body = self.body
+            raise error
+
+    def find_header(self, name: str):
+        bname = name.encode("ascii")
+        for hname, hval in self._headers:
+            if bname == hname:
+                yield hval.decode("ascii")
 
 
-class HttpProtocolRedirect(HttpProtocolError):
-    """Raised when redirect is requested."""
-
-
-def _default_target_encoder(path: str, params: Optional[dict] = None):
+def _default_target_encoder(path: str, params: dict | None = None):
     url = builder.URIBuilder()
     url = url.add_path(path)
     if params:
@@ -75,15 +107,15 @@ class _WebInterface:
                  hostname: str,
                  target_encoder: TargetEncoder = _default_target_encoder,
                  accept: str = "application/json",
-                 extra_headers: Optional[list] = None,
+                 extra_headers: list | None = None,
                  port: int = 80,
                  usessl: bool = False):
         self._hostname = hostname
         self._port = port
         self._usessl = usessl
         self.protocol = "https" if usessl else "http"
-        self._sock: Optional[async_socket.Socket] = None
-        self._conn: Optional[h11.Connection] = None
+        self._sock: async_socket.Socket | socket.socket | None = None
+        self._conn: h11.Connection | None = None
         self._target_encoder: TargetEncoder = target_encoder
         self._ssl_context = None
         self._headers = [
@@ -112,11 +144,13 @@ class _WebInterface:
                  accept="text/*",
                  extra_headers=None):
         url = rfc3986.urlparse(urlstr)
+        assert url.host is not None
         cl = cls(hostname=url.host,
                  target_encoder=target_encoder,
                  accept=accept,
                  extra_headers=extra_headers,
                  port=url.port or 80)
+        assert url.scheme is not None
         cl.protocol = url.scheme
         return cl
 
@@ -134,11 +168,14 @@ class AsyncWebInterface(_WebInterface):
 
     async def _send_event(self, event):
         assert self._conn is not None
+        assert self._sock is not None
         msg = self._conn.send(event)
         if msg:
             await self._sock.sendall(msg)
 
     async def _next_event(self):
+        assert self._conn is not None
+        assert self._sock is not None
         while True:
             event = self._conn.next_event()
             if event is h11.NEED_DATA:
@@ -157,12 +194,11 @@ class AsyncWebInterface(_WebInterface):
                 self._ssl_context = ctx
             self._sock = sock
 
-    async def get_request(self, path, filestream=None, params=None):
+    async def get_request(self, path, params=None):
         await self._connect()
-        body = []
-        headers = []
-        hasher = hashlib.sha256()
-        content_type = None
+        assert self._conn is not None
+        assert self._sock is not None
+        resp_body = []
         req_event = h11.Request(method="GET",
                                 target=self._target_encoder(path, params),
                                 headers=self._headers)
@@ -172,34 +208,26 @@ class AsyncWebInterface(_WebInterface):
         while True:
             ev = await self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 await self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 await self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 201, 304):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-                headers = list(ev.headers)
-                for header_name, header_value in ev.headers:
-                    if header_name == b"content-type":
-                        content_type = header_value
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
             elif evt is h11.Data:
-                if filestream is not None:
-                    filestream.write(ev.data)
-                    hasher.update(ev.data)
-                else:
-                    body.append(ev.data)
-        if filestream is None:
-            return headers, _decode_content(content_type, b"".join(body))
+                resp_body.append(ev.data)
+        if resp_body:
+            response.body = b"".join(resp_body)
         else:
-            return headers, hasher.hexdigest()
+            response.body = b""
+        return response
 
     async def head_request(self, path, params=None):
         await self._connect()
-        headers = []
+        assert self._conn is not None
+        assert self._sock is not None
         req_event = h11.Request(method="HEAD",
                                 target=self._target_encoder(path, params),
                                 headers=self._headers)
@@ -209,22 +237,20 @@ class AsyncWebInterface(_WebInterface):
         while True:
             ev = await self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 await self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 await self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 201, 304):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-                headers = list(ev.headers)
-        return headers
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
+        return response
 
     async def _request_with_data(self, method, path, data=None, params=None):
         await self._connect()
-        content_type = None
+        assert self._conn is not None
+        assert self._sock is not None
         if data:
             body = json.encode_bytes(data)
             headers = self.get_headers((b"Content-Type", b"application/json; charset=UTF-8"),
@@ -248,23 +274,19 @@ class AsyncWebInterface(_WebInterface):
         while True:
             ev = await self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 await self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 await self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 201):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-                for header_name, header_value in ev.headers:
-                    if header_name == b"content-type":
-                        content_type = header_value
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
             elif evt is h11.Data:
                 resp_body.append(ev.data)
         if resp_body:
-            return _decode_content(content_type, b"".join(resp_body))
+            response.body = b"".join(resp_body)
+        return response
 
     async def put_request(self, path, data=None, params=None):
         return await self._request_with_data("PUT", path, data=data, params=params)
@@ -274,6 +296,8 @@ class AsyncWebInterface(_WebInterface):
 
     async def delete_request(self, path, params=None):
         await self._connect()
+        assert self._conn is not None
+        assert self._sock is not None
         req_event = h11.Request(method="DELETE",
                                 target=self._target_encoder(path, params),
                                 headers=self._headers)
@@ -283,16 +307,15 @@ class AsyncWebInterface(_WebInterface):
         while True:
             ev = await self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
-                self.close()
+            if evt is h11.EndOfMessage:  # noqa: SIM114
+                await self.close()
                 break
             elif evt is h11.ConnectionClosed:
-                self.close()
+                await self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 204):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
+        return response
 
 
 class SyncWebInterface(_WebInterface):
@@ -309,16 +332,20 @@ class SyncWebInterface(_WebInterface):
             self._conn = None
 
     def _send_event(self, event):
+        assert self._conn is not None
+        assert self._sock is not None
         msg = self._conn.send(event)
         if msg:
             self._sock.sendall(msg)
 
     def _next_event(self):
+        assert self._conn is not None
+        assert self._sock is not None
         while True:
             event = self._conn.next_event()
             if event is h11.NEED_DATA:
                 data = self._sock.recv(65536)
-                self._conn.receive_data(data)
+                self._conn.receive_data(data)  # ty: ignore[invalid-argument-type]
                 continue
             return event
 
@@ -329,13 +356,12 @@ class SyncWebInterface(_WebInterface):
             # TODO(dart) ssl
             self._sock = sock
 
-    def get_request(self, path, filestream=None, params=None):
+    def get_request(self, path, params=None):
         """Perform a GET with optional query parameters."""
         self._connect()
-        body = []
-        headers = []
-        hasher = hashlib.sha256()
-        content_type = None
+        assert self._conn is not None
+        assert self._sock is not None
+        resp_body = []
         req_event = h11.Request(method="GET",
                                 target=self._target_encoder(path, params),
                                 headers=self._headers)
@@ -345,34 +371,23 @@ class SyncWebInterface(_WebInterface):
         while True:
             ev = self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 201, 304):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-                headers = ev.headers[:]
-                for header_name, header_value in ev.headers:
-                    if header_name == b"content-type":
-                        content_type = header_value
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
             elif evt is h11.Data:
-                if filestream is not None:
-                    filestream.write(ev.data)
-                    hasher.update(ev.data)
-                else:
-                    body.append(ev.data)
-        if filestream is None:
-            return headers, _decode_content(content_type, b"".join(body))
-        else:
-            return headers, hasher.hexdigest()
+                resp_body.append(ev.data)
+        response.body = b"".join(resp_body)
+        return response
 
     def _request_with_data(self, method, path, data=None, params=None):
         self._connect()
-        content_type = None
+        assert self._conn is not None
+        assert self._sock is not None
         if data:
             body = json.encode_bytes(data)
             headers = self.get_headers((b"Content-Type", b"application/json; charset=UTF-8"),
@@ -396,23 +411,18 @@ class SyncWebInterface(_WebInterface):
         while True:
             ev = self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 201):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-                for header_name, header_value in ev.headers:
-                    if header_name == b"content-type":
-                        content_type = header_value
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
             elif evt is h11.Data:
                 resp_body.append(ev.data)
-        if resp_body:
-            return _decode_content(content_type, b"".join(resp_body))
+        response.body = b"".join(resp_body)
+        return response
 
     def put_request(self, path, data=None, params=None):
         return self._request_with_data("PUT", path, data=data, params=params)
@@ -422,6 +432,8 @@ class SyncWebInterface(_WebInterface):
 
     def delete_request(self, path, params=None):
         self._connect()
+        assert self._conn is not None
+        assert self._sock is not None
         req_event = h11.Request(method="DELETE",
                                 target=self._target_encoder(path, params),
                                 headers=self._headers)
@@ -431,43 +443,39 @@ class SyncWebInterface(_WebInterface):
         while True:
             ev = self._next_event()
             evt = type(ev)
-            if evt is h11.EndOfMessage:
+            if evt is h11.EndOfMessage:  # noqa: SIM114
                 self.close()
                 break
             elif evt is h11.ConnectionClosed:
                 self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code not in (200, 204):
-                    raise HttpControllerError(
-                        f"Bad HTTP response, code: {ev.status_code} {ev.reason}")
-
-
-def _decode_content(content_type, data):
-    if content_type and b"json" in content_type:
-        return json.decode_bytes(data)
-    else:
-        raise HttpControllerError(f"Unhandled content-type: {content_type}.")
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
+        return response
 
 
 class SimpleWebInterface:
     """Simple, blocking HTTP/HTTPS client interface."""
 
-    def __init__(self, baseurl: str, extra_headers: Optional[Iterable[Tuple]] = None):
-        self._url = url = builder.URIBuilder.from_uri(baseurl)
+    def __init__(self, baseurl: str, extra_headers: Iterable[tuple] | None = None):
+        url = builder.URIBuilder.from_uri(baseurl)
+        if url.host is None or url.scheme is None:
+            raise ValueError("Invalid base URL: needs at least host and scheme.")
         if not url.port:
             url.port = "443" if url.scheme == "https" else "80"
-        self._headers = [
-            ("Host", self._url.host),
+        assert url.host is not None
+        self._headers: list[tuple[str, str]] = [
+            ("Host", url.host),
             ("User-Agent", h11.PRODUCT_ID),
             ("Connection", "keep-alive"),
         ]
         if extra_headers and isinstance(extra_headers, list):
             self._headers.extend(extra_headers)
         self._need_ssl: bool = url.scheme.endswith("s")
-        self._sock: Optional[socket.SocketType] = None
-        self._conn: Optional[h11.Connection] = None
+        self._sock: socket.SocketType | None = None
+        self._conn: h11.Connection | None = None
         self._cookie: cookies.SimpleCookie = cookies.SimpleCookie()
+        self._url: builder.URIBuilder = url
 
     def __del__(self):
         self.close()
@@ -475,7 +483,7 @@ class SimpleWebInterface:
     def __enter__(self):
         return self
 
-    def __exit__(self, *exc_info):
+    def __exit__(self, *_):
         self.close()
 
     def fileno(self) -> int:
@@ -485,10 +493,14 @@ class SimpleWebInterface:
             return -1
 
     @property
-    def baseurl(self):
+    def baseurl(self) -> str:
         return self._url.finalize().unsplit()
 
-    def get_headers(self, *tuples):
+    @property
+    def cookie(self):
+        return self._cookie
+
+    def _get_headers(self, *tuples):
         """get base HTTP headers with additions appended."""
         hl = self._headers + list(tuples)
         cookieval = self._cookie.output(attrs={}, header="", sep="; ").strip()
@@ -504,11 +516,15 @@ class SimpleWebInterface:
             self._conn = None
 
     def _send_event(self, event):
+        assert self._conn is not None
+        assert self._sock is not None
         msg = self._conn.send(event)
         if msg:
             self._sock.sendall(msg)
 
     def _next_event(self):
+        assert self._conn is not None
+        assert self._sock is not None
         while True:
             event = self._conn.next_event()
             if event is h11.NEED_DATA:
@@ -521,6 +537,7 @@ class SimpleWebInterface:
 
     def _connect(self):
         if self._sock is None:
+            assert self._url.port is not None
             self._sock = socket.create_connection((self._url.host, int(self._url.port)))
             if self._need_ssl:
                 context = ssl.create_default_context()
@@ -530,22 +547,21 @@ class SimpleWebInterface:
     def _request(self,
                  method: str,
                  path: str,
-                 data: Optional[Any] = None,
-                 content_type: Optional[str] = None,
-                 fragment: Optional[str] = None,
-                 query: Optional[str] = None,
-                 params: Optional[dict] = None) -> Tuple[list, Any]:
+                 data: Any | None = None,
+                 content_type: str | None = None,
+                 fragment: str | None = None,
+                 query: str | None = None,
+                 params: dict | None = None) -> HTTPResponse:
         self._connect()
-        resp_headers = []
         msgbody = None
-        send_headers = self.get_headers()
+        send_headers = self._get_headers()
         if content_type:
             cast(str, content_type)
             send_headers.append((b"Content-Type", content_type.encode("ascii")))
             if data:
-                msgbody = self.encode_content(content_type, data)
+                msgbody = encode_content(content_type, data)
                 send_headers.append((b"Content-Length", str(len(msgbody)).encode("ascii")))
-        target = self.encode_target(path=path, fragment=fragment, query=query, params=params)
+        target = encode_target(path=path, fragment=fragment, query=query, params=params)
         req_event = h11.Request(method=method, target=target, headers=send_headers)
         # asserts are for mypy type checking
         assert self._conn is not None
@@ -560,7 +576,8 @@ class SimpleWebInterface:
         self._send_event(h11.EndOfMessage())
 
         resp_body: list = []
-        error: Optional[HttpProtocolError] = None
+        response: HTTPResponse | None = None
+        resp_content_type = None
         while True:
             ev = self._next_event()
             evt = type(ev)
@@ -577,50 +594,32 @@ class SimpleWebInterface:
                 self.close()
                 break
             elif evt is h11.Response:
-                if ev.status_code == 302:
-                    location = None
-                    for header_name, header_value in ev.headers:
-                        if header_name == b"location":
-                            location = header_value.decode("ascii")
-                        context = {
-                            "location": location,
-                            "method": method,
-                            "path": path,
-                            "data": data,
-                            "content_type": content_type,
-                            "fragment": fragment,
-                            "query": query,
-                            "params": params,
-                        }
-                    error = HttpProtocolRedirect(context)
-                elif ev.status_code not in (200, 201, 304):
-                    # Delay raising exception in this case to allow protocol to finish and collect
-                    # body.
-                    error = HttpResponseError(ev.status_code, ev.reason.decode("ascii"))
-                resp_headers = list(ev.headers)
+                response = HTTPResponse(HTTPStatus(ev.status_code), list(ev.headers))
             elif evt is h11.Data:
                 resp_body.append(ev.data)
-        if error is not None:
-            if resp_body:
-                error.body = b"".join(resp_body)
-            raise error
+        if response is None:
+            raise HttpProtocolError("Invalid state: no Response found.")
+        for header_name, header_value in response.headers:
+            if header_name == b"content-type":
+                resp_content_type = header_value
+            elif header_name == b"set-cookie":
+                self._cookie.load(header_value.decode("ascii"))
         if resp_body:
-            resp_content_type = None
-            for header_name, header_value in resp_headers:
-                if header_name == b"content-type":
-                    resp_content_type = header_value
-                elif header_name == b"set-cookie":
-                    self._cookie.load(header_value.decode("ascii"))
-            return resp_headers, self.decode_content(resp_content_type, b"".join(resp_body))
+            if resp_content_type is not None:
+                body = decode_content(resp_content_type, b"".join(resp_body))
+            else:
+                body = b"".join(resp_body)
         else:
-            return resp_headers, b""
+            body = b""
+        response.body = body
+        return response
 
     def get_request(self,
                     path: str,
                     content_type: str = "text/html",
-                    fragment: Optional[str] = None,
-                    query: Optional[str] = None,
-                    params: Optional[dict] = None):
+                    fragment: str | None = None,
+                    query: str | None = None,
+                    params: dict | None = None) -> HTTPResponse:
         """Perform a GET request with path and optional query parameters."""
         return self._request("GET",
                              path=path,
@@ -633,9 +632,9 @@ class SimpleWebInterface:
     def head_request(self,
                      path: str,
                      content_type: str = "*/*",
-                     fragment: Optional[str] = None,
-                     query: Optional[str] = None,
-                     params: Optional[dict] = None):
+                     fragment: str | None = None,
+                     query: str | None = None,
+                     params: dict | None = None) -> HTTPResponse:
         """Perform a HEAD request with path and optional query parameters."""
         return self._request("HEAD",
                              path=path,
@@ -649,9 +648,9 @@ class SimpleWebInterface:
                      path: str,
                      data: Any,
                      content_type: str,
-                     fragment: Optional[str] = None,
-                     query: Optional[str] = None,
-                     params: Optional[dict] = None):
+                     fragment: str | None = None,
+                     query: str | None = None,
+                     params: dict | None = None) -> HTTPResponse:
         """Perform a POST with path, data, content type, and optional query parameters."""
         return self._request("POST",
                              path=path,
@@ -661,15 +660,19 @@ class SimpleWebInterface:
                              query=query,
                              params=params)
 
-    def put_request(self, path: str, data: Any, content_type: str, params: Optional[dict] = None):
+    def put_request(self,
+                    path: str,
+                    data: Any,
+                    content_type: str,
+                    params: dict | None = None) -> HTTPResponse:
         """Perform a PUT with path, data, content type, and optional query parameters."""
         return self._request("PUT", path, data=data, content_type=content_type, params=params)
 
-    def delete_request(self, path: str, params: Optional[dict] = None):
+    def delete_request(self, path: str, params: dict | None = None) -> HTTPResponse:
         """Perform a DELETE request with path and optional query parameters."""
         return self._request("DELETE", path, params=params)
 
-    def download(self, path: str, filestream: BinaryIO, params: Optional[dict] = None):
+    def download(self, path: str, filestream: BinaryIO, params: dict | None = None):
         """Perform a GET and write body to filestream, with optional query parameters.
 
         Also computes the SHA256 checksum of downloaded content for comparison to externally
@@ -687,7 +690,7 @@ class SimpleWebInterface:
         headers = []
         hasher = hashlib.sha256()
         req_event = h11.Request(method="GET",
-                                target=self.encode_target(path=path, params=params),
+                                target=encode_target(path=path, params=params),
                                 headers=self._headers)
         assert self._conn is not None
         assert self._sock is not None
@@ -720,46 +723,50 @@ class SimpleWebInterface:
                 hasher.update(ev.data)
         return headers, hasher.hexdigest()
 
-    def decode_content(self, content_type, data):
-        value, params = _parse_header_with_params(content_type)
-        if b"json" in value:
-            return json.decode_bytes(data)
-        elif b"text/html" in value:
-            charset = params.get(b"charset", b"utf-8")
-            return data.decode(charset.decode("ascii"))
-        else:
-            raise HttpProtocolError(f"Unhandled receive content-type: {content_type}.")
 
-    def encode_content(self, content_type: str, data: Any):
-        if isinstance(data, bytes):  # allow for pre-encoded content.
-            return data
-        if "json" in content_type:
-            return json.encode_bytes(data)
-        else:
-            raise HttpProtocolError(f"Unhandled encode content-type: {content_type}.")
+def decode_content(content_type: bytes, data: bytes) -> Any:
+    value, params = _parse_header_with_params(content_type)
+    if b"json" in value:
+        return json.decode_bytes(data)
+    elif b"text/html" in value:
+        charset = params.get(b"charset", b"utf-8")
+        return data.decode(charset.decode("ascii"))
+    else:
+        raise HttpProtocolError(f"Unhandled receive content-type: {content_type!r}.")
 
-    def encode_target(self,
-                      path: Optional[str] = None,
-                      fragment: Optional[str] = None,
-                      query: Optional[str] = None,
-                      params: Optional[dict] = None):
-        url = builder.URIBuilder.from_uri(self._url.finalize())
-        if path:
-            url = url.add_path(path)
-        if fragment:
-            url = url.add_fragment(fragment)
-        if query:
-            url = url.add_query(query)
-        if params:
-            url = url.add_query_from(params)
-        return url.finalize().unsplit()
+
+def encode_content(content_type: str, data: Any) -> bytes:
+    if isinstance(data, bytes):  # allow for pre-encoded content.
+        return data
+    if "json" in content_type:
+        return json.encode_bytes(data)
+    if "application/x-www-form-urlencoded" in content_type:
+        return parse.urlencode(data).encode("utf-8")
+    else:
+        raise HttpProtocolError(f"Unhandled encode content-type: {content_type}.")
+
+
+def encode_target(path: str | None = None,
+                  fragment: str | None = None,
+                  query: str | None = None,
+                  params: dict | None = None):
+    url = builder.URIBuilder()
+    if path:
+        url = url.add_path(path)
+    if fragment:
+        url = url.add_fragment(fragment)
+    if query:
+        url = url.add_query(query)
+    if params:
+        url = url.add_query_from(params)
+    return url.finalize().unsplit()
 
 
 def parse_url(urlstr):
     return rfc3986.urlparse(urlstr)
 
 
-def _parse_header_with_params(text: bytes) -> Tuple[bytes, dict]:
+def _parse_header_with_params(text: bytes) -> tuple[bytes, dict]:
     parts = text.split(b";")
     value = parts.pop(0).strip()
     params = {}
@@ -773,7 +780,10 @@ def _parse_header_with_params(text: bytes) -> Tuple[bytes, dict]:
 
 
 if __name__ == "__main__":
-    c = SimpleWebInterface("https://www.google.com/", extra_headers=[("Accept", "*/*")])
-    h, body = c.get_request("/")
-    print(body)
+    c = SimpleWebInterface("https://powerdroid.net", extra_headers=[("Accept", "*/*")])
+    resp = c.get_request("/index.html")
+    print(resp.status)
+    resp.raise_for_status()
+    print(resp.headers)
+    print(resp.body)
     c.close()

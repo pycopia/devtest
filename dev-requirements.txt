@@ -3,10 +3,14 @@ flake8
 mypy
 pytest
 pytest-runner
+rfc3986-stubs
 setuptools
 setuptools_scm
 sphinx
 sphinx-autodoc-annotation
 types-PyYAML
+types-pytz
+types-peewee
+types-psycopg2
 wheel
 yapf

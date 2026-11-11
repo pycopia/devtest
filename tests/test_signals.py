@@ -23,8 +23,11 @@ import threading
 
 import pytest
 
-from devtest import signals
 
+try:
+    from devtest import signals
+except ImportError:
+    signals = None
 
 def _signal_later(delay, sig):
 

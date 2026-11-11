@@ -1,3 +1,4 @@
+# noqa: ignore[E712]
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -109,13 +110,23 @@ class AccountIds(BaseModel):
         return f"AccountId: {self.identifier}"
 
     @classmethod
-    def create_or_get(cls, identifier=None, login=None, password=None, admin=True, note=None,
-                      private_key=None, public_key=None):
+    def create_or_get(cls,
+                      identifier=None,
+                      login=None,
+                      password=None,
+                      admin=True,
+                      note=None,
+                      private_key=None,
+                      public_key=None):
         try:
             assert database is not None
             with database.atomic():
-                return cls.create(identifier=identifier, login=login, password=password,
-                                  admin=admin, note=note, private_key=private_key,
+                return cls.create(identifier=identifier,
+                                  login=login,
+                                  password=password,
+                                  admin=admin,
+                                  note=note,
+                                  private_key=private_key,
                                   public_key=public_key), True
         except IntegrityError:
             return cls.get(cls.identifier == identifier), False
@@ -132,6 +143,7 @@ class EquipmentModel(BaseModel):
     picture = BlobField(null=True)
     specs = CharField(max_length=255, null=True)  # URL
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+
     # backrefs:
     # equipment: collection of Equipment
 
@@ -152,12 +164,21 @@ class EquipmentModel(BaseModel):
         return _attribute_del(self, attrname)
 
     @classmethod
-    def create_or_get(cls, name=None, manufacturer=None, note=None, picture=None, specs=None,
+    def create_or_get(cls,
+                      name=None,
+                      manufacturer=None,
+                      note=None,
+                      picture=None,
+                      specs=None,
                       attributes=None):
         try:
             with database.atomic():  # ty: ignore[unresolved-attribute]
-                return cls.create(name=name, manufacturer=manufacturer, note=note,
-                                  picture=picture, specs=specs, attributes=attributes), True
+                return cls.create(name=name,
+                                  manufacturer=manufacturer,
+                                  note=note,
+                                  picture=picture,
+                                  specs=specs,
+                                  attributes=attributes), True
         except IntegrityError:
             return (cls.get(cls.name == name, cls.manufacturer == manufacturer), False)
 
@@ -193,6 +214,7 @@ class Equipment(BaseModel):
     notes = TextField(null=True)
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
     active = BooleanField(default=True)
+
     # backrefs:
     # interfaces: collection of Interfaces
     # subcomponents: collection of other Equipment that are part of this Equipment
@@ -306,7 +328,10 @@ class Equipment(BaseModel):
             other = Equipment.select().where(Equipment.name == other).get()
         assert database is not None
         with database.atomic():
-            _Connection.create(source=self, destination=other, type=connection_type, source_port=port,
+            _Connection.create(source=self,
+                               destination=other,
+                               type=connection_type,
+                               source_port=port,
                                destination_port=destination_port)
 
     def remove_connection(self, other, connection_type=None, port=None):
@@ -322,8 +347,8 @@ class Equipment(BaseModel):
 
     def get_connected(self, connection_type):
         """Return equipment on other end of a connection."""
-        return [(conn.destination, conn.source_port) for conn in
-                self.connections.filter(type=connection_type).peek(n=100)]
+        return [(conn.destination, conn.source_port)
+                for conn in self.connections.filter(type=connection_type).peek(n=100)]
 
 
 class Function(BaseModel):
@@ -380,6 +405,7 @@ class Software(BaseModel):
                                  field='id',
                                  backref="implementations")
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+
     # backrefs:
     # variants: collection of Software variants
 
@@ -436,6 +462,7 @@ class TestBed(BaseModel):
     name = CharField(max_length=255, unique=True)
     notes = TextField(null=True)
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+
     # backrefs:
     # testequipment: collection of Equipment in the test bed.
 
@@ -526,19 +553,17 @@ class TestBed(BaseModel):
             te.delete_instance()
 
     def get_testequipment(self):
-        q = (_Testequipment.select(_Testequipment, Equipment, Function, TestBed)
-             .join_from(_Testequipment, Equipment)
-             .join_from(_Testequipment, Function)
-             .join_from(_Testequipment, TestBed)
-             .where(_Testequipment.testbed == self))
+        q = (_Testequipment.select(_Testequipment, Equipment, Function, TestBed).join_from(
+            _Testequipment,
+            Equipment).join_from(_Testequipment,
+                                 Function).join_from(_Testequipment,
+                                                     TestBed).where(_Testequipment.testbed == self))
         return q.peek(n=100)
 
     def get_equipment(self):
-        q = (Equipment.select(Equipment, Function.name.alias("role"), Function.implementation)
-             .join(_Testequipment)
-             .join(Function)
-             .switch(_Testequipment)
-             .where(_Testequipment.testbed == self)).objects()
+        q = (Equipment.select(Equipment, Function.name.alias("role"),
+                              Function.implementation).join(_Testequipment).join(Function).switch(
+                                  _Testequipment).where(_Testequipment.testbed == self)).objects()
         return q.peek(n=100)
 
     def get_all_equipment_with_role(self, rolename):
@@ -586,7 +611,8 @@ class _Testequipment(BaseModel):
         indexes = ((("testbed", "equipment", "function"), True),)
 
     def __str__(self):
-        return f"Equipment {self.equipment.name!r} in TestBed {self.testbed.name!r} as role {self.function.name!r}"
+        role = f"as role {self.function.name!r}" if self.function else ""
+        return (f"Equipment {self.equipment.name!r} in TestBed {self.testbed.name!r} {role}")
 
     @classmethod
     def create_or_get(cls, testbed=None, equipment=None, function=None):
@@ -644,7 +670,8 @@ class _Connection(BaseModel):
         table_name = 'connections'
 
     def __str__(self):
-        return f"{self.source.name} <-({self.type.name}:{self.source_port})-> {self.destination.name}"
+        return (f"{self.source.name} <-({self.type.name}:{self.source_port})-> "
+                f"{self.destination.name}")
 
 
 class Networks(BaseModel):
@@ -665,6 +692,7 @@ class Networks(BaseModel):
     notes = TextField(null=True)
     # User defined attributes.
     attributes = BinaryJSONField(dumps=json.dumps, default=None, null=True)
+
     # backrefs:
     # interfaces: collection of connected Interfaces
     # upper: Upper layer network of this network
@@ -723,6 +751,7 @@ class Interfaces(BaseModel):
                               backref="interfaces",
                               on_update="CASCADE",
                               on_delete="SET NULL")
+
     # backrefs:
     # subinterface: lower layer (child) network interface.
 
@@ -745,6 +774,7 @@ class TestSuites(BaseModel):
     test_cases = ArrayField(null=True)  # Ordered array of TestCase.id values.
     owners = ArrayField(null=True)  # Array of user IDs
     valid = BooleanField(default=True)
+
     # backrefs:
     # scenarios: collection of Scenarios that this suite is a part of.
     # testresults: collection of TestResults for this suite.
@@ -805,6 +835,7 @@ class TestCases(BaseModel):
     related_issues = ArrayField(null=True)  # list of bug IDs
     time_estimate = IntervalField(null=True)
     valid = BooleanField(default=True)
+
     # backrefs:
     # testresults: collection of Test run results for this test case.
 
@@ -907,6 +938,7 @@ class TestResults(BaseModel):
                                 field='id',
                                 backref="testresults")
     testbed = ForeignKeyField(column_name='testbed_id', null=True, model=TestBed, field='id')
+
     # backrefs:
     # subresults: collection of child test rusults from a run.
 
@@ -928,8 +960,7 @@ class TestResults(BaseModel):
     def get_latest_run(cls):
         """Get most recent run record."""
         r = cls.select().where((cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
-            (cls.resulttype == constants.TestResultType.TestRunSummary) &
-            (cls.valid == True))) &
+            (cls.resulttype == constants.TestResultType.TestRunSummary) & (cls.valid == True))) &
                                (cls.resulttype == constants.TestResultType.TestRunSummary)).get()
         return r
 
@@ -962,9 +993,8 @@ class TestResults(BaseModel):
         """Get results for a test case, optionally filtered by testbed or dutbuild, or both."""
         # simple case, use direct query if no testbed specified.
         if testbed is None and dutbuild is None:
-            return cls.select().where(
-                (cls.testcase == testcase) & (cls.valid == True)).order_by(
-                    cls.starttime).limit(limit).offset(offset).execute()
+            return cls.select().where((cls.testcase == testcase) & (cls.valid == True)).order_by(
+                cls.starttime).limit(limit).offset(offset).execute()
         else:  # Also filter by testbed and/or dutbuild, which is in root record.
             # Need recursive common table expression to get testbed from root record.
             Root = cls.alias("tr_root")
@@ -980,32 +1010,31 @@ class TestResults(BaseModel):
                                               RTerm).where(RTerm.parent_id == root_query.c.id))
             cte = root_query.union_all(recursive)
             q = cls._get_modelselect(root_query)
-            q = (
-                q.from_(cte).with_cte(cte).where(
-                    (cte.c.testcase_id == testcase) & (cte.c.valid == True))
-                .order_by(cte.c.starttime))
+            q = (q.from_(cte).with_cte(cte).where((cte.c.testcase_id == testcase) &
+                                                  (cte.c.valid == True)).order_by(cte.c.starttime))
             return q.execute()
 
     @classmethod
     def get_runs(cls, limit=20, offset=0):
         """Get run results with paging."""
         return cls.select().where((cls.resulttype == constants.TestResultType.TestRunSummary) &
-                                  (cls.valid == True)).order_by(cls.starttime.desc()).limit(
-                                      limit).offset(offset).execute()
+                                  (cls.valid == True)).order_by(
+                                      cls.starttime.desc()).limit(limit).offset(offset).execute()
 
     @classmethod
     def get_testcase_data(cls, testcase, limit=100):
         """Return only the data associated with a test case."""
-        return cls.select(cls.data).where((cls.resulttype == constants.TestResultType.Test) &
-                                          (cls.testcase == testcase) & (cls.valid == True)
-                                          ).order_by(cls.starttime).limit(limit).execute()
+        return cls.select(
+            cls.data).where((cls.resulttype == constants.TestResultType.Test) &
+                            (cls.testcase == testcase) & (cls.valid == True)).order_by(
+                                cls.starttime).limit(limit).execute()
 
     @classmethod
     def get_latest_for_testcase(cls, testcase):
         """Get latest valid result for a test case."""
-        r = cls.select().where(cls.starttime == cls.select(fn.MAX(cls.starttime)).where(
-            (cls.resulttype == constants.TestResultType.Test) & (cls.valid == True) &
-            (cls.testcase == testcase))).get()
+        r = cls.select().where(cls.starttime == cls.select(fn.MAX(
+            cls.starttime)).where((cls.resulttype == constants.TestResultType.Test) &
+                                  (cls.valid == True) & (cls.testcase == testcase))).get()
         return r
 
     @classmethod
@@ -1020,7 +1049,8 @@ class TestResults(BaseModel):
                 "rnk")).where((TRAlias.testcase == testcase) &
                               (TRAlias.resulttype == constants.TestResultType.Test) &
                               (TRAlias.valid == True)).alias("tcq"))
-        q = cls.select(SQL("*")).from_(tcq).where((tcq.c.rnk <= number)).order_by(tcq.c.starttime)  # noqa: UP034
+        q = cls.select(SQL("*")).from_(tcq).where(
+            (tcq.c.rnk <= number)).order_by(tcq.c.starttime)  # noqa: UP034
         return q.execute()
 
     @classmethod
@@ -1028,8 +1058,7 @@ class TestResults(BaseModel):
         """Get latest run result for a testbed."""
         r = cls.select().where(cls.starttime == cls.select(fn.MAX(
             cls.starttime)).where((cls.resulttype == constants.TestResultType.TestRunSummary) &
-                                  (cls.valid == True) &
-                                  (cls.testbed == testbed))).get()
+                                  (cls.valid == True) & (cls.testbed == testbed))).get()
         return r
 
     @classmethod
@@ -1045,7 +1074,8 @@ class TestResults(BaseModel):
         cte = tr_root.union_all(rterm)
         # Main query
         q = cls._get_modelselect(tr_root)
-        q = q.from_(cte).with_cte(cte).where(cte.c.valid == True).order_by(cte.c.starttime)
+        q = q.from_(cte).with_cte(cte).where(cte.c.valid == True).order_by(
+            cte.c.starttime)  # noqa: ignore[E712]
         return q.execute()
 
 

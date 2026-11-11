@@ -491,48 +491,6 @@ class EquipmentRuntime:
             except Exception as ex:  # noqa: BLE001
                 logging.exception_warning("initializer close", ex)
 
-    def get_console(self):
-        """Fetch any console controller.
-
-        A console is another kind of controller that provides console access to
-        a device, if it defines one. Usually a serial port.
-        """
-        if self._console is None:
-            console_config = self._attributes.get("console")
-            if console_config is None:
-                raise ConfigError("Equipment has no console config.")
-            signals.service_dontwant.send(self, service="seriallog")
-            self._console = _get_console(console_config,
-                                         login=self._attributes.get("login"),
-                                         password=self._attributes.get("password"))
-        return self._console
-
-    @property
-    def console(self):
-        """Console access to device.
-
-        Often a serial port or port concentrator.
-        """
-        try:
-            return self.get_console()
-        except:  # noqa
-            _, err, tb = sys.exc_info()
-            msg = "Console could not be created for {!r}".format(self._attributes["hostname"])
-            logging.exception_error(msg, err)
-            if self._debug:
-                debugger.post_mortem(tb)
-            del tb
-            raise ConfigError(msg) from err
-
-    @console.deleter
-    def console(self):
-        if self._console is not None:
-            cons = self._console
-            self._console = None
-            cons.close()
-            # Resume serial logging
-            signals.service_want.send(self, service="seriallog")
-
     @property
     def state(self):
         """User-defined state attribute."""
@@ -742,15 +700,9 @@ def _get_controller(equipmentrt, rolename):
     FM = models.Function
     impl = FM.select(FM.implementation).where(FM.name == rolename).scalar()
     if impl is None:
-        raise ConfigError(
-            f"No implementation for role {rolename!r} found in Function list.")
+        raise ConfigError(f"No implementation for role {rolename!r} found in Function list.")
     klass = importlib.get_callable(impl)
     return klass(equipmentrt)
-
-
-def _get_console(console_config, login=None, password=None):
-    from devtest.device import console  # ty: ignore[unresolved-import]
-    return console.get_console(console_config, account=login, password=password)
 
 
 def _get_software_instance(softwarert):
