@@ -14,7 +14,7 @@ flags:
 
 uiautomator:
     upstream:
-        runner: "com.github.uiautomator.test/android.support.test.runner.AndroidJUnitRunner"
+        runner: "com.github.uiautomator.test/androidx.test.runner.AndroidJUnitRunner"
         apks:
             - "apks/app-uiautomator.apk"
             - "apks/app-uiautomator-test.apk"

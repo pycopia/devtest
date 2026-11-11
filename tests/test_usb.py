@@ -86,7 +86,8 @@ def test_supports_detach_kernel_driver():
 def test_find_device():
     session = usb.UsbSession()
     if sys.platform == "darwin":  # TODO(dart) a better MacOS selector
-        dev = session.find(0x05AC, 0x0274)  # Apple keyboard and trackpad
+        # dev = session.find(0x05AC, 0x0274)  # Apple keyboard and trackpad
+        dev = session.find(0x413c, 0x301a)
         if dev is None:
             dev = session.find(0x2109, 0x0812)  # USB 3.0 Hub
     else:

@@ -44,7 +44,7 @@ SERVICES = {
     "sqlite": 0,
 }
 
-SERVICES_REVERSE = dict((v, k) for k, v in list(SERVICES.items()))
+SERVICES_REVERSE = {v: k for k, v in SERVICES.items()}
 
 # from rfc2396 appendix B:
 URI_RE_STRICT_PATTERN = r"^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
@@ -80,13 +80,13 @@ def uriparse(uri, strict=False):
         if mo:
             _, scheme, _, authority, path, _, query, _, fragment = mo.groups()
         else:
-            raise ValueError("Invalid URI: %r" % (uri,))
+            raise ValueError(f"Invalid URI: {uri!r}")
     else:
         mo = URI_RE.search(uri)
         if mo:
             _, scheme, authority, path, _, query, _, fragment = mo.groups()
         else:
-            raise ValueError("Invalid URI: %r" % (uri,))
+            raise ValueError(f"Invalid URI: {uri!r}")
     if query:
         q = queryparse(query)
     else:
@@ -107,10 +107,10 @@ def urimatch(uri, strict=False):
 def serverparse(server):
     """serverparse(serverpart)
     Parses a server part and returns a 4-tuple (user, password, host, port). """
-    user = password = host = port = None
+    user = password = port = None
     server = server.split("@", 1)
     if len(server) == 2:
-        userinfo, hostport = server
+        userinfo, _ = server
         userinfo = userinfo.split(":", 1)
         if len(userinfo) == 2:
             user, password = userinfo
@@ -158,10 +158,10 @@ class URLQuery(dict):
         dict.__init__(self, init)
 
     def __str__(self):
-        return urlencode(self, 1)
+        return urlencode(self, True)
 
     def __repr__(self):
-        return "%s(%r)" % (self.__class__.__name__, list(self.items()))
+        return f"{self.__class__.__name__}({list(self.items())!r})"
 
     # This setitem enforces the "contract" that values are strings or list
     # of strings.
@@ -210,10 +210,10 @@ class URLQuery(dict):
         else:
             return [val]
 
-    def update(self, other):
+    def update(self, other=(), **kwargs):
         if isinstance(other, str):
             other = queryparse(other)
-        dict.update(self, other)
+        dict.update(self, other, **kwargs)
 
     # semi-deep copy since the values here will only be strings, or a list
     # of strings (only). A complete deepcopy implementation is not
@@ -271,7 +271,7 @@ class UniversalResourceLocator:
         elif isinstance(url, self.__class__):
             self._set_from_instance(url)
         else:
-            raise ValueError("Invalid initializer: %r" % (url,))
+            raise TypeError(f"Invalid initializer: {url!r}")
 
     def _parse(self, url, strict):
         self._scheme, netloc, self._path, self._query, self._fragment = uriparse(url, strict)
@@ -288,7 +288,7 @@ class UniversalResourceLocator:
         self._badurl = True
 
     def __repr__(self):
-        return "%s(%r, %r)" % (self.__class__.__name__, self.__str__(), self._strict)
+        return f"{self.__class__.__name__}({self.__str__()!r}, {self._strict!r})"
 
     def __str__(self):
         if not self._badurl:
@@ -300,7 +300,7 @@ class UniversalResourceLocator:
             s.append(self._host)
             if self._user:
                 if self._password:
-                    s.insert(2, "%s:%s" % (self._user, self._password))
+                    s.insert(2, f"{self._user}:{self._password}")
                 else:
                     s.insert(2, self._user)
                 s.insert(3, "@")

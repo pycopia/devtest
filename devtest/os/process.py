@@ -813,17 +813,17 @@ if __name__ == "__main__":
     assert resp == b"echo me"
     proc.close()
 
-    coprocess = run("ls /bin", capture_output=True)
+    coprocess = run("ls /usr/bin", capture_output=True)
     print(coprocess)
 
-    coprocess = run("/bin/true")
+    coprocess = run("/usr/bin/true")
     print(coprocess)
 
-    coprocess = run("/bin/false")
+    coprocess = run("/usr/bin/false")
     print(coprocess)
 
     try:
-        coprocess = run("/bin/false", check=True)
+        coprocess = run("/usr/bin/false", check=True)
     except CalledProcessError:
         print("Got CalledProcessError as expected")
     else:

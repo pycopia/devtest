@@ -33,7 +33,7 @@ cdef extern from "signal.h" nogil:
 
     enum:SIGEV_SIGNAL
 
-cdef extern from "time.h" nogil:
+cdef extern from "sys/time.h" nogil:
 
     cdef struct timeval:
        long int tv_sec
@@ -195,7 +195,7 @@ IF UNAME_SYSNAME == "Linux":
         def __dealloc__(self):
             self.close()
 
-        def __nonzero__(self):
+        def __bool__(self):
             cdef itimerspec ts
             if self._fd == -1:
                 return False
