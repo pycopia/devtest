@@ -1,3 +1,4 @@
+allure-python-commons
 blinker
 cryptography
 git+https://github.com/dabeaz/curio.git#egg=curio

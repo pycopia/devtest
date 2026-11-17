@@ -1057,7 +1057,7 @@ class TestSuite:
                         test_diagnostic.send(tc, message="Prerequisite: {}".format(prereq))  # noqa
                         test_incomplete.send(tc, message="Prerequisite did not pass.")  # noqa
                         test_end.send(tc, time=datetime.now(timezone.utc))
-                        currententry.result = TestResult.INCOMPLETE
+                        currententry.result = TestResult.SKIPPED
                         return False
         return True  # No prerequisite, or prereq did pass.
 
